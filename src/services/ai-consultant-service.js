@@ -42,7 +42,8 @@ export class AiConsultantService {
 
     return {
       insights: data.insights,
-      usage: data.usage || null
+      usage: data.usage || null,
+      storedInsight: data.storedInsight || null
     };
   }
 

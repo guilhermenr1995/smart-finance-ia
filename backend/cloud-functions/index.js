@@ -151,6 +151,35 @@ function safeParseJson(rawText) {
   }
 }
 
+function toSafeKey(value) {
+  return String(value || '')
+    .trim()
+    .replace(/=+$/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+function buildInsightKeyFromFilters(filters = {}) {
+  const payload = JSON.stringify({
+    startDate: filters.startDate || '',
+    endDate: filters.endDate || '',
+    accountType: filters.accountType || 'all',
+    category: filters.category || 'all'
+  });
+
+  return toSafeKey(Buffer.from(payload, 'utf8').toString('base64'));
+}
+
+function resolveInsightKey(rawKey, filters) {
+  const safeRawKey = toSafeKey(rawKey);
+  if (safeRawKey.length >= 12) {
+    return safeRawKey;
+  }
+
+  return buildInsightKeyFromFilters(filters);
+}
+
 function getDateKeyInTimezone() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: APP_TIMEZONE,
@@ -383,6 +412,7 @@ exports.analyzeSpendingInsights = onRequest(
       const previousPeriod = request.body?.previousPeriod;
       const filters = request.body?.filters || {};
       const appId = request.body?.appId || null;
+      const insightKey = resolveInsightKey(request.body?.insightKey, filters);
 
       if (!currentPeriod || typeof currentPeriod !== 'object') {
         response.status(400).json({ error: 'currentPeriod is required' });
@@ -394,22 +424,13 @@ exports.analyzeSpendingInsights = onRequest(
         return;
       }
 
-      let usage;
-      try {
-        usage = await reserveConsultantUsage(decodedToken.uid, appId);
-      } catch (error) {
-        if (error?.code === 'DAILY_LIMIT_REACHED') {
-          response.status(429).json({
-            error: 'Daily limit reached for AI consultant',
-            message: 'Você já usou o Consultor IA 3 vezes hoje. Tente novamente amanhã.',
-            dailyLimitReached: true,
-            usage: error.usage
-          });
-          return;
-        }
-
-        throw error;
-      }
+      // Daily usage validation is temporarily disabled.
+      const usage = {
+        limit: CONSULTANT_DAILY_LIMIT,
+        used: 0,
+        remaining: CONSULTANT_DAILY_LIMIT,
+        dateKey: getDateKeyInTimezone()
+      };
 
       const geminiApiKey = process.env.GEMINI_API_KEY;
       const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -446,9 +467,40 @@ exports.analyzeSpendingInsights = onRequest(
         return;
       }
 
+      const generatedAt = new Date().toISOString();
+      const storedInsight = {
+        key: insightKey,
+        filters: {
+          startDate: filters.startDate || '',
+          endDate: filters.endDate || '',
+          accountType: filters.accountType || 'all',
+          category: filters.category || 'all'
+        },
+        currentPeriod: {
+          startDate: currentPeriod.startDate || '',
+          endDate: currentPeriod.endDate || ''
+        },
+        previousPeriod: {
+          startDate: previousPeriod.startDate || '',
+          endDate: previousPeriod.endDate || ''
+        },
+        insights: result.data,
+        model: result.model || geminiModel,
+        generatedAt,
+        updatedAt: generatedAt
+      };
+
+      if (appId) {
+        await db
+          .collection(`artifacts/${appId}/users/${decodedToken.uid}/consultor_insights`)
+          .doc(insightKey)
+          .set(storedInsight, { merge: true });
+      }
+
       response.status(200).json({
         insights: result.data,
-        usage
+        usage,
+        storedInsight
       });
     } catch (error) {
       response.status(500).json({

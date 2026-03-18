@@ -25,24 +25,24 @@
       <div class="auth-shell w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6">
         <aside class="auth-hero neo-brutalism p-8 lg:p-10">
           <p class="auth-chip">Smart Finance IA</p>
-          <h1 class="auth-title mt-6">Seu dinheiro organizado em minutos.</h1>
+          <h1 class="auth-title mt-6">Controle financeiro simples, sem planilhas complicadas.</h1>
           <p class="auth-subtitle mt-4">
-            Importe a planilha do banco ou do cartão, clique em um botão e veja seus gastos organizados por categoria.
-            Simples, rápido e sem complicação.
+            Importe seu extrato em CSV ou OFX, clique para categorizar e veja para onde seu dinheiro está indo.
+            Sem termos técnicos, sem trabalho manual.
           </p>
 
           <div class="auth-points mt-8 space-y-3">
             <div class="auth-point neo-brutalism">
-              <span>1. Importe a planilha</span>
-              <small>CSV de crédito e conta em poucos segundos</small>
+              <span>1. Envie seu extrato</span>
+              <small>Funciona com CSV e OFX de banco e cartão</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>2. Clique em categorizar</span>
-              <small>A IA sugere tudo e aprende com seu histórico</small>
+              <span>2. Clique para organizar</span>
+              <small>A IA classifica os gastos e aprende com suas escolhas</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>3. Entenda para onde vai seu dinheiro</span>
-              <small>Compare períodos e tome decisões com confiança</small>
+              <span>3. Tome decisões com confiança</span>
+              <small>Entenda excessos, compare períodos e economize com clareza</small>
             </div>
           </div>
         </aside>
@@ -50,7 +50,7 @@
         <div class="auth-card neo-brutalism p-8 lg:p-10">
           <div class="text-center">
             <h2 class="auth-form-title">Acesse sua conta</h2>
-            <p class="auth-form-subtitle mt-2">Entre e continue seu controle financeiro sem dor de cabeça.</p>
+            <p class="auth-form-subtitle mt-2">Entre para acompanhar seus gastos em poucos cliques.</p>
           </div>
 
           <form id="auth-form" class="space-y-5 mt-8">
@@ -105,88 +105,91 @@
         </header>
 
         <div class="space-y-4">
-          <div class="bg-white p-5 neo-brutalism flex flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[140px]">
-              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Início do Ciclo</label>
-              <input
-                type="date"
-                id="data-inicio"
-                class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
-              />
-            </div>
-            <div class="flex-1 min-w-[140px]">
-              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Fim do Ciclo</label>
-              <input
-                type="date"
-                id="data-fim"
-                class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
-              />
-            </div>
-            <div class="flex-1 min-w-[180px]">
-              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Categoria</label>
-              <select id="filter-category" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"></select>
-            </div>
-            <div class="flex gap-2 w-full sm:w-auto">
-              <button
-                id="filter-all"
-                class="filter-active px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
-              >
-                Tudo
-              </button>
-              <button
-                id="filter-credit"
-                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
-              >
-                Crédito
-              </button>
-              <button
-                id="filter-debit"
-                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
-              >
-                Conta
-              </button>
-            </div>
-            <div class="w-full grid grid-cols-1 md:grid-cols-[190px_1fr_auto] gap-3 pt-1">
-              <div>
-                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Buscar Por</label>
-                <select id="search-mode" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm">
-                  <option value="description">Descrição</option>
-                  <option value="value">Valor</option>
-                </select>
+          <div class="bg-white p-5 neo-brutalism space-y-5">
+            <div class="flex items-center justify-between gap-3 pb-2 border-b-2 border-black">
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-xs uppercase italic">Filtros e Busca</h3>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Defina período e tipo de conta para montar o recorte principal dos gráficos e totais."
+                  aria-label="Ajuda sobre filtros"
+                >
+                  ?
+                </button>
               </div>
-              <div>
-                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Busca Global</label>
+              <p class="text-[10px] font-black uppercase text-zinc-500">Atualize o recorte em tempo real</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div class="lg:col-span-4">
+                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Início do Ciclo</label>
                 <input
-                  id="search-term"
-                  type="text"
-                  placeholder="Busca em toda base do cliente"
+                  type="date"
+                  id="data-inicio"
                   class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
                 />
               </div>
-              <button
-                id="btn-clear-search"
-                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white h-fit"
-              >
-                Limpar
-              </button>
+              <div class="lg:col-span-4">
+                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Fim do Ciclo</label>
+                <input
+                  type="date"
+                  id="data-fim"
+                  class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+                />
+              </div>
+              <div class="lg:col-span-4">
+                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Tipo de Conta</label>
+                <div class="grid grid-cols-3 gap-2">
+                  <button
+                    id="filter-all"
+                    class="filter-active px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
+                  >
+                    Tudo
+                  </button>
+                  <button
+                    id="filter-credit"
+                    class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
+                  >
+                    Crédito
+                  </button>
+                  <button
+                    id="filter-debit"
+                    class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
+                  >
+                    Conta
+                  </button>
+                </div>
+              </div>
             </div>
+
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-5 neo-brutalism flex flex-col gap-3">
-              <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Dados</span>
+              <div class="flex items-center gap-2">
+                <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Dados</span>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Use arquivos CSV ou OFX. O app ignora duplicados e já tenta reaproveitar categorias anteriores."
+                  aria-label="Ajuda sobre importação"
+                >
+                  ?
+                </button>
+              </div>
               <div class="flex gap-3">
                 <label
                   class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
                 >
-                  💳 Crédito
-                  <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" />
+                  💳 Crédito (CSV/OFX)
+                  <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
                 </label>
                 <label
                   class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
                 >
-                  🏦 Conta
-                  <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" />
+                  🏦 Conta (CSV/OFX)
+                  <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
                 </label>
               </div>
             </div>
@@ -197,25 +200,50 @@
               <span class="font-black text-xs uppercase tracking-widest">Categorizar Ciclo com IA</span>
               <p id="label-ia-count" class="text-[8px] uppercase font-bold opacity-70 mt-1">0 Pendentes</p>
             </button>
-            <button
-              id="btn-ai-consultant"
-              class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
-            >
-              <span class="font-black text-xs uppercase tracking-widest">Consultor IA</span>
-              <p id="label-ai-consultant-usage" class="text-[8px] uppercase font-bold opacity-70 mt-1">3 usos disponíveis hoje</p>
-            </button>
           </div>
 
-          <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
+          <section class="bg-white p-5 neo-brutalism space-y-4">
             <div class="flex items-center justify-between border-b-2 border-black pb-2">
-              <h3 class="font-black text-xs uppercase italic">Consultor IA - Insights de Gastos</h3>
-              <span id="ai-consultant-status" class="text-[9px] font-black uppercase text-zinc-500">Aguardando análise</span>
+              <h3 class="font-black text-xs uppercase italic">Guia Rápido de Importação</h3>
+              <button
+                type="button"
+                class="help-tooltip"
+                data-tooltip="Os caminhos podem mudar por atualização do app do banco. Procure por termos como: Extrato, Exportar, OFX ou CSV."
+                aria-label="Ajuda sobre guia de importação"
+              >
+                ?
+              </button>
             </div>
-            <p id="ai-consultant-placeholder" class="text-[11px] font-bold text-zinc-600">
-              Clique em <strong>Consultor IA</strong> para comparar o período filtrado com o período anterior e receber recomendações práticas.
+            <p class="text-[11px] font-bold text-zinc-600">
+              Exemplos práticos para quem nunca exportou extrato. O caminho exato pode variar por versão do aplicativo.
             </p>
-            <div id="ai-consultant-content" class="hidden space-y-4"></div>
-          </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              <details class="tutorial-card">
+                <summary>Nubank</summary>
+                <p>No app, acesse Conta ou Cartão, abra Extrato e procure Exportar/Compartilhar. Geralmente há opção OFX para conta e CSV para fatura.</p>
+              </details>
+              <details class="tutorial-card">
+                <summary>Itaú</summary>
+                <p>No Internet Banking, vá em Conta Corrente, Extrato e opção Exportar. Normalmente disponibiliza OFX e, em alguns casos, CSV.</p>
+              </details>
+              <details class="tutorial-card">
+                <summary>Bradesco</summary>
+                <p>No Internet Banking, abra Extrato por período e use Exportar. OFX costuma aparecer como padrão para integração financeira.</p>
+              </details>
+              <details class="tutorial-card">
+                <summary>Santander</summary>
+                <p>Em Conta Corrente, consulte o extrato e busque Exportar. Algumas contas oferecem OFX e CSV no menu de download.</p>
+              </details>
+              <details class="tutorial-card">
+                <summary>Banco do Brasil</summary>
+                <p>No menu de Extratos, selecione o período e procure Download/Exportação. OFX é comum para conta corrente.</p>
+              </details>
+              <details class="tutorial-card">
+                <summary>Caixa e Inter</summary>
+                <p>No app/web, procure por Extrato detalhado e função de compartilhamento/arquivo. Quando CSV não existir, priorize OFX.</p>
+              </details>
+            </div>
+          </section>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -245,26 +273,109 @@
             <div id="stats-list" class="space-y-5"></div>
           </div>
 
+          <div class="md:col-span-4 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
+            <button
+              id="btn-ai-consultant"
+              class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+            >
+              <span class="font-black text-xs uppercase tracking-widest">Consultor IA</span>
+              <p id="label-ai-consultant-usage" class="text-[8px] uppercase font-bold opacity-70 mt-1">3 usos disponíveis hoje</p>
+            </button>
+
+            <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
+              <div class="flex items-center justify-between border-b-2 border-black pb-2">
+                <h3 class="font-black text-xs uppercase italic">Consultor IA - Insights de Gastos</h3>
+                <span id="ai-consultant-status" class="text-[9px] font-black uppercase text-zinc-500">Aguardando análise</span>
+              </div>
+              <p id="ai-consultant-placeholder" class="text-[11px] font-bold text-zinc-600">
+                Clique em <strong>Consultor IA</strong> para comparar o período filtrado com o período anterior e receber recomendações práticas.
+              </p>
+              <div id="ai-consultant-content" class="hidden space-y-4"></div>
+            </div>
+          </div>
+
           <div class="md:col-span-4 bg-white p-4 neo-brutalism">
             <div class="flex justify-between items-center px-2 py-3 border-b-2 border-black mb-4">
-              <h3 class="font-black text-xs uppercase italic">Lançamentos Detalhados</h3>
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-xs uppercase italic">Lançamentos Detalhados</h3>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Você pode editar categoria por item, ignorar lançamento e usar a busca por descrição, valor ou categoria."
+                  aria-label="Ajuda sobre lançamentos"
+                >
+                  ?
+                </button>
+              </div>
               <span id="contador-itens" class="text-[9px] font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-xs font-bold border-separate border-spacing-y-2">
-                <thead class="text-[10px] text-zinc-400 uppercase">
-                  <tr>
-                    <th class="text-left px-3 py-2">Data</th>
-                    <th class="text-left px-3 py-2">Tipo</th>
-                    <th class="text-center px-1 py-2">Uso</th>
-                    <th class="text-left px-3 py-2">Descrição</th>
-                    <th class="text-left px-3 py-2">Categoria</th>
-                    <th class="text-right px-3 py-2">Valor</th>
-                  </tr>
-                </thead>
-                <tbody id="tabela-corpo"></tbody>
-              </table>
+
+            <div class="mb-4 border-2 border-black bg-zinc-50 p-3">
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                <div class="lg:col-span-3">
+                  <div class="flex items-center gap-2 mb-2">
+                    <label class="block text-[10px] font-black uppercase text-zinc-500 italic">Buscar Por</label>
+                    <button
+                      type="button"
+                      class="help-tooltip"
+                      data-tooltip="Descrição: texto do lançamento. Valor: número exato. Categoria: nome da categoria aplicada."
+                      aria-label="Ajuda sobre modo de busca"
+                    >
+                      ?
+                    </button>
+                  </div>
+                  <select
+                    id="search-mode"
+                    class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+                  >
+                    <option value="description">Descrição</option>
+                    <option value="value">Valor</option>
+                    <option value="category">Categoria</option>
+                  </select>
+                </div>
+                <div class="lg:col-span-7">
+                  <label class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Busca nos Lançamentos</label>
+                  <input
+                    id="search-term"
+                    type="text"
+                    placeholder="Digite descrição ou valor para localizar transações"
+                    class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+                  />
+                </div>
+                <div class="lg:col-span-2">
+                  <button
+                    id="btn-clear-search"
+                    class="w-full px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white h-fit"
+                  >
+                    Limpar busca
+                  </button>
+                </div>
+              </div>
+              <label class="mt-3 inline-flex items-center gap-2 text-[10px] font-black uppercase text-zinc-600 cursor-pointer">
+                <input id="search-use-global-base" type="checkbox" class="w-4 h-4 accent-black" />
+                Buscar em toda a base do cliente (ignora período superior)
+              </label>
             </div>
+
+            <div id="search-summary-panel" class="hidden mb-4 bg-zinc-900 text-white border-2 border-black p-4">
+              <p id="search-summary-title" class="text-[10px] font-black uppercase tracking-wide text-yellow-300"></p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                <div>
+                  <p class="text-[9px] font-black uppercase opacity-70">Total Encontrado</p>
+                  <p id="search-summary-matched-value" class="text-lg font-black">R$ 0,00</p>
+                </div>
+                <div>
+                  <p id="search-summary-base-label" class="text-[9px] font-black uppercase opacity-70">Base Ativa</p>
+                  <p id="search-summary-base-value" class="text-lg font-black">R$ 0,00</p>
+                </div>
+                <div>
+                  <p class="text-[9px] font-black uppercase opacity-70">Representatividade</p>
+                  <p id="search-summary-share" class="text-lg font-black">0,00%</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="tabela-corpo" class="space-y-3"></div>
           </div>
         </div>
       </div>

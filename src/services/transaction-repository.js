@@ -12,6 +12,10 @@ export class TransactionRepository {
     return this.db.collection(`artifacts/${this.appId}/users/${userId}/categorias`);
   }
 
+  getConsultantInsightsCollection(userId) {
+    return this.db.collection(`artifacts/${this.appId}/users/${userId}/consultor_insights`);
+  }
+
   async fetchAll(userId) {
     const snapshot = await this.getCollection(userId).get();
     const transactions = [];
@@ -36,6 +40,25 @@ export class TransactionRepository {
     });
 
     return categories.sort((left, right) => left.localeCompare(right, 'pt-BR'));
+  }
+
+  async fetchConsultantInsights(userId) {
+    const snapshot = await this.getConsultantInsightsCollection(userId).get();
+    const insights = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (!data?.key || typeof data?.insights !== 'object') {
+        return;
+      }
+
+      insights.push({
+        ...data,
+        docId: doc.id
+      });
+    });
+
+    insights.sort((left, right) => String(right.generatedAt || '').localeCompare(String(left.generatedAt || '')));
+    return insights;
   }
 
   async bulkInsert(userId, transactions, options = {}) {

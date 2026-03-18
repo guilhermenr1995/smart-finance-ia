@@ -20,10 +20,11 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 - Logout.
 - Isolamento de dados por usuário autenticado.
 
-### 2) Importação de transações por CSV
+### 2) Importação de transações (CSV e OFX)
 
 - Importa CSV de cartão de crédito.
 - Importa CSV de conta corrente.
+- Importa OFX de conta/cartão (ex.: Nu, Itaú e outros bancos compatíveis).
 - Ignora entradas inválidas (pagamentos, estornos e receitas quando aplicável).
 - Evita duplicidade por hash (`date + title + value + accountType`).
 - Após importar, já tenta reaproveitar categoria com base no histórico do usuário.
@@ -53,6 +54,7 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 
 - Filtros por período, tipo de conta e categoria.
 - Busca global na base do usuário (por descrição ou valor).
+- Totalizador da busca: mostra valor encontrado e participação sobre a base ativa.
 - Mix de gastos com comparação:
   - barra amarela: período atual filtrado
   - barra cinza: mesmo range do período anterior
@@ -64,7 +66,8 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 - Botão dedicado de Consultor IA na dashboard.
 - Analisa período filtrado atual vs mesmo range anterior.
 - Retorna insights úteis: categorias que aumentaram, reduziram, ações críticas e cortes dispensáveis.
-- Limite de uso por usuário logado: **3 análises por dia** (validado no backend).
+- Salva automaticamente os insights por período/filtro no Firestore para reaproveitar sem nova consulta.
+- Limite diário por usuário já está preparado no backend e pode ser ativado quando necessário.
 
 ### 8) Cache e performance
 

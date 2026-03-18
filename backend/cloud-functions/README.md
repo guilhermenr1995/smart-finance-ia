@@ -16,14 +16,15 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 - Objetivo: gerar insights comparando período atual vs período anterior.
 - Entrada: snapshot agregado de gastos dos dois períodos.
 - Saída: resumo com aumentos, reduções e recomendações práticas.
-- Regra de uso: **máximo de 3 análises por dia por usuário autenticado**.
+- Regra de uso: limite diário previsto no backend (no momento, validação desativada temporariamente).
+- Persistência: salva insight por período/filtro em `artifacts/{appId}/users/{userId}/consultor_insights/{insightKey}`.
 
 ## Segurança aplicada
 
 - Firebase Auth obrigatório (header `Authorization: Bearer <id_token>`).
 - CORS controlado por `ALLOWED_ORIGINS` em `index.js`.
 - Chave Gemini fica no servidor (`.env`), não no frontend.
-- Limite diário do Consultor IA validado no backend (Firestore, transacional).
+- Estrutura de limite diário do Consultor IA pronta no backend (Firestore, transacional), com validação temporariamente desativada.
 
 ## Estrutura desta pasta
 
@@ -170,7 +171,7 @@ Resposta:
 
 - `401 Missing Authorization token`: token não enviado.
 - `401 Invalid or expired Authorization token`: token inválido/expirado.
-- `429 Daily limit reached for AI consultant`: limite diário do Consultor IA atingido.
+- `429 Daily limit reached for AI consultant`: pode ocorrer se a validação diária for reativada.
 - `500 Missing GEMINI_API_KEY environment variable`: `.env` ausente ou incompleto.
 - Erro de CORS: origem não está em `ALLOWED_ORIGINS`.
 - `404 model not found`: ajuste `GEMINI_MODEL` ou use `GEMINI_FALLBACK_MODELS` para fallback automático.

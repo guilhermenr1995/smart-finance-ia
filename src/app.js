@@ -17,7 +17,8 @@ import {
   TransactionQueryService,
   getInstallmentGroupKey,
   getInstallmentInfo,
-  matchesTransactionSearch
+  matchesTransactionSearch,
+  getTransactionTitleMatchKey
 } from './utils/transaction-utils.js';
 import { shiftInputDateByMonths } from './utils/date-utils.js';
 
@@ -111,9 +112,10 @@ class SmartFinanceApplication {
     if (!user) {
       this.state.setTransactions([]);
       this.state.setUserCategories([]);
-      this.state.updateSearch({ mode: 'description', term: '' });
+      this.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false });
       this.state.setAiConsultantReport(null);
       this.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
+      this.state.setAiConsultantHistory([]);
       this.refreshDashboard();
       return;
     }
@@ -122,6 +124,7 @@ class SmartFinanceApplication {
     if (cached.transactions.length > 0) {
       this.state.setTransactions(cached.transactions);
       this.state.setUserCategories(cached.categories || []);
+      this.state.setAiConsultantHistory(cached.consultantInsights || []);
       this.refreshDashboard();
     }
 
@@ -133,22 +136,36 @@ class SmartFinanceApplication {
     return this.queryService.getVisibleTransactions(this.state.transactions, this.state.getFilterBoundaries());
   }
 
-  getTableTransactions(visibleTransactions) {
+  getTableTransactions(sourceTransactions) {
     const term = this.state.search.term.trim();
     if (!term) {
-      return visibleTransactions;
+      return sourceTransactions;
     }
 
-    return this.state.transactions.filter((transaction) =>
+    return sourceTransactions.filter((transaction) =>
       matchesTransactionSearch(transaction, this.state.search.mode, term)
     );
   }
 
   refreshDashboard() {
     const visibleTransactions = this.getVisibleTransactions();
-    const tableTransactions = this.getTableTransactions(visibleTransactions);
+    const trimmedSearchTerm = this.state.search.term.trim();
+    const useGlobalBase = Boolean(this.state.search.useGlobalBase) && trimmedSearchTerm.length > 0;
+    const searchSourceTransactions = useGlobalBase ? this.state.transactions : visibleTransactions;
+    const tableTransactions = this.getTableTransactions(searchSourceTransactions);
     const summary = this.queryService.buildSummary(visibleTransactions);
     const pendingAiCount = this.queryService.getAiCandidates(visibleTransactions).length;
+    const activeInsight = this.state.getAiConsultantHistory(this.buildConsultantInsightKey(this.state.filters));
+    const activeTableTransactions = tableTransactions.filter((transaction) => transaction.active !== false);
+    const matchedTotal = activeTableTransactions.reduce((sum, transaction) => sum + Number(transaction.value || 0), 0);
+    const baseTotal = searchSourceTransactions.reduce((sum, transaction) => {
+      if (transaction.active === false) {
+        return sum;
+      }
+
+      return sum + Number(transaction.value || 0);
+    }, 0);
+    const percentageOfBase = baseTotal > 0 ? (matchedTotal / baseTotal) * 100 : 0;
 
     const previousStartDate = shiftInputDateByMonths(this.state.filters.startDate, -1);
     const previousEndDate = shiftInputDateByMonths(this.state.filters.endDate, -1);
@@ -168,9 +185,22 @@ class SmartFinanceApplication {
       summary,
       previousSummary,
       tableTransactions,
+      searchTotals: {
+        hasSearch: trimmedSearchTerm.length > 0,
+        mode: this.state.search.mode,
+        term: trimmedSearchTerm,
+        useGlobalBase,
+        matchedCount: tableTransactions.length,
+        matchedTotal,
+        baseTotal,
+        percentageOfBase
+      },
       pendingAiCount,
       categories: availableCategories,
-      aiConsultant: this.state.aiConsultant
+      aiConsultant: {
+        ...this.state.aiConsultant,
+        report: activeInsight?.insights || null
+      }
     });
   }
 
@@ -181,7 +211,8 @@ class SmartFinanceApplication {
 
     this.localCacheService.save(this.state.user.uid, {
       transactions: this.state.transactions,
-      categories: this.state.userCategories
+      categories: this.state.userCategories,
+      consultantInsights: Object.values(this.state.aiConsultant.historyByKey || {})
     });
   }
 
@@ -209,11 +240,20 @@ class SmartFinanceApplication {
     }
 
     try {
-      const [transactions, categories] = await Promise.all([
+      const consultantInsightsPromise = this.repository
+        .fetchConsultantInsights(this.state.user.uid)
+        .catch((error) => {
+          console.warn('Consultant insights sync skipped:', error);
+          return [];
+        });
+
+      const [transactions, categories, consultantInsights] = await Promise.all([
         this.repository.fetchAll(this.state.user.uid),
-        this.repository.fetchCategories(this.state.user.uid)
+        this.repository.fetchCategories(this.state.user.uid),
+        consultantInsightsPromise
       ]);
       this.state.setUserCategories(categories);
+      this.state.setAiConsultantHistory(consultantInsights);
       this.setTransactionsAndRefresh(transactions);
       if (showOverlay) {
         this.overlayView.hide();
@@ -293,9 +333,16 @@ class SmartFinanceApplication {
     this.overlayView.show(`Importando ${accountType}...`);
 
     try {
-      const csvText = await file.text();
+      await this.syncDataFromCloud({ force: false, showOverlay: false });
+
+      const fileContent = await file.text();
       const existingHashes = new Set(this.state.transactions.map((transaction) => transaction.hash));
-      const parseResult = this.csvImportService.parseContent(csvText, accountType, existingHashes);
+      const parseResult = this.csvImportService.parseFileContent(
+        file.name,
+        fileContent,
+        accountType,
+        existingHashes
+      );
 
       if (parseResult.transactions.length === 0) {
         this.overlayView.log('Nenhuma transação nova foi identificada.');
@@ -371,29 +418,42 @@ class SmartFinanceApplication {
       const updatesByDocId = new Map([[docId, normalizedCategory]]);
 
       if (targetTransaction) {
+        const targetTitleKey = getTransactionTitleMatchKey(targetTransaction.title);
         const targetGroupKey = getInstallmentGroupKey(targetTransaction.title);
         const targetInstallmentInfo = getInstallmentInfo(targetTransaction.title);
 
-        if (targetGroupKey && targetInstallmentInfo) {
-          this.state.transactions.forEach((transaction) => {
-            if (transaction.docId === docId || transaction.accountType !== targetTransaction.accountType) {
-              return;
-            }
+        this.state.transactions.forEach((transaction) => {
+          if (transaction.docId === docId) {
+            return;
+          }
 
-            const transactionGroupKey = getInstallmentGroupKey(transaction.title);
-            const transactionInstallmentInfo = getInstallmentInfo(transaction.title);
-            if (!transactionGroupKey || !transactionInstallmentInfo) {
-              return;
-            }
+          const isSameAccountType = transaction.accountType === targetTransaction.accountType;
+          const transactionGroupKey = getInstallmentGroupKey(transaction.title);
+          const transactionInstallmentInfo = getInstallmentInfo(transaction.title);
+          const isSameInstallmentSeries =
+            Boolean(targetGroupKey) &&
+            Boolean(targetInstallmentInfo) &&
+            isSameAccountType &&
+            Boolean(transactionGroupKey) &&
+            Boolean(transactionInstallmentInfo) &&
+            transactionGroupKey === targetGroupKey &&
+            transactionInstallmentInfo.total === targetInstallmentInfo.total;
 
-            const isSameInstallmentSeries =
-              transactionGroupKey === targetGroupKey && transactionInstallmentInfo.total === targetInstallmentInfo.total;
+          if (isSameInstallmentSeries) {
+            updatesByDocId.set(transaction.docId, normalizedCategory);
+            return;
+          }
 
-            if (isSameInstallmentSeries) {
-              updatesByDocId.set(transaction.docId, normalizedCategory);
-            }
-          });
-        }
+          if (transaction.category !== 'Outros') {
+            return;
+          }
+
+          const transactionTitleKey = getTransactionTitleMatchKey(transaction.title);
+          const isSameTitle = Boolean(targetTitleKey) && transactionTitleKey === targetTitleKey;
+          if (isSameTitle) {
+            updatesByDocId.set(transaction.docId, normalizedCategory);
+          }
+        });
       }
 
       const updates = [...updatesByDocId].map(([nextDocId, nextCategory]) => ({
@@ -554,6 +614,19 @@ class SmartFinanceApplication {
     };
   }
 
+  buildConsultantInsightKey(filters) {
+    const payload = JSON.stringify({
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      accountType: filters.accountType,
+      category: filters.category
+    });
+    return btoa(unescape(encodeURIComponent(payload)))
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+  }
+
   async runAiConsultant() {
     if (!this.state.user) {
       this.authView.showMessage('Faça login para usar o Consultor IA.', 'error');
@@ -578,8 +651,20 @@ class SmartFinanceApplication {
       return;
     }
 
+    const insightKey = this.buildConsultantInsightKey(this.state.filters);
+    const existingInsight = this.state.getAiConsultantHistory(insightKey);
+    if (existingInsight?.insights) {
+      this.state.setAiConsultantReport(existingInsight.insights);
+      this.refreshDashboard();
+      this.overlayView.show('Consultor IA: carregando insight salvo...');
+      this.overlayView.log('Insight encontrado na base para este período. Nenhuma nova consulta foi necessária.');
+      setTimeout(() => this.overlayView.hide(), 800);
+      return;
+    }
+
     const payload = {
       appId: this.config.appId,
+      insightKey,
       filters: {
         startDate: this.state.filters.startDate,
         endDate: this.state.filters.endDate,
@@ -601,7 +686,24 @@ class SmartFinanceApplication {
 
     try {
       const result = await this.aiConsultantService.analyzeSpending(payload);
-      this.state.setAiConsultantReport(result.insights);
+      const storedInsight = result.storedInsight || {
+        key: insightKey,
+        filters: payload.filters,
+        currentPeriod: {
+          startDate: payload.currentPeriod.startDate,
+          endDate: payload.currentPeriod.endDate
+        },
+        previousPeriod: {
+          startDate: payload.previousPeriod.startDate,
+          endDate: payload.previousPeriod.endDate
+        },
+        generatedAt: new Date().toISOString(),
+        insights: result.insights
+      };
+
+      this.state.setAiConsultantReport(storedInsight.insights);
+      this.state.upsertAiConsultantHistory(storedInsight);
+      this.persistTransactionsCache();
       if (result.usage) {
         this.state.setAiConsultantUsage(result.usage);
       }

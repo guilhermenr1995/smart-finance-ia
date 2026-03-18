@@ -56,5 +56,10 @@ service cloud.firestore {
       allow update: if isOwner(userId) && hasValidCategoryShape(request.resource.data);
       allow delete: if isOwner(userId);
     }
+
+    match /artifacts/{appId}/users/{userId}/consultor_insights/{insightId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
   }
 }

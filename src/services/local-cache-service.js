@@ -13,6 +13,7 @@ export class LocalCacheService {
       return {
         transactions: [],
         categories: [],
+        consultantInsights: [],
         lastSyncedAt: 0
       };
     }
@@ -23,6 +24,7 @@ export class LocalCacheService {
         return {
           transactions: [],
           categories: [],
+          consultantInsights: [],
           lastSyncedAt: 0
         };
       }
@@ -30,11 +32,13 @@ export class LocalCacheService {
       const parsed = JSON.parse(raw);
       const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
       const categories = Array.isArray(parsed?.categories) ? parsed.categories : [];
+      const consultantInsights = Array.isArray(parsed?.consultantInsights) ? parsed.consultantInsights : [];
       const lastSyncedAt = Number(parsed?.lastSyncedAt || 0);
 
       return {
         transactions,
         categories,
+        consultantInsights,
         lastSyncedAt
       };
     } catch (error) {
@@ -42,6 +46,7 @@ export class LocalCacheService {
       return {
         transactions: [],
         categories: [],
+        consultantInsights: [],
         lastSyncedAt: 0
       };
     }
@@ -54,10 +59,12 @@ export class LocalCacheService {
 
     const transactions = Array.isArray(data?.transactions) ? data.transactions : [];
     const categories = Array.isArray(data?.categories) ? data.categories : [];
+    const consultantInsights = Array.isArray(data?.consultantInsights) ? data.consultantInsights : [];
 
     const cachePayload = {
       transactions,
       categories,
+      consultantInsights,
       lastSyncedAt: Date.now()
     };
 

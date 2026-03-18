@@ -9,7 +9,8 @@ export class AppState {
     this.userCategories = [];
     this.search = {
       mode: 'description',
-      term: ''
+      term: '',
+      useGlobalBase: false
     };
     this.aiConsultant = {
       report: null,
@@ -18,7 +19,8 @@ export class AppState {
         used: 0,
         remaining: 3,
         dateKey: ''
-      }
+      },
+      historyByKey: {}
     };
     this.filters = {
       startDate: defaultRange.startDate,
@@ -63,6 +65,45 @@ export class AppState {
         ...(usage || {})
       }
     };
+  }
+
+  setAiConsultantHistory(records) {
+    const historyByKey = {};
+    (records || []).forEach((record) => {
+      if (!record?.key) {
+        return;
+      }
+
+      historyByKey[record.key] = record;
+    });
+
+    this.aiConsultant = {
+      ...this.aiConsultant,
+      historyByKey
+    };
+  }
+
+  upsertAiConsultantHistory(record) {
+    if (!record?.key) {
+      return;
+    }
+
+    this.aiConsultant = {
+      ...this.aiConsultant,
+      report: record.insights || this.aiConsultant.report,
+      historyByKey: {
+        ...(this.aiConsultant.historyByKey || {}),
+        [record.key]: record
+      }
+    };
+  }
+
+  getAiConsultantHistory(key) {
+    if (!key) {
+      return null;
+    }
+
+    return this.aiConsultant.historyByKey?.[key] || null;
   }
 
   updateFilters(partialFilters) {

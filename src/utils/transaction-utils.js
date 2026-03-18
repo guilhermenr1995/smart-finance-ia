@@ -52,6 +52,13 @@ export function matchesTransactionSearch(transaction, mode, term) {
     return Math.abs(Number(transaction.value || 0) - expectedValue) <= 0.01;
   }
 
+  if (mode === 'category') {
+    const normalizedTerm = normalizeTitleForMatching(searchTerm);
+    const normalizedCategory = normalizeTitleForMatching(transaction.category || '');
+    const normalizedDisplayCategory = normalizeTitleForMatching(getDisplayCategory(transaction) || '');
+    return normalizedCategory.includes(normalizedTerm) || normalizedDisplayCategory.includes(normalizedTerm);
+  }
+
   const normalizedTerm = normalizeTitleForMatching(searchTerm);
   const normalizedTitle = normalizeTitleForMatching(transaction.title);
   return normalizedTitle.includes(normalizedTerm);
@@ -61,17 +68,26 @@ export function isTransferTransactionTitle(title) {
   return normalizeTitleForMatching(title).startsWith('TRANSFERENCIA');
 }
 
+export function getTransactionTitleMatchKey(title) {
+  return normalizeTitleForMatching(title)
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function generateTransactionHash({ date, title, value, accountType }) {
   const payload = `${date}_${title}_${Number(value).toFixed(2)}_${accountType}`;
   return btoa(unescape(encodeURIComponent(payload)));
 }
 
 export function isIncomeOrIgnoredStatement(value, title) {
-  return value >= 0 || /PAGAMENTO|RECEBIDO|DEPOSITO|DEPÓSITO|ESTORNO|CREDITO|CRÉDITO/i.test(title);
+  const normalizedTitle = normalizeTitleForMatching(title);
+  return value >= 0 || /\b(PAGAMENTO|RECEBIDO|DEPOSITO|ESTORNO|CREDITO)\b/.test(normalizedTitle);
 }
 
 export function isIgnoredCreditEntry(value, title) {
-  return value <= 0 || /PAGAMENTO|ESTORNO/i.test(title);
+  const normalizedTitle = normalizeTitleForMatching(title);
+  return value <= 0 || /\b(PAGAMENTO|ESTORNO)\b/.test(normalizedTitle);
 }
 
 export function detectBaseCategory(title) {

@@ -19,6 +19,7 @@ export class DashboardView {
     this.searchModeSelect = document.getElementById('search-mode');
     this.searchTermInput = document.getElementById('search-term');
     this.clearSearchButton = document.getElementById('btn-clear-search');
+    this.searchUseGlobalBaseCheckbox = document.getElementById('search-use-global-base');
 
     this.accountFilterButtons = {
       all: document.getElementById('filter-all'),
@@ -43,6 +44,12 @@ export class DashboardView {
     this.statsList = document.getElementById('stats-list');
     this.itemsCounter = document.getElementById('contador-itens');
     this.tableBody = document.getElementById('tabela-corpo');
+    this.searchSummaryPanel = document.getElementById('search-summary-panel');
+    this.searchSummaryTitle = document.getElementById('search-summary-title');
+    this.searchSummaryBaseLabel = document.getElementById('search-summary-base-label');
+    this.searchSummaryMatchedValue = document.getElementById('search-summary-matched-value');
+    this.searchSummaryBaseValue = document.getElementById('search-summary-base-value');
+    this.searchSummaryShare = document.getElementById('search-summary-share');
     this.aiPendingLabel = document.getElementById('label-ia-count');
 
     this.categoryPickerModal = document.getElementById('category-picker-modal');
@@ -61,6 +68,10 @@ export class DashboardView {
   }
 
   initCategoryFilter() {
+    if (!this.categoryFilterSelect) {
+      return;
+    }
+
     this.categoryFilterSelect.innerHTML = [
       '<option value="all">Todas as categorias</option>',
       ...this.availableCategories.map(
@@ -81,10 +92,15 @@ export class DashboardView {
   setInitialFilters(filters, search = {}) {
     this.startDateInput.value = filters.startDate;
     this.endDateInput.value = filters.endDate;
-    this.categoryFilterSelect.value = filters.category;
+    if (this.categoryFilterSelect) {
+      this.categoryFilterSelect.value = filters.category;
+    }
     this.setAccountFilterButton(filters.accountType);
     this.searchModeSelect.value = search.mode || 'description';
     this.searchTermInput.value = search.term || '';
+    if (this.searchUseGlobalBaseCheckbox) {
+      this.searchUseGlobalBaseCheckbox.checked = Boolean(search.useGlobalBase);
+    }
     this.clearSearchButton.disabled = !this.searchTermInput.value.trim();
   }
 
@@ -99,9 +115,11 @@ export class DashboardView {
       handlers.onFiltersChange({ endDate: this.endDateInput.value });
     });
 
-    this.categoryFilterSelect.addEventListener('change', () => {
-      handlers.onFiltersChange({ category: this.categoryFilterSelect.value });
-    });
+    if (this.categoryFilterSelect) {
+      this.categoryFilterSelect.addEventListener('change', () => {
+        handlers.onFiltersChange({ category: this.categoryFilterSelect.value });
+      });
+    }
 
     this.searchModeSelect.addEventListener('change', () => {
       handlers.onSearchChange({
@@ -112,6 +130,12 @@ export class DashboardView {
     this.searchTermInput.addEventListener('input', () => {
       handlers.onSearchChange({
         term: this.searchTermInput.value
+      });
+    });
+
+    this.searchUseGlobalBaseCheckbox?.addEventListener('change', () => {
+      handlers.onSearchChange({
+        useGlobalBase: this.searchUseGlobalBaseCheckbox?.checked
       });
     });
 
@@ -277,15 +301,21 @@ export class DashboardView {
     summary,
     previousSummary,
     tableTransactions,
+    searchTotals,
     pendingAiCount,
     categories,
     aiConsultant
   }) {
     this.setAvailableCategories(categories);
     this.setAccountFilterButton(filters.accountType);
-    this.categoryFilterSelect.value = filters.category;
+    if (this.categoryFilterSelect) {
+      this.categoryFilterSelect.value = filters.category;
+    }
     this.searchModeSelect.value = search.mode;
     this.searchTermInput.value = search.term;
+    if (this.searchUseGlobalBaseCheckbox) {
+      this.searchUseGlobalBaseCheckbox.checked = Boolean(search.useGlobalBase);
+    }
     this.clearSearchButton.disabled = !search.term.trim();
 
     this.totalValue.innerText = formatCurrencyBRL(summary.total);
@@ -295,12 +325,37 @@ export class DashboardView {
     this.renderCategoryChart(summary, previousSummary);
     this.renderCategoryStats(summary, previousSummary);
     this.renderTransactions(tableTransactions);
+    this.renderSearchTotals(searchTotals);
     this.renderAiConsultant(aiConsultant);
 
     this.itemsCounter.innerText = search.term.trim()
-      ? `${tableTransactions.length} RESULTADOS (BASE TOTAL)`
+      ? `${tableTransactions.length} RESULTADOS (${search.useGlobalBase ? 'BASE TOTAL' : 'PERÍODO FILTRADO'})`
       : `${tableTransactions.length} LANÇAMENTOS`;
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
+  }
+
+  renderSearchTotals(searchTotals = {}) {
+    if (!this.searchSummaryPanel) {
+      return;
+    }
+
+    if (!searchTotals.hasSearch) {
+      this.searchSummaryPanel.classList.add('hidden');
+      return;
+    }
+
+    this.searchSummaryPanel.classList.remove('hidden');
+    const modeLabelMap = {
+      value: 'valor',
+      category: 'categoria',
+      description: 'descrição'
+    };
+    const modeLabel = modeLabelMap[searchTotals.mode] || 'descrição';
+    this.searchSummaryTitle.innerText = `Busca por ${modeLabel}: "${searchTotals.term || ''}"`;
+    this.searchSummaryBaseLabel.innerText = searchTotals.useGlobalBase ? 'Base Ativa Total' : 'Base Ativa Filtrada';
+    this.searchSummaryMatchedValue.innerText = formatCurrencyBRL(Number(searchTotals.matchedTotal || 0));
+    this.searchSummaryBaseValue.innerText = formatCurrencyBRL(Number(searchTotals.baseTotal || 0));
+    this.searchSummaryShare.innerText = `${Number(searchTotals.percentageOfBase || 0).toFixed(2)}% da base ativa`;
   }
 
   renderAiConsultant(aiConsultantState = {}) {
@@ -480,38 +535,56 @@ export class DashboardView {
       .map((transaction) => {
         const displayCategory = getDisplayCategory(transaction);
         const installmentOverride = displayCategory === 'Parcelas' && transaction.category !== 'Parcelas';
+        const usageLabel = transaction.active === false ? 'Ignorado' : 'Ativo';
+        const usageButtonLabel = transaction.active === false ? 'Reativar' : 'Ignorar';
 
         return `
-          <tr class="transition-all ${transaction.active === false ? 'row-inactive' : ''}">
-            <td class="px-3 py-3 text-zinc-400 font-mono text-[10px]">${escapeHtml(toBrDate(transaction.date))}</td>
-            <td class="px-3 py-3 font-bold text-[10px] uppercase opacity-60">${escapeHtml(transaction.accountType)}</td>
-            <td class="px-1 py-3 text-center">
-              <button
-                data-action="toggle-active"
-                data-doc-id="${escapeHtml(transaction.docId)}"
-                data-active="${transaction.active !== false}"
-                class="text-lg hover:scale-110 transition-transform"
-                title="Ativar ou ignorar item"
-              >
-                ${transaction.active === false ? '👁️‍🗨️' : '👁️'}
-              </button>
-            </td>
-            <td class="px-3 py-3 font-bold text-zinc-900">${escapeHtml(transaction.title)}</td>
-            <td class="px-3 py-3">
-              <div class="flex flex-col gap-1">
-                <button data-action="open-category-picker" data-doc-id="${escapeHtml(transaction.docId)}" data-current-category="${escapeHtml(transaction.category)}" class="edit-mode text-left">
-                  ${escapeHtml(transaction.category)}
-                </button>
+          <article class="transaction-card transition-all ${transaction.active === false ? 'row-inactive' : ''}">
+            <div class="transaction-head">
+              <div class="min-w-0">
+                <p class="transaction-meta">${escapeHtml(toBrDate(transaction.date))} • ${escapeHtml(transaction.accountType)}</p>
+                <h4 class="transaction-title">${escapeHtml(transaction.title)}</h4>
+              </div>
+              <p class="transaction-value">${formatCurrencyBRL(transaction.value)}</p>
+            </div>
+
+            <div class="transaction-foot">
+              <div class="transaction-badges">
+                <span class="transaction-badge">${usageLabel}</span>
                 ${
                   installmentOverride
-                    ? '<span class="text-[9px] font-black uppercase italic text-zinc-500">Exibido no mix como Parcelas</span>'
+                    ? '<span class="transaction-badge transaction-badge-neutral">Mix: Parcelas</span>'
                     : ''
                 }
               </div>
-            </td>
-            <td class="px-3 py-3 text-right font-black">${formatCurrencyBRL(transaction.value)}</td>
-          </tr>`;
+              <div class="transaction-actions">
+                <button
+                  data-action="open-category-picker"
+                  data-doc-id="${escapeHtml(transaction.docId)}"
+                  data-current-category="${escapeHtml(transaction.category)}"
+                  class="transaction-category-btn"
+                  title="Editar categoria deste lançamento"
+                >
+                  ${escapeHtml(transaction.category)}
+                </button>
+                <button
+                  data-action="toggle-active"
+                  data-doc-id="${escapeHtml(transaction.docId)}"
+                  data-active="${transaction.active !== false}"
+                  class="transaction-toggle-btn"
+                  title="Ativar ou ignorar item"
+                >
+                  ${usageButtonLabel}
+                </button>
+              </div>
+            </div>
+          </article>`;
       })
       .join('');
+
+    if (!this.tableBody.innerHTML) {
+      this.tableBody.innerHTML =
+        '<p class="text-[11px] font-black uppercase text-zinc-500 text-center py-6">Nenhuma transação encontrada para este recorte.</p>';
+    }
   }
 }
