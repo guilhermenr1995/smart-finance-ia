@@ -9,6 +9,54 @@ function normalizeTitleForMatching(value) {
     .trim();
 }
 
+function parseSearchAmount(rawValue) {
+  const sanitized = String(rawValue || '')
+    .replace(/[^\d,.-]/g, '')
+    .trim();
+
+  if (!sanitized) {
+    return Number.NaN;
+  }
+
+  let normalized = sanitized;
+  const hasComma = normalized.includes(',');
+  const hasDot = normalized.includes('.');
+
+  if (hasComma && hasDot) {
+    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      normalized = normalized.replace(/,/g, '');
+    }
+  } else if (hasComma) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  } else {
+    normalized = normalized.replace(/,/g, '');
+  }
+
+  return Number.parseFloat(normalized);
+}
+
+export function matchesTransactionSearch(transaction, mode, term) {
+  const searchTerm = String(term || '').trim();
+  if (!searchTerm) {
+    return true;
+  }
+
+  if (mode === 'value') {
+    const expectedValue = parseSearchAmount(searchTerm);
+    if (!Number.isFinite(expectedValue)) {
+      return false;
+    }
+
+    return Math.abs(Number(transaction.value || 0) - expectedValue) <= 0.01;
+  }
+
+  const normalizedTerm = normalizeTitleForMatching(searchTerm);
+  const normalizedTitle = normalizeTitleForMatching(transaction.title);
+  return normalizedTitle.includes(normalizedTerm);
+}
+
 export function isTransferTransactionTitle(title) {
   return normalizeTitleForMatching(title).startsWith('TRANSFERENCIA');
 }

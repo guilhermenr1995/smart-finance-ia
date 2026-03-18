@@ -7,6 +7,19 @@ export class AppState {
     this.user = null;
     this.transactions = [];
     this.userCategories = [];
+    this.search = {
+      mode: 'description',
+      term: ''
+    };
+    this.aiConsultant = {
+      report: null,
+      usage: {
+        limit: 3,
+        used: 0,
+        remaining: 3,
+        dateKey: ''
+      }
+    };
     this.filters = {
       startDate: defaultRange.startDate,
       endDate: defaultRange.endDate,
@@ -26,6 +39,30 @@ export class AppState {
 
   setUserCategories(categories) {
     this.userCategories = categories;
+  }
+
+  updateSearch(partialSearch) {
+    this.search = {
+      ...this.search,
+      ...partialSearch
+    };
+  }
+
+  setAiConsultantReport(report) {
+    this.aiConsultant = {
+      ...this.aiConsultant,
+      report
+    };
+  }
+
+  setAiConsultantUsage(usage) {
+    this.aiConsultant = {
+      ...this.aiConsultant,
+      usage: {
+        ...this.aiConsultant.usage,
+        ...(usage || {})
+      }
+    };
   }
 
   updateFilters(partialFilters) {

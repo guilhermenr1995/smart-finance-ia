@@ -1,10 +1,9 @@
-const CACHE_NAME = 'smart-finance-shell-v1';
+const CACHE_NAME = 'smart-finance-shell-v2';
 
 const APP_SHELL_FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './runtime-config.js',
   './src/styles.css',
   './src/app.js',
   './src/config/app-config.js',
@@ -12,6 +11,7 @@ const APP_SHELL_FILES = [
   './src/state/app-state.js',
   './src/services/auth-service.js',
   './src/services/ai-categorization-service.js',
+  './src/services/ai-consultant-service.js',
   './src/services/csv-import-service.js',
   './src/services/firebase-service.js',
   './src/services/pwa-service.js',

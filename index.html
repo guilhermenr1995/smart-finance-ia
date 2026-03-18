@@ -146,9 +146,33 @@
                 Conta
               </button>
             </div>
+            <div class="w-full grid grid-cols-1 md:grid-cols-[190px_1fr_auto] gap-3 pt-1">
+              <div>
+                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Buscar Por</label>
+                <select id="search-mode" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm">
+                  <option value="description">Descrição</option>
+                  <option value="value">Valor</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Busca Global</label>
+                <input
+                  id="search-term"
+                  type="text"
+                  placeholder="Busca em toda base do cliente"
+                  class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+                />
+              </div>
+              <button
+                id="btn-clear-search"
+                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white h-fit"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-white p-5 neo-brutalism flex flex-col gap-3">
               <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Dados</span>
               <div class="flex gap-3">
@@ -173,6 +197,24 @@
               <span class="font-black text-xs uppercase tracking-widest">Categorizar Ciclo com IA</span>
               <p id="label-ia-count" class="text-[8px] uppercase font-bold opacity-70 mt-1">0 Pendentes</p>
             </button>
+            <button
+              id="btn-ai-consultant"
+              class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+            >
+              <span class="font-black text-xs uppercase tracking-widest">Consultor IA</span>
+              <p id="label-ai-consultant-usage" class="text-[8px] uppercase font-bold opacity-70 mt-1">3 usos disponíveis hoje</p>
+            </button>
+          </div>
+
+          <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
+            <div class="flex items-center justify-between border-b-2 border-black pb-2">
+              <h3 class="font-black text-xs uppercase italic">Consultor IA - Insights de Gastos</h3>
+              <span id="ai-consultant-status" class="text-[9px] font-black uppercase text-zinc-500">Aguardando análise</span>
+            </div>
+            <p id="ai-consultant-placeholder" class="text-[11px] font-bold text-zinc-600">
+              Clique em <strong>Consultor IA</strong> para comparar o período filtrado com o período anterior e receber recomendações práticas.
+            </p>
+            <div id="ai-consultant-content" class="hidden space-y-4"></div>
           </div>
         </div>
 

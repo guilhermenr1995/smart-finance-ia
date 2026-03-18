@@ -1,29 +1,35 @@
 # Cloud Functions (AI Proxy)
 
-Este diretório **não é um backend completo da aplicação**.
-Ele contém apenas uma Cloud Function chamada `categorizeTransactions`, usada como **proxy seguro** entre o frontend e a API do Gemini.
+Este diretório contém o backend serverless do Smart Finance IA para chamadas de IA.
+Ele não é um backend completo da aplicação, mas sim um conjunto de proxies HTTP seguros.
 
-## O que este projeto faz
+## Funções disponíveis
 
-- Recebe uma lista de descrições de transações.
-- Valida se o usuário está autenticado via Firebase Auth (token JWT no header).
-- Chama o modelo Gemini no servidor (sem expor chave no frontend).
-- Retorna o mapeamento `{ "index": "categoria" }` para o app.
+### 1) `categorizeTransactions`
 
-## Por que existe este proxy
+- Objetivo: categorizar transações com Gemini.
+- Entrada: lista de itens + categorias permitidas.
+- Saída: mapeamento `{ "index": "categoria" }`.
 
-Sem esse proxy, você teria que colocar a `GEMINI_API_KEY` no frontend, o que é inseguro.
-Com ele:
+### 2) `analyzeSpendingInsights`
 
-- a chave fica no servidor;
-- somente usuários autenticados podem categorizar;
-- você consegue controlar CORS, limites e logs centralmente.
+- Objetivo: gerar insights comparando período atual vs período anterior.
+- Entrada: snapshot agregado de gastos dos dois períodos.
+- Saída: resumo com aumentos, reduções e recomendações práticas.
+- Regra de uso: **máximo de 3 análises por dia por usuário autenticado**.
+
+## Segurança aplicada
+
+- Firebase Auth obrigatório (header `Authorization: Bearer <id_token>`).
+- CORS controlado por `ALLOWED_ORIGINS` em `index.js`.
+- Chave Gemini fica no servidor (`.env`), não no frontend.
+- Limite diário do Consultor IA validado no backend (Firestore, transacional).
 
 ## Estrutura desta pasta
 
 ```text
 backend/cloud-functions/
-  index.js              # função HTTP categorizeTransactions
+  index.js              # implementação das duas funções HTTP
   package.json          # dependências da function
   .env.example          # exemplo de variáveis locais
   .env                  # variáveis reais (NÃO versionar)
@@ -32,124 +38,144 @@ backend/cloud-functions/
 ## Pré-requisitos
 
 - Node.js 22
-- Firebase CLI instalado e logado
-- Projeto Firebase já criado e selecionado (`firebase use <project-id>`)
+- Firebase CLI instalado e autenticado
+- Projeto Firebase selecionado (`firebase use <project-id>`)
 
-## Configuração local (didática)
+## Configuração local
 
-1. Entre na pasta da function:
+1. Entrar na pasta:
    - `cd backend/cloud-functions`
 
-2. Instale dependências:
+2. Instalar dependências:
    - `npm install`
 
-3. Crie seu arquivo de ambiente local:
+3. Criar `.env` local:
    - `cp .env.example .env`
 
-4. Edite o `.env` com seus valores reais:
+4. Preencher variáveis:
    - `GEMINI_API_KEY=...`
-   - `GEMINI_MODEL=gemini-3.1-flash-lite` (ou outro modelo habilitado)
+   - `GEMINI_MODEL=gemini-3.1-flash-lite` (ou modelo disponível no seu projeto)
+   - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash` (opcional, recomendado)
 
-5. Volte para a raiz do projeto:
+5. Voltar para a raiz:
    - `cd ../..`
 
 ## Deploy
 
-Na raiz do projeto (`smart-finance-ia`):
+Na raiz do projeto:
+
+```bash
+firebase deploy --only functions
+```
+
+Ou apenas uma função específica:
 
 ```bash
 firebase deploy --only functions:categorizeTransactions
+firebase deploy --only functions:analyzeSpendingInsights
 ```
 
-Se o deploy passar, você verá a URL da função no final (Cloud Run URL).
+## Configuração do frontend
 
-## Conectar o frontend à function
-
-No arquivo `runtime-config.js` (local), configure:
+No `runtime-config.js`, configure:
 
 ```js
 ai: {
-  proxyUrl: 'https://SUA_URL_DA_FUNCTION.a.run.app',
+  proxyUrl: 'https://.../categorizetransactions...',
+  consultantProxyUrl: 'https://.../analyzespendinginsights...',
   allowDirectRequest: false,
   directApiKey: ''
 }
 ```
 
+Se `consultantProxyUrl` não for informado, o frontend tenta derivar automaticamente a URL trocando
+`categorizetransactions` por `analyzespendinginsights`.
+
 ## Contrato da API
 
-### Endpoint
+### `POST categorizeTransactions`
 
-- `POST /` na URL da function
-
-### Headers obrigatórios
-
-- `Content-Type: application/json`
-- `Authorization: Bearer <firebase_id_token>`
-
-### Body esperado
+Body:
 
 ```json
 {
-  "items": [
-    { "index": 0, "title": "UBER TRIP" },
-    { "index": 1, "title": "IFOOD PIZZARIA" }
-  ],
+  "items": [{ "index": 0, "title": "UBER TRIP" }],
   "categories": ["Alimentação", "Transporte", "Outros"]
 }
 ```
 
-### Resposta de sucesso
+Resposta:
 
 ```json
 {
   "mapping": {
-    "0": "Transporte",
-    "1": "Alimentação"
+    "0": "Transporte"
   }
 }
 ```
 
-## Segurança implementada
+### `POST analyzeSpendingInsights`
 
-- Verificação de token: `verifyIdToken` (Firebase Admin).
-- CORS restrito por `ALLOWED_ORIGINS` no `index.js`.
-- Chave Gemini fica no servidor (`.env`), não no frontend.
+Body (resumido):
 
-## Ajustar origens permitidas (CORS)
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "filters": {
+    "startDate": "2026-03-02",
+    "endDate": "2026-04-03",
+    "accountType": "all",
+    "category": "all"
+  },
+  "currentPeriod": {
+    "startDate": "2026-03-02",
+    "endDate": "2026-04-03",
+    "total": 2500.0,
+    "count": 62,
+    "categoryBreakdown": [{ "category": "Transporte", "total": 380.0 }],
+    "topTransactions": [{ "title": "Ribeirao Shopping", "value": 290.0 }]
+  },
+  "previousPeriod": {
+    "startDate": "2026-02-02",
+    "endDate": "2026-03-03",
+    "total": 2100.0,
+    "count": 57,
+    "categoryBreakdown": [{ "category": "Transporte", "total": 260.0 }],
+    "topTransactions": [{ "title": "Posto XPTO", "value": 170.0 }]
+  }
+}
+```
 
-Se o domínio do frontend mudar, atualize `ALLOWED_ORIGINS` em `index.js` e faça novo deploy.
+Resposta:
 
-Exemplo de origem local já permitida:
+```json
+{
+  "insights": {
+    "overview": "...",
+    "increased": [{ "category": "Transporte", "current": 380, "previous": 260, "delta": 120, "insight": "..." }],
+    "reduced": [],
+    "criticalActions": ["..."],
+    "dispensableCuts": ["..."]
+  },
+  "usage": {
+    "limit": 3,
+    "used": 1,
+    "remaining": 2,
+    "dateKey": "2026-03-18"
+  }
+}
+```
 
-- `http://localhost:5173`
+## Erros comuns
 
-## Tratamento de falhas de IA
+- `401 Missing Authorization token`: token não enviado.
+- `401 Invalid or expired Authorization token`: token inválido/expirado.
+- `429 Daily limit reached for AI consultant`: limite diário do Consultor IA atingido.
+- `500 Missing GEMINI_API_KEY environment variable`: `.env` ausente ou incompleto.
+- Erro de CORS: origem não está em `ALLOWED_ORIGINS`.
+- `404 model not found`: ajuste `GEMINI_MODEL` ou use `GEMINI_FALLBACK_MODELS` para fallback automático.
 
-A function já possui retry com backoff para status transitórios:
+## Observação
 
-- `429`, `500`, `502`, `503`, `504`
-
-Isso ajuda quando o Gemini está temporariamente sobrecarregado.
-
-## Troubleshooting rápido
-
-### 1) `Missing Authorization token`
-
-A requisição não enviou token Firebase no header `Authorization`.
-
-### 2) `Missing GEMINI_API_KEY environment variable`
-
-O `.env` não está presente/preenchido corretamente na pasta da function no momento do deploy.
-
-### 3) Erro de CORS
-
-A origem do seu frontend não está em `ALLOWED_ORIGINS`.
-
-### 4) `Gemini request failed (503/429)`
-
-Limite temporário do modelo. A function já tenta novamente, mas em picos pode falhar mesmo assim.
-
-## Observação importante
-
-Este módulo é um proxy de categorização por IA.
-Persistência de transações, cache, regras de negócio da UI e autenticação do app ficam no frontend + Firestore, fora desta pasta.
+Persistência de transações, cache local e UI ficam no frontend + Firestore.
+Estas functions cuidam apenas das integrações de IA e proteção de acesso.

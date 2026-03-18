@@ -52,19 +52,27 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 ### 6) Dashboard e análise
 
 - Filtros por período, tipo de conta e categoria.
+- Busca global na base do usuário (por descrição ou valor).
 - Mix de gastos com comparação:
   - barra amarela: período atual filtrado
   - barra cinza: mesmo range do período anterior
 - Lista de transações com edição de categoria e ação de ignorar/reativar item.
 - Indicadores de total gasto e total ignorado.
 
-### 7) Cache e performance
+### 7) Consultor IA (insights comparativos)
+
+- Botão dedicado de Consultor IA na dashboard.
+- Analisa período filtrado atual vs mesmo range anterior.
+- Retorna insights úteis: categorias que aumentaram, reduziram, ações críticas e cortes dispensáveis.
+- Limite de uso por usuário logado: **3 análises por dia** (validado no backend).
+
+### 8) Cache e performance
 
 - Cache local por usuário para reduzir leituras recorrentes no Firestore.
 - Sincronização inteligente com nuvem (evita fetch desnecessário quando cache está fresco).
 - Objetivo: reduzir custo operacional e melhorar tempo de resposta.
 
-### 8) PWA e acesso mobile
+### 9) PWA e acesso mobile
 
 - Instalável no Android/iOS (Add to Home Screen).
 - `manifest.webmanifest` + `service-worker.js`.
@@ -78,8 +86,10 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 4. Usuário clica em `Categorizar ciclo com IA` para pendências.
 5. Revisa a tabela e ajusta manualmente apenas o necessário.
 6. Se faltar categoria, cria na hora pelo seletor.
-7. Observa o mix atual x período anterior e toma decisões de gasto.
-8. Nas próximas importações, a memória interna melhora automaticamente e reduz dependência da IA.
+7. Usa a busca global para localizar rapidamente lançamentos por descrição/valor.
+8. Aciona o Consultor IA para receber insights comparativos e recomendações práticas.
+9. Observa o mix atual x período anterior e toma decisões de gasto.
+10. Nas próximas importações, a memória interna melhora automaticamente e reduz dependência da IA.
 
 ## Stack técnica
 

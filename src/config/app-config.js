@@ -10,6 +10,7 @@ const DEFAULT_CONFIG = {
   },
   ai: {
     proxyUrl: '',
+    consultantProxyUrl: '',
     allowDirectRequest: false,
     directApiKey: '',
     model: 'gemini-2.5-flash',

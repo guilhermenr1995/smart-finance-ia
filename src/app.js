@@ -2,6 +2,7 @@ import { loadAppConfig } from './config/app-config.js';
 import { AppState } from './state/app-state.js';
 import { AuthService } from './services/auth-service.js';
 import { AiCategorizationService } from './services/ai-categorization-service.js';
+import { AiConsultantService } from './services/ai-consultant-service.js';
 import { CsvImportService } from './services/csv-import-service.js';
 import { FirebaseService } from './services/firebase-service.js';
 import { CategoryMemoryService } from './services/category-memory-service.js';
@@ -12,7 +13,12 @@ import { AuthView } from './ui/auth-view.js';
 import { DashboardView } from './ui/dashboard-view.js';
 import { OverlayView } from './ui/overlay-view.js';
 import { CATEGORIES } from './constants/categories.js';
-import { TransactionQueryService, getInstallmentGroupKey, getInstallmentInfo } from './utils/transaction-utils.js';
+import {
+  TransactionQueryService,
+  getInstallmentGroupKey,
+  getInstallmentInfo,
+  matchesTransactionSearch
+} from './utils/transaction-utils.js';
 import { shiftInputDateByMonths } from './utils/date-utils.js';
 
 const AUTH_ERROR_MESSAGES = {
@@ -35,6 +41,7 @@ class SmartFinanceApplication {
     this.repository = dependencies.repository;
     this.csvImportService = dependencies.csvImportService;
     this.aiService = dependencies.aiService;
+    this.aiConsultantService = dependencies.aiConsultantService;
     this.queryService = dependencies.queryService;
     this.categoryMemoryService = dependencies.categoryMemoryService;
     this.localCacheService = dependencies.localCacheService;
@@ -47,7 +54,7 @@ class SmartFinanceApplication {
   }
 
   async init() {
-    this.dashboardView.setInitialFilters(this.state.filters);
+    this.dashboardView.setInitialFilters(this.state.filters, this.state.search);
     this.bindEvents();
 
     await this.pwaService.registerServiceWorker();
@@ -80,8 +87,13 @@ class SmartFinanceApplication {
         this.state.updateFilters(partialFilters);
         this.refreshDashboard();
       },
+      onSearchChange: (partialSearch) => {
+        this.state.updateSearch(partialSearch);
+        this.refreshDashboard();
+      },
       onImportFile: (file, accountType) => this.importCsv(file, accountType),
       onAiCategorization: () => this.syncCategoriesWithAi(),
+      onAiConsultant: () => this.runAiConsultant(),
       onToggleActive: ({ docId, currentState }) => this.toggleActive(docId, currentState),
       onCategoryUpdate: ({ docId, category }) => this.updateCategory(docId, category),
       onCreateCategory: ({ docId, categoryName }) => this.createAndAssignCategory(docId, categoryName)
@@ -99,6 +111,9 @@ class SmartFinanceApplication {
     if (!user) {
       this.state.setTransactions([]);
       this.state.setUserCategories([]);
+      this.state.updateSearch({ mode: 'description', term: '' });
+      this.state.setAiConsultantReport(null);
+      this.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
       this.refreshDashboard();
       return;
     }
@@ -118,8 +133,20 @@ class SmartFinanceApplication {
     return this.queryService.getVisibleTransactions(this.state.transactions, this.state.getFilterBoundaries());
   }
 
+  getTableTransactions(visibleTransactions) {
+    const term = this.state.search.term.trim();
+    if (!term) {
+      return visibleTransactions;
+    }
+
+    return this.state.transactions.filter((transaction) =>
+      matchesTransactionSearch(transaction, this.state.search.mode, term)
+    );
+  }
+
   refreshDashboard() {
     const visibleTransactions = this.getVisibleTransactions();
+    const tableTransactions = this.getTableTransactions(visibleTransactions);
     const summary = this.queryService.buildSummary(visibleTransactions);
     const pendingAiCount = this.queryService.getAiCandidates(visibleTransactions).length;
 
@@ -137,11 +164,13 @@ class SmartFinanceApplication {
 
     this.dashboardView.render({
       filters: this.state.filters,
+      search: this.state.search,
       summary,
       previousSummary,
-      visibleTransactions,
+      tableTransactions,
       pendingAiCount,
-      categories: availableCategories
+      categories: availableCategories,
+      aiConsultant: this.state.aiConsultant
     });
   }
 
@@ -495,6 +524,104 @@ class SmartFinanceApplication {
     }
   }
 
+  buildConsultantPeriodSnapshot(periodDates, summary) {
+    const categoryBreakdown = Object.entries(summary.categoryTotals)
+      .sort((left, right) => right[1] - left[1])
+      .map(([category, total]) => ({
+        category,
+        total: Number(total.toFixed(2))
+      }));
+
+    const topTransactions = [...summary.considered]
+      .sort((left, right) => right.value - left.value)
+      .slice(0, 20)
+      .map((transaction) => ({
+        date: transaction.date,
+        title: transaction.title,
+        category: transaction.category,
+        value: Number(transaction.value.toFixed(2)),
+        accountType: transaction.accountType
+      }));
+
+    return {
+      ...periodDates,
+      total: Number(summary.total.toFixed(2)),
+      count: summary.considered.length,
+      ignoredTotal: Number(summary.ignoredTotal.toFixed(2)),
+      ignoredCount: summary.ignored.length,
+      categoryBreakdown,
+      topTransactions
+    };
+  }
+
+  async runAiConsultant() {
+    if (!this.state.user) {
+      this.authView.showMessage('Faça login para usar o Consultor IA.', 'error');
+      return;
+    }
+
+    const currentVisibleTransactions = this.getVisibleTransactions();
+    const currentSummary = this.queryService.buildSummary(currentVisibleTransactions);
+
+    const previousStartDate = shiftInputDateByMonths(this.state.filters.startDate, -1);
+    const previousEndDate = shiftInputDateByMonths(this.state.filters.endDate, -1);
+    const previousBounds = {
+      ...this.state.getFilterBoundaries(),
+      cycleStart: new Date(`${previousStartDate}T00:00:00`),
+      cycleEnd: new Date(`${previousEndDate}T23:59:59`)
+    };
+    const previousVisibleTransactions = this.queryService.getVisibleTransactions(this.state.transactions, previousBounds);
+    const previousSummary = this.queryService.buildSummary(previousVisibleTransactions);
+
+    if (currentSummary.considered.length === 0 && previousSummary.considered.length === 0) {
+      window.alert('Sem gastos suficientes no período atual e anterior para gerar insights.');
+      return;
+    }
+
+    const payload = {
+      appId: this.config.appId,
+      filters: {
+        startDate: this.state.filters.startDate,
+        endDate: this.state.filters.endDate,
+        accountType: this.state.filters.accountType,
+        category: this.state.filters.category
+      },
+      currentPeriod: this.buildConsultantPeriodSnapshot(
+        { startDate: this.state.filters.startDate, endDate: this.state.filters.endDate },
+        currentSummary
+      ),
+      previousPeriod: this.buildConsultantPeriodSnapshot(
+        { startDate: previousStartDate, endDate: previousEndDate },
+        previousSummary
+      )
+    };
+
+    this.dashboardView.setBusy(true);
+    this.overlayView.show('Consultor IA: analisando o comportamento de gastos...');
+
+    try {
+      const result = await this.aiConsultantService.analyzeSpending(payload);
+      this.state.setAiConsultantReport(result.insights);
+      if (result.usage) {
+        this.state.setAiConsultantUsage(result.usage);
+      }
+
+      this.refreshDashboard();
+      this.overlayView.log('Insights gerados com sucesso.');
+      setTimeout(() => this.overlayView.hide(), 900);
+    } catch (error) {
+      if (Number(error?.status) === 429 || error?.details?.dailyLimitReached) {
+        this.state.setAiConsultantUsage(error?.details?.usage || { limit: 3, used: 3, remaining: 0 });
+        this.refreshDashboard();
+        this.overlayView.showError('Limite diário do Consultor IA atingido (3 análises por dia).');
+      } else {
+        this.overlayView.showError(this.normalizeError(error));
+      }
+    } finally {
+      this.dashboardView.setBusy(false);
+    }
+  }
+
   assertEmailAndPassword(email, password) {
     if (!email || !password) {
       throw new Error('Informe e-mail e senha.');
@@ -514,6 +641,10 @@ class SmartFinanceApplication {
   }
 
   normalizeError(error) {
+    if (typeof error?.details === 'string' && error.details.trim()) {
+      return error.details;
+    }
+
     return error?.message || 'Ocorreu um erro inesperado.';
   }
 }
@@ -560,6 +691,17 @@ function bootstrap() {
       },
       CATEGORIES
     ),
+    aiConsultantService: new AiConsultantService({
+      ...config.ai,
+      getAuthToken: async () => {
+        const user = firebaseContext.auth.currentUser;
+        if (!user) {
+          return '';
+        }
+
+        return user.getIdToken();
+      }
+    }),
     queryService: new TransactionQueryService(),
     pwaService: new PwaService({ onInstallAvailabilityChanged: updateInstallButtonVisibility }),
     authView: new AuthView(),

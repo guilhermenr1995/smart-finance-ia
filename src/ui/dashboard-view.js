@@ -16,6 +16,9 @@ export class DashboardView {
     this.startDateInput = document.getElementById('data-inicio');
     this.endDateInput = document.getElementById('data-fim');
     this.categoryFilterSelect = document.getElementById('filter-category');
+    this.searchModeSelect = document.getElementById('search-mode');
+    this.searchTermInput = document.getElementById('search-term');
+    this.clearSearchButton = document.getElementById('btn-clear-search');
 
     this.accountFilterButtons = {
       all: document.getElementById('filter-all'),
@@ -26,6 +29,11 @@ export class DashboardView {
     this.creditFileInput = document.getElementById('file-credit');
     this.accountFileInput = document.getElementById('file-account');
     this.aiButton = document.getElementById('btn-ai-sync');
+    this.aiConsultantButton = document.getElementById('btn-ai-consultant');
+    this.aiConsultantUsageLabel = document.getElementById('label-ai-consultant-usage');
+    this.aiConsultantStatusLabel = document.getElementById('ai-consultant-status');
+    this.aiConsultantPlaceholder = document.getElementById('ai-consultant-placeholder');
+    this.aiConsultantContent = document.getElementById('ai-consultant-content');
 
     this.totalValue = document.getElementById('total-fatura-val');
     this.ignoredValue = document.getElementById('valor-ignorado');
@@ -46,6 +54,8 @@ export class DashboardView {
     this.handlers = null;
     this.availableCategories = [...CATEGORIES];
     this.activePickerDocId = null;
+    this.isBusy = false;
+    this.consultantHasRemaining = true;
 
     this.initCategoryFilter();
   }
@@ -68,11 +78,14 @@ export class DashboardView {
     this.initCategoryFilter();
   }
 
-  setInitialFilters(filters) {
+  setInitialFilters(filters, search = {}) {
     this.startDateInput.value = filters.startDate;
     this.endDateInput.value = filters.endDate;
     this.categoryFilterSelect.value = filters.category;
     this.setAccountFilterButton(filters.accountType);
+    this.searchModeSelect.value = search.mode || 'description';
+    this.searchTermInput.value = search.term || '';
+    this.clearSearchButton.disabled = !this.searchTermInput.value.trim();
   }
 
   bindEvents(handlers) {
@@ -88,6 +101,23 @@ export class DashboardView {
 
     this.categoryFilterSelect.addEventListener('change', () => {
       handlers.onFiltersChange({ category: this.categoryFilterSelect.value });
+    });
+
+    this.searchModeSelect.addEventListener('change', () => {
+      handlers.onSearchChange({
+        mode: this.searchModeSelect.value
+      });
+    });
+
+    this.searchTermInput.addEventListener('input', () => {
+      handlers.onSearchChange({
+        term: this.searchTermInput.value
+      });
+    });
+
+    this.clearSearchButton.addEventListener('click', () => {
+      this.searchTermInput.value = '';
+      handlers.onSearchChange({ term: '' });
     });
 
     Object.entries(this.accountFilterButtons).forEach(([accountType, button]) => {
@@ -110,6 +140,10 @@ export class DashboardView {
 
     this.aiButton.addEventListener('click', () => {
       handlers.onAiCategorization();
+    });
+
+    this.aiConsultantButton.addEventListener('click', () => {
+      handlers.onAiConsultant();
     });
 
     this.tableBody.addEventListener('click', (event) => {
@@ -174,9 +208,11 @@ export class DashboardView {
   }
 
   setBusy(isBusy) {
+    this.isBusy = isBusy;
     this.aiButton.disabled = isBusy;
     this.creditFileInput.disabled = isBusy;
     this.accountFileInput.disabled = isBusy;
+    this.aiConsultantButton.disabled = isBusy || !this.consultantHasRemaining;
   }
 
   setAccountFilterButton(accountType) {
@@ -235,10 +271,22 @@ export class DashboardView {
     }
   }
 
-  render({ filters, summary, previousSummary, visibleTransactions, pendingAiCount, categories }) {
+  render({
+    filters,
+    search,
+    summary,
+    previousSummary,
+    tableTransactions,
+    pendingAiCount,
+    categories,
+    aiConsultant
+  }) {
     this.setAvailableCategories(categories);
     this.setAccountFilterButton(filters.accountType);
     this.categoryFilterSelect.value = filters.category;
+    this.searchModeSelect.value = search.mode;
+    this.searchTermInput.value = search.term;
+    this.clearSearchButton.disabled = !search.term.trim();
 
     this.totalValue.innerText = formatCurrencyBRL(summary.total);
     this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
@@ -246,10 +294,112 @@ export class DashboardView {
 
     this.renderCategoryChart(summary, previousSummary);
     this.renderCategoryStats(summary, previousSummary);
-    this.renderTransactions(visibleTransactions);
+    this.renderTransactions(tableTransactions);
+    this.renderAiConsultant(aiConsultant);
 
-    this.itemsCounter.innerText = `${visibleTransactions.length} LANÇAMENTOS`;
+    this.itemsCounter.innerText = search.term.trim()
+      ? `${tableTransactions.length} RESULTADOS (BASE TOTAL)`
+      : `${tableTransactions.length} LANÇAMENTOS`;
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
+  }
+
+  renderAiConsultant(aiConsultantState = {}) {
+    const usage = aiConsultantState?.usage || { limit: 3, used: 0, remaining: 3 };
+    const report = aiConsultantState?.report || null;
+    const limit = Number(usage.limit || 3);
+    const used = Number(usage.used || 0);
+    const remaining = Number.isFinite(usage.remaining) ? Number(usage.remaining) : Math.max(0, limit - used);
+    this.consultantHasRemaining = remaining > 0;
+
+    this.aiConsultantUsageLabel.innerText = `${remaining}/${limit} usos restantes hoje`;
+    this.aiConsultantButton.disabled = this.isBusy || !this.consultantHasRemaining;
+    this.aiConsultantButton.classList.toggle('opacity-50', remaining <= 0);
+    this.aiConsultantButton.classList.toggle('cursor-not-allowed', remaining <= 0);
+
+    if (!report) {
+      this.aiConsultantStatusLabel.innerText = 'Aguardando análise';
+      this.aiConsultantPlaceholder.classList.remove('hidden');
+      this.aiConsultantContent.classList.add('hidden');
+      this.aiConsultantContent.innerHTML = '';
+      return;
+    }
+
+    const increased = Array.isArray(report.increased) ? report.increased : [];
+    const reduced = Array.isArray(report.reduced) ? report.reduced : [];
+    const criticalActions = Array.isArray(report.criticalActions) ? report.criticalActions : [];
+    const dispensableCuts = Array.isArray(report.dispensableCuts) ? report.dispensableCuts : [];
+
+    this.aiConsultantStatusLabel.innerText = 'Análise disponível';
+    this.aiConsultantPlaceholder.classList.add('hidden');
+    this.aiConsultantContent.classList.remove('hidden');
+    this.aiConsultantContent.innerHTML = `
+      <div class="bg-zinc-50 border-2 border-black p-3">
+        <p class="text-[10px] font-black uppercase text-zinc-500 mb-1">Leitura Geral</p>
+        <p class="text-sm font-bold text-zinc-800">${escapeHtml(report.overview || 'Sem resumo gerado.')}</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        ${this.renderDeltaBlock('Aumentou vs Período Anterior', increased, 'bg-red-50')}
+        ${this.renderDeltaBlock('Reduziu vs Período Anterior', reduced, 'bg-emerald-50')}
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        ${this.renderTipsBlock('Ações Prioritárias', criticalActions)}
+        ${this.renderTipsBlock('Cortes Dispensáveis', dispensableCuts)}
+      </div>
+    `;
+  }
+
+  renderDeltaBlock(title, items, backgroundClass) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return `
+        <div class="${backgroundClass} border-2 border-black p-3">
+          <p class="text-[10px] font-black uppercase text-zinc-500 mb-2">${escapeHtml(title)}</p>
+          <p class="text-[11px] font-bold text-zinc-600">Sem variações relevantes neste recorte.</p>
+        </div>
+      `;
+    }
+
+    const rows = items
+      .slice(0, 5)
+      .map((item) => {
+        const category = escapeHtml(item.category || 'Sem categoria');
+        const current = formatCompactCurrency(Number(item.current || 0));
+        const previous = formatCompactCurrency(Number(item.previous || 0));
+        const delta = formatCompactCurrency(Number(item.delta || 0));
+        const insight = escapeHtml(item.insight || '');
+
+        return `
+          <div class="border border-black/20 p-2 bg-white/70">
+            <p class="text-[11px] font-black uppercase">${category}</p>
+            <p class="text-[10px] font-bold text-zinc-700">Atual: ${current} | Anterior: ${previous} | Diferença: ${delta}</p>
+            ${insight ? `<p class="text-[10px] font-bold text-zinc-600 mt-1">${insight}</p>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+
+    return `
+      <div class="${backgroundClass} border-2 border-black p-3">
+        <p class="text-[10px] font-black uppercase text-zinc-500 mb-2">${escapeHtml(title)}</p>
+        <div class="space-y-2">${rows}</div>
+      </div>
+    `;
+  }
+
+  renderTipsBlock(title, tips) {
+    const normalizedTips = Array.isArray(tips) ? tips.slice(0, 4) : [];
+    const content =
+      normalizedTips.length === 0
+        ? '<p class="text-[11px] font-bold text-zinc-600">Sem sugestões para este recorte.</p>'
+        : normalizedTips
+            .map((tip) => `<p class="text-[11px] font-bold text-zinc-700">- ${escapeHtml(String(tip || ''))}</p>`)
+            .join('');
+
+    return `
+      <div class="bg-zinc-50 border-2 border-black p-3">
+        <p class="text-[10px] font-black uppercase text-zinc-500 mb-2">${escapeHtml(title)}</p>
+        <div class="space-y-2">${content}</div>
+      </div>
+    `;
   }
 
   renderCategoryChart(summary, previousSummary) {
