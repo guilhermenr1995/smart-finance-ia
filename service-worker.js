@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-finance-shell-v5';
+const CACHE_NAME = 'smart-finance-shell-v6';
 
 const APP_SHELL_FILES = [
   './',
@@ -7,6 +7,11 @@ const APP_SHELL_FILES = [
   './src/styles.css',
   './src/app.js',
   './src/config/app-config.js',
+  './src/application/flows/auth-flow.js',
+  './src/application/flows/dashboard-flow.js',
+  './src/application/flows/data-sync-flow.js',
+  './src/application/flows/transaction-flow.js',
+  './src/application/flows/ai-flow.js',
   './src/constants/categories.js',
   './src/state/app-state.js',
   './src/services/auth-service.js',

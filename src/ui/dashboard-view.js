@@ -61,10 +61,12 @@ export class DashboardView {
     this.handlers = null;
     this.availableCategories = [...CATEGORIES];
     this.activePickerDocId = null;
+    this.activeTooltipTrigger = null;
     this.isBusy = false;
     this.consultantHasRemaining = true;
 
     this.initCategoryFilter();
+    this.bindTooltipInteractions();
   }
 
   initCategoryFilter() {
@@ -229,6 +231,50 @@ export class DashboardView {
 
       this.closeCategoryPicker();
     });
+  }
+
+  bindTooltipInteractions() {
+    document.addEventListener('click', (event) => {
+      const trigger = event.target.closest('.help-tooltip');
+      if (trigger) {
+        event.preventDefault();
+
+        if (this.activeTooltipTrigger === trigger) {
+          this.closeTooltip();
+          return;
+        }
+
+        this.closeTooltip();
+        trigger.classList.add('is-open');
+        this.activeTooltipTrigger = trigger;
+        return;
+      }
+
+      this.closeTooltip();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        this.closeTooltip();
+      }
+    });
+
+    window.addEventListener(
+      'scroll',
+      () => {
+        this.closeTooltip();
+      },
+      true
+    );
+  }
+
+  closeTooltip() {
+    if (!this.activeTooltipTrigger) {
+      return;
+    }
+
+    this.activeTooltipTrigger.classList.remove('is-open');
+    this.activeTooltipTrigger = null;
   }
 
   setBusy(isBusy) {

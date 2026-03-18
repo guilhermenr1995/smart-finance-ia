@@ -104,11 +104,122 @@
           </div>
         </header>
 
-        <div class="space-y-4">
-          <div class="bg-white p-5 neo-brutalism space-y-5">
+        <div class="space-y-6">
+          <section class="bg-white p-5 neo-brutalism space-y-5">
             <div class="flex items-center justify-between gap-3 pb-2 border-b-2 border-black">
               <div class="flex items-center gap-2">
-                <h3 class="font-black text-xs uppercase italic">Filtros e Busca</h3>
+                <h3 class="font-black text-xs uppercase italic">Importar Dados e Guia Rápido</h3>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Importe CSV/OFX e use o guia para localizar rapidamente a opção de exportação no seu banco."
+                  aria-label="Ajuda sobre importação e guia rápido"
+                >
+                  ?
+                </button>
+              </div>
+              <p class="text-[10px] font-black uppercase text-zinc-500">Importe e categorize em poucos cliques</p>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
+              <div>
+                <p class="text-[11px] font-bold text-zinc-600 mb-3">
+                  Exemplos práticos para quem nunca exportou extrato. O caminho exato pode variar por versão do aplicativo.
+                </p>
+                <p class="tutorial-swipe-hint md:hidden">Arraste para o lado para ver mais bancos</p>
+                <div class="tutorial-bank-grid">
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Nubank</h4>
+                    <ul class="tutorial-card-list">
+                      <li>Abra <strong>Conta</strong> ou <strong>Cartão</strong>.</li>
+                      <li>Entre em <strong>Extrato</strong>.</li>
+                      <li>Procure <strong>Exportar/Compartilhar</strong> (OFX para conta, CSV para fatura).</li>
+                    </ul>
+                  </article>
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Itaú</h4>
+                    <ul class="tutorial-card-list">
+                      <li>No Internet Banking, vá em <strong>Conta Corrente</strong>.</li>
+                      <li>Acesse <strong>Extrato</strong> no período desejado.</li>
+                      <li>Use <strong>Exportar</strong> (geralmente OFX e, em alguns casos, CSV).</li>
+                    </ul>
+                  </article>
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Bradesco</h4>
+                    <ul class="tutorial-card-list">
+                      <li>Acesse <strong>Extrato por período</strong>.</li>
+                      <li>Toque em <strong>Exportar</strong> no rodapé/menu.</li>
+                      <li>Priorize <strong>OFX</strong> para integração financeira.</li>
+                    </ul>
+                  </article>
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Santander</h4>
+                    <ul class="tutorial-card-list">
+                      <li>Abra <strong>Conta Corrente</strong>.</li>
+                      <li>Consulte o <strong>Extrato</strong> do período.</li>
+                      <li>Use <strong>Exportar/Download</strong> (OFX/CSV conforme disponibilidade).</li>
+                    </ul>
+                  </article>
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Banco do Brasil</h4>
+                    <ul class="tutorial-card-list">
+                      <li>Entre no menu de <strong>Extratos</strong>.</li>
+                      <li>Selecione o período desejado.</li>
+                      <li>Use <strong>Download/Exportação</strong> (OFX é comum).</li>
+                    </ul>
+                  </article>
+                  <article class="tutorial-card">
+                    <h4 class="tutorial-card-title">Caixa e Inter</h4>
+                    <ul class="tutorial-card-list">
+                      <li>Busque por <strong>Extrato detalhado</strong>.</li>
+                      <li>Abra o menu de <strong>compartilhar/exportar</strong>.</li>
+                      <li>Quando não houver CSV, use <strong>OFX</strong>.</li>
+                    </ul>
+                  </article>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Arquivos</span>
+                  <button
+                    type="button"
+                    class="help-tooltip"
+                    data-tooltip="Use arquivos CSV ou OFX. O app ignora duplicados e já tenta reaproveitar categorias anteriores."
+                    aria-label="Ajuda sobre importação"
+                  >
+                    ?
+                  </button>
+                </div>
+                <div class="flex flex-col gap-3">
+                  <label
+                    class="relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
+                  >
+                    💳 Crédito (CSV/OFX)
+                    <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
+                  </label>
+                  <label
+                    class="relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
+                  >
+                    🏦 Conta (CSV/OFX)
+                    <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
+                  </label>
+                </div>
+                <button
+                  id="btn-ai-sync"
+                  class="w-full bg-black text-yellow-300 p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+                >
+                  <span class="font-black text-xs uppercase tracking-widest">Categorizar Ciclo com IA</span>
+                  <p id="label-ia-count" class="text-[8px] uppercase font-bold opacity-70 mt-1">0 Pendentes</p>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="bg-white p-5 neo-brutalism space-y-5">
+            <div class="flex items-center justify-between gap-3 pb-2 border-b-2 border-black">
+              <div class="flex items-center gap-2">
+                <h3 class="font-black text-xs uppercase italic">Filtros de Período</h3>
                 <button
                   type="button"
                   class="help-tooltip"
@@ -162,92 +273,9 @@
                 </div>
               </div>
             </div>
-
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white p-5 neo-brutalism flex flex-col gap-3">
-              <div class="flex items-center gap-2">
-                <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Dados</span>
-                <button
-                  type="button"
-                  class="help-tooltip"
-                  data-tooltip="Use arquivos CSV ou OFX. O app ignora duplicados e já tenta reaproveitar categorias anteriores."
-                  aria-label="Ajuda sobre importação"
-                >
-                  ?
-                </button>
-              </div>
-              <div class="flex gap-3">
-                <label
-                  class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
-                >
-                  💳 Crédito (CSV/OFX)
-                  <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
-                </label>
-                <label
-                  class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
-                >
-                  🏦 Conta (CSV/OFX)
-                  <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
-                </label>
-              </div>
-            </div>
-            <button
-              id="btn-ai-sync"
-              class="bg-black text-yellow-300 p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
-            >
-              <span class="font-black text-xs uppercase tracking-widest">Categorizar Ciclo com IA</span>
-              <p id="label-ia-count" class="text-[8px] uppercase font-bold opacity-70 mt-1">0 Pendentes</p>
-            </button>
-          </div>
-
-          <section class="bg-white p-5 neo-brutalism space-y-4">
-            <div class="flex items-center justify-between border-b-2 border-black pb-2">
-              <h3 class="font-black text-xs uppercase italic">Guia Rápido de Importação</h3>
-              <button
-                type="button"
-                class="help-tooltip"
-                data-tooltip="Os caminhos podem mudar por atualização do app do banco. Procure por termos como: Extrato, Exportar, OFX ou CSV."
-                aria-label="Ajuda sobre guia de importação"
-              >
-                ?
-              </button>
-            </div>
-            <p class="text-[11px] font-bold text-zinc-600">
-              Exemplos práticos para quem nunca exportou extrato. O caminho exato pode variar por versão do aplicativo.
-            </p>
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              <details class="tutorial-card">
-                <summary>Nubank</summary>
-                <p>No app, acesse Conta ou Cartão, abra Extrato e procure Exportar/Compartilhar. Geralmente há opção OFX para conta e CSV para fatura.</p>
-              </details>
-              <details class="tutorial-card">
-                <summary>Itaú</summary>
-                <p>No Internet Banking, vá em Conta Corrente, Extrato e opção Exportar. Normalmente disponibiliza OFX e, em alguns casos, CSV.</p>
-              </details>
-              <details class="tutorial-card">
-                <summary>Bradesco</summary>
-                <p>No Internet Banking, abra Extrato por período e use Exportar. OFX costuma aparecer como padrão para integração financeira.</p>
-              </details>
-              <details class="tutorial-card">
-                <summary>Santander</summary>
-                <p>Em Conta Corrente, consulte o extrato e busque Exportar. Algumas contas oferecem OFX e CSV no menu de download.</p>
-              </details>
-              <details class="tutorial-card">
-                <summary>Banco do Brasil</summary>
-                <p>No menu de Extratos, selecione o período e procure Download/Exportação. OFX é comum para conta corrente.</p>
-              </details>
-              <details class="tutorial-card">
-                <summary>Caixa e Inter</summary>
-                <p>No app/web, procure por Extrato detalhado e função de compartilhamento/arquivo. Quando CSV não existir, priorize OFX.</p>
-              </details>
-            </div>
           </section>
-        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div class="md:col-span-4 p-8 neo-brutalism text-white bg-zinc-900 flex flex-wrap justify-between items-center gap-6">
+          <section class="p-8 neo-brutalism text-white bg-zinc-900 flex flex-wrap justify-between items-center gap-6">
             <div>
               <p class="text-[11px] font-black uppercase mb-1 opacity-50 italic">Gastos do Ciclo</p>
               <h2 id="total-fatura-val" class="text-5xl font-black italic tracking-tighter">R$ 0,00</h2>
@@ -257,23 +285,25 @@
               <p class="text-[9px] font-black uppercase opacity-40 mb-1">Itens Ignorados</p>
               <p id="valor-ignorado" class="text-xl font-bold text-zinc-500">R$ 0,00</p>
             </div>
-          </div>
+          </section>
 
-          <div class="md:col-span-3 bg-white p-6 neo-brutalism">
-            <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-6 pb-2">Mix de Gastos</h3>
-            <div class="flex items-center gap-3 mb-3 text-[10px] font-black uppercase">
-              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
-              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
+          <section class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="md:col-span-3 bg-white p-6 neo-brutalism">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-6 pb-2">Mix de Gastos</h3>
+              <div class="flex items-center gap-3 mb-3 text-[10px] font-black uppercase">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
+              </div>
+              <div id="chart-bars" class="flex items-end justify-between h-44 pt-4 pb-2 gap-4 overflow-x-auto no-scrollbar"></div>
             </div>
-            <div id="chart-bars" class="flex items-end justify-between h-44 pt-4 pb-2 gap-4 overflow-x-auto no-scrollbar"></div>
-          </div>
 
-          <div class="md:col-span-1 bg-white p-6 neo-brutalism overflow-y-auto max-h-[350px] no-scrollbar">
-            <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Mix</h3>
-            <div id="stats-list" class="space-y-5"></div>
-          </div>
+            <div class="md:col-span-1 bg-white p-6 neo-brutalism overflow-y-auto max-h-[350px] no-scrollbar">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Mix</h3>
+              <div id="stats-list" class="space-y-5"></div>
+            </div>
+          </section>
 
-          <div class="md:col-span-4 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
+          <section class="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
             <button
               id="btn-ai-consultant"
               class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
@@ -292,9 +322,9 @@
               </p>
               <div id="ai-consultant-content" class="hidden space-y-4"></div>
             </div>
-          </div>
+          </section>
 
-          <div class="md:col-span-4 bg-white p-4 neo-brutalism">
+          <section class="bg-white p-4 neo-brutalism">
             <div class="flex justify-between items-center px-2 py-3 border-b-2 border-black mb-4">
               <div class="flex items-center gap-2">
                 <h3 class="font-black text-xs uppercase italic">Lançamentos Detalhados</h3>
@@ -376,7 +406,7 @@
             </div>
 
             <div id="tabela-corpo" class="space-y-3"></div>
-          </div>
+          </section>
         </div>
       </div>
     </section>

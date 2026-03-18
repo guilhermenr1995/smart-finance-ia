@@ -1,0 +1,106 @@
+const AUTH_ERROR_MESSAGES = {
+  'auth/email-already-in-use': 'Este e-mail já está cadastrado.',
+  'auth/invalid-email': 'E-mail inválido.',
+  'auth/user-not-found': 'Usuário não encontrado.',
+  'auth/wrong-password': 'Senha incorreta.',
+  'auth/weak-password': 'A senha deve ter pelo menos 6 caracteres.',
+  'auth/popup-closed-by-user': 'Login com Google cancelado.',
+  'auth/popup-blocked': 'O navegador bloqueou o popup de login. Tente novamente.',
+  'auth/operation-not-supported-in-this-environment': 'Este ambiente não suporta popup. Redirecionando para login...',
+  'auth/network-request-failed': 'Falha de rede. Verifique sua conexão.'
+};
+
+export async function handleAuthState(app, user) {
+  app.state.setUser(user);
+  app.authView.setAuthenticated(user);
+
+  if (!user) {
+    app.state.setTransactions([]);
+    app.state.setUserCategories([]);
+    app.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false });
+    app.state.setAiConsultantReport(null);
+    app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
+    app.state.setAiConsultantHistory([]);
+    app.refreshDashboard();
+    return;
+  }
+
+  const cached = app.localCacheService.load(user.uid);
+  if (cached.transactions.length > 0) {
+    app.state.setTransactions(cached.transactions);
+    app.state.setUserCategories(cached.categories || []);
+    app.state.setAiConsultantHistory(cached.consultantInsights || []);
+    app.refreshDashboard();
+  }
+
+  const shouldSyncCloud = !app.localCacheService.isFresh(cached.lastSyncedAt);
+  await app.syncDataFromCloud({ force: shouldSyncCloud, showOverlay: shouldSyncCloud });
+}
+
+export async function runAuthOperation(app, action) {
+  app.authView.setBusy(true);
+  try {
+    await action();
+    app.authView.clearMessage();
+  } catch (error) {
+    app.authView.showMessage(normalizeAuthError(app, error), 'error');
+  } finally {
+    app.authView.setBusy(false);
+  }
+}
+
+export async function handleEmailLogin(app, { email, password }) {
+  await runAuthOperation(app, async () => {
+    assertEmailAndPassword(email, password);
+    await app.authService.signInWithEmail(email, password);
+  });
+}
+
+export async function handleEmailRegister(app, { email, password }) {
+  await runAuthOperation(app, async () => {
+    assertEmailAndPassword(email, password);
+    await app.authService.registerWithEmail(email, password);
+    app.authView.showMessage('Conta criada com sucesso.', 'success');
+  });
+}
+
+export async function handleGoogleLogin(app) {
+  await runAuthOperation(app, async () => {
+    await app.authService.signInWithGoogle();
+  });
+}
+
+export async function handlePasswordReset(app, email) {
+  await runAuthOperation(app, async () => {
+    if (!email) {
+      throw new Error('Informe seu e-mail para redefinir a senha.');
+    }
+
+    await app.authService.sendPasswordReset(email);
+    app.authView.showMessage('E-mail de redefinição enviado.', 'success');
+  });
+}
+
+export async function handleLogout(app) {
+  await runAuthOperation(app, async () => {
+    await app.authService.signOut();
+  });
+}
+
+export function assertEmailAndPassword(email, password) {
+  if (!email || !password) {
+    throw new Error('Informe e-mail e senha.');
+  }
+
+  if (password.length < 6) {
+    throw new Error('A senha deve ter no mínimo 6 caracteres.');
+  }
+}
+
+export function normalizeAuthError(app, error) {
+  if (error?.message && !error?.code) {
+    return error.message;
+  }
+
+  return AUTH_ERROR_MESSAGES[error?.code] || app.normalizeError(error);
+}

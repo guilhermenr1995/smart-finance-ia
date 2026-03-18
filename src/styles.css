@@ -146,6 +146,8 @@ select.edit-mode {
   align-items: center;
   justify-content: center;
   cursor: help;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .help-tooltip::after {
@@ -173,46 +175,53 @@ select.edit-mode {
 }
 
 .help-tooltip:hover::after,
-.help-tooltip:focus-visible::after {
+.help-tooltip:focus-visible::after,
+.help-tooltip.is-open::after {
   opacity: 1;
 }
 
 .tutorial-card {
   border: 2px solid #111827;
-  background: #f8fafc;
-  padding: 10px 12px;
+  background: linear-gradient(170deg, #ffffff 0%, #f8fafc 100%);
+  padding: 12px;
+  box-shadow: 2px 2px 0 #111827;
 }
 
-.tutorial-card summary {
-  cursor: pointer;
-  font-size: 11px;
+.tutorial-card-title {
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #111827;
-  list-style: none;
 }
 
-.tutorial-card summary::-webkit-details-marker {
-  display: none;
-}
-
-.tutorial-card summary::after {
-  content: '+';
-  float: right;
-  font-weight: 800;
-}
-
-.tutorial-card[open] summary::after {
-  content: '-';
-}
-
-.tutorial-card p {
+.tutorial-card-list {
   margin-top: 8px;
+  padding-left: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.tutorial-card-list li {
   font-size: 12px;
   font-weight: 600;
   color: #374151;
   line-height: 1.45;
+}
+
+.tutorial-swipe-hint {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.tutorial-bank-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .auth-message[data-type='error'] {
@@ -428,6 +437,7 @@ select.edit-mode {
     min-width: 200px;
     max-width: 240px;
   }
+
 }
 
 @media (min-width: 768px) {
@@ -447,5 +457,32 @@ select.edit-mode {
   .transaction-actions {
     justify-self: end;
     min-width: 340px;
+  }
+
+  .tutorial-bank-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .tutorial-bank-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 85%;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .tutorial-card {
+    scroll-snap-align: start;
+    min-height: 170px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .tutorial-bank-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
