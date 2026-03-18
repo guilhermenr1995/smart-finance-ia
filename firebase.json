@@ -1,0 +1,26 @@
+{
+  "functions": {
+    "source": "backend/cloud-functions"
+  },
+  "hosting": {
+    "site": "smart-finance-ia",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "backend/**",
+      "novas_demandas.md",
+      "playstore_publicacao.md"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

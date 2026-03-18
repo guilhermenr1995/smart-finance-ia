@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasValidTransactionShape(data) {
+      return data.keys().hasOnly(['hash', 'date', 'title', 'value', 'category', 'accountType', 'active'])
+        && data.hash is string
+        && data.date is string
+        && data.title is string
+        && data.value is number
+        && data.value >= 0
+        && data.category is string
+        && data.category.size() > 0
+        && data.category.size() <= 50
+        && data.accountType in ['Crédito', 'Conta']
+        && data.active is bool;
+    }
+
+    function hasValidCategoryShape(data) {
+      return data.keys().hasOnly(['name', 'normalizedName', 'createdAt'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 50
+        && data.normalizedName is string
+        && data.normalizedName.size() <= 80
+        && data.createdAt is string;
+    }
+
+    match /artifacts/{appId}/users/{userId}/transacoes/{transactionId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && hasValidTransactionShape(request.resource.data);
+
+      allow update: if isOwner(userId)
+        && hasValidTransactionShape(request.resource.data)
+        && request.resource.data.hash == resource.data.hash
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.title == resource.data.title
+        && request.resource.data.value == resource.data.value
+        && request.resource.data.accountType == resource.data.accountType;
+
+      allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/categorias/{categoryId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidCategoryShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidCategoryShape(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+  }
+}

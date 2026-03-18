@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Smart Finance IA">
+  <rect width="512" height="512" rx="72" fill="#facc15" />
+  <rect x="48" y="48" width="416" height="416" rx="54" fill="#fafafa" stroke="#000" stroke-width="22" />
+  <path d="M112 332h58V172h-58zm116 0h58V126h-58zm116 0h58V218h-58z" fill="#111827" />
+  <text x="256" y="420" text-anchor="middle" font-size="62" font-family="Arial, sans-serif" font-weight="700" fill="#111827">SF</text>
+</svg>

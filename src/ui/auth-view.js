@@ -1,0 +1,100 @@
+export class AuthView {
+  constructor() {
+    this.authScreen = document.getElementById('auth-screen');
+    this.appScreen = document.getElementById('app-screen');
+
+    this.authForm = document.getElementById('auth-form');
+    this.emailInput = document.getElementById('auth-email');
+    this.passwordInput = document.getElementById('auth-password');
+
+    this.loginButton = document.getElementById('btn-login');
+    this.registerButton = document.getElementById('btn-register');
+    this.googleButton = document.getElementById('btn-google');
+    this.resetPasswordButton = document.getElementById('btn-reset-password');
+    this.logoutButton = document.getElementById('btn-logout');
+
+    this.authStatus = document.getElementById('auth-status');
+    this.userEmail = document.getElementById('user-email');
+    this.message = document.getElementById('auth-message');
+  }
+
+  bindEvents(handlers) {
+    this.loginButton.addEventListener('click', () => {
+      handlers.onLogin(this.getCredentials());
+    });
+
+    this.registerButton.addEventListener('click', () => {
+      handlers.onRegister(this.getCredentials());
+    });
+
+    this.googleButton.addEventListener('click', () => {
+      handlers.onGoogleLogin();
+    });
+
+    this.resetPasswordButton.addEventListener('click', () => {
+      handlers.onPasswordReset(this.emailInput.value.trim());
+    });
+
+    this.logoutButton.addEventListener('click', () => {
+      handlers.onLogout();
+    });
+
+    this.authForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      handlers.onLogin(this.getCredentials());
+    });
+  }
+
+  getCredentials() {
+    return {
+      email: this.emailInput.value.trim(),
+      password: this.passwordInput.value
+    };
+  }
+
+  setAuthenticated(user) {
+    const isAuthenticated = Boolean(user);
+
+    this.authScreen.classList.toggle('hidden', isAuthenticated);
+    this.appScreen.classList.toggle('hidden', !isAuthenticated);
+    this.logoutButton.classList.toggle('hidden', !isAuthenticated);
+
+    if (isAuthenticated) {
+      this.authStatus.innerText = 'Online';
+      this.userEmail.innerText = user.email || 'Sessão autenticada';
+      this.clearMessage();
+      return;
+    }
+
+    this.authStatus.innerText = 'Offline';
+    this.userEmail.innerText = 'Faça login para acessar seus dados';
+  }
+
+  setBusy(isBusy) {
+    const controls = [
+      this.loginButton,
+      this.registerButton,
+      this.googleButton,
+      this.resetPasswordButton,
+      this.logoutButton,
+      this.emailInput,
+      this.passwordInput
+    ];
+
+    controls.forEach((element) => {
+      element.disabled = isBusy;
+    });
+  }
+
+  showMessage(text, type = 'info') {
+    this.message.innerText = text;
+    this.message.dataset.type = type;
+    this.message.classList.remove('hidden');
+  }
+
+  clearMessage() {
+    this.message.innerText = '';
+    this.message.dataset.type = '';
+    this.message.classList.add('hidden');
+  }
+}

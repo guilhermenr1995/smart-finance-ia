@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Smart Finance IA - Pro</title>
+
+    <meta name="theme-color" content="#facc15" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Smart Finance IA" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body class="font-sans text-zinc-900 bg-zinc-100 min-h-screen">
+    <section id="auth-screen" class="auth-screen min-h-screen flex items-center justify-center p-6">
+      <div class="auth-bg-shape auth-bg-shape-left"></div>
+      <div class="auth-bg-shape auth-bg-shape-right"></div>
+
+      <div class="auth-shell w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <aside class="auth-hero neo-brutalism p-8 lg:p-10">
+          <p class="auth-chip">Smart Finance IA</p>
+          <h1 class="auth-title mt-6">Seu dinheiro organizado em minutos.</h1>
+          <p class="auth-subtitle mt-4">
+            Importe a planilha do banco ou do cartão, clique em um botão e veja seus gastos organizados por categoria.
+            Simples, rápido e sem complicação.
+          </p>
+
+          <div class="auth-points mt-8 space-y-3">
+            <div class="auth-point neo-brutalism">
+              <span>1. Importe a planilha</span>
+              <small>CSV de crédito e conta em poucos segundos</small>
+            </div>
+            <div class="auth-point neo-brutalism">
+              <span>2. Clique em categorizar</span>
+              <small>A IA sugere tudo e aprende com seu histórico</small>
+            </div>
+            <div class="auth-point neo-brutalism">
+              <span>3. Entenda para onde vai seu dinheiro</span>
+              <small>Compare períodos e tome decisões com confiança</small>
+            </div>
+          </div>
+        </aside>
+
+        <div class="auth-card neo-brutalism p-8 lg:p-10">
+          <div class="text-center">
+            <h2 class="auth-form-title">Acesse sua conta</h2>
+            <p class="auth-form-subtitle mt-2">Entre e continue seu controle financeiro sem dor de cabeça.</p>
+          </div>
+
+          <form id="auth-form" class="space-y-5 mt-8">
+            <div>
+              <label for="auth-email" class="auth-label">E-mail</label>
+              <input id="auth-email" type="email" autocomplete="email" class="auth-input" required />
+            </div>
+            <div>
+              <label for="auth-password" class="auth-label">Senha</label>
+              <input id="auth-password" type="password" autocomplete="current-password" class="auth-input" required />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button id="btn-login" type="submit" class="auth-btn auth-btn-primary">Entrar</button>
+              <button id="btn-google" type="button" class="auth-btn auth-btn-light">Google</button>
+              <button id="btn-register" type="button" class="auth-btn auth-btn-light">Criar conta</button>
+              <button id="btn-reset-password" type="button" class="auth-btn auth-btn-light">Esqueci senha</button>
+            </div>
+          </form>
+
+          <p id="auth-message" class="hidden auth-message text-[11px] font-black uppercase text-center mt-5"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="app-screen" class="hidden p-4 pb-24">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <header class="bg-yellow-300 p-6 neo-brutalism flex justify-between items-start gap-4">
+          <div>
+            <h1 class="text-2xl font-black italic uppercase tracking-tighter leading-none">Smart Finance IA</h1>
+            <p class="text-[10px] font-bold uppercase opacity-60 mt-1 tracking-widest">
+              Status: <span id="auth-status" class="text-black italic">Offline</span>
+            </p>
+            <p id="user-email" class="text-[10px] font-bold uppercase mt-1 tracking-widest text-zinc-700">
+              Faça login para acessar seus dados
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button
+              id="btn-install-app"
+              class="hidden px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
+            >
+              Instalar App
+            </button>
+            <button
+              id="btn-logout"
+              class="hidden px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-black text-white"
+            >
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <div class="space-y-4">
+          <div class="bg-white p-5 neo-brutalism flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[140px]">
+              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Início do Ciclo</label>
+              <input
+                type="date"
+                id="data-inicio"
+                class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+              />
+            </div>
+            <div class="flex-1 min-w-[140px]">
+              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Fim do Ciclo</label>
+              <input
+                type="date"
+                id="data-fim"
+                class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"
+              />
+            </div>
+            <div class="flex-1 min-w-[180px]">
+              <label class="block text-[10px] font-black uppercase text-zinc-400 italic mb-2">Categoria</label>
+              <select id="filter-category" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-1 text-sm"></select>
+            </div>
+            <div class="flex gap-2 w-full sm:w-auto">
+              <button
+                id="filter-all"
+                class="filter-active px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
+              >
+                Tudo
+              </button>
+              <button
+                id="filter-credit"
+                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
+              >
+                Crédito
+              </button>
+              <button
+                id="filter-debit"
+                class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
+              >
+                Conta
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white p-5 neo-brutalism flex flex-col gap-3">
+              <span class="font-black text-[11px] uppercase italic text-zinc-500">Importar Dados</span>
+              <div class="flex gap-3">
+                <label
+                  class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
+                >
+                  💳 Crédito
+                  <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" />
+                </label>
+                <label
+                  class="relative flex-1 bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
+                >
+                  🏦 Conta
+                  <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" />
+                </label>
+              </div>
+            </div>
+            <button
+              id="btn-ai-sync"
+              class="bg-black text-yellow-300 p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+            >
+              <span class="font-black text-xs uppercase tracking-widest">Categorizar Ciclo com IA</span>
+              <p id="label-ia-count" class="text-[8px] uppercase font-bold opacity-70 mt-1">0 Pendentes</p>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div class="md:col-span-4 p-8 neo-brutalism text-white bg-zinc-900 flex flex-wrap justify-between items-center gap-6">
+            <div>
+              <p class="text-[11px] font-black uppercase mb-1 opacity-50 italic">Gastos do Ciclo</p>
+              <h2 id="total-fatura-val" class="text-5xl font-black italic tracking-tighter">R$ 0,00</h2>
+              <p id="legenda-ciclo" class="text-[9px] mt-2 font-bold text-yellow-300 uppercase tracking-widest"></p>
+            </div>
+            <div class="bg-white/5 p-5 border border-white/10 min-w-[160px]">
+              <p class="text-[9px] font-black uppercase opacity-40 mb-1">Itens Ignorados</p>
+              <p id="valor-ignorado" class="text-xl font-bold text-zinc-500">R$ 0,00</p>
+            </div>
+          </div>
+
+          <div class="md:col-span-3 bg-white p-6 neo-brutalism">
+            <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-6 pb-2">Mix de Gastos</h3>
+            <div class="flex items-center gap-3 mb-3 text-[10px] font-black uppercase">
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
+            </div>
+            <div id="chart-bars" class="flex items-end justify-between h-44 pt-4 pb-2 gap-4 overflow-x-auto no-scrollbar"></div>
+          </div>
+
+          <div class="md:col-span-1 bg-white p-6 neo-brutalism overflow-y-auto max-h-[350px] no-scrollbar">
+            <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Mix</h3>
+            <div id="stats-list" class="space-y-5"></div>
+          </div>
+
+          <div class="md:col-span-4 bg-white p-4 neo-brutalism">
+            <div class="flex justify-between items-center px-2 py-3 border-b-2 border-black mb-4">
+              <h3 class="font-black text-xs uppercase italic">Lançamentos Detalhados</h3>
+              <span id="contador-itens" class="text-[9px] font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs font-bold border-separate border-spacing-y-2">
+                <thead class="text-[10px] text-zinc-400 uppercase">
+                  <tr>
+                    <th class="text-left px-3 py-2">Data</th>
+                    <th class="text-left px-3 py-2">Tipo</th>
+                    <th class="text-center px-1 py-2">Uso</th>
+                    <th class="text-left px-3 py-2">Descrição</th>
+                    <th class="text-left px-3 py-2">Categoria</th>
+                    <th class="text-right px-3 py-2">Valor</th>
+                  </tr>
+                </thead>
+                <tbody id="tabela-corpo"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="category-picker-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-md bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-black text-sm uppercase">Selecionar Categoria</h3>
+          <button id="category-picker-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <input id="category-picker-input" type="text" placeholder="Buscar ou criar categoria" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" />
+        <button id="category-picker-create" class="hidden w-full px-3 py-2 border-2 border-black font-black text-[11px] uppercase bg-yellow-200"></button>
+        <div id="category-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <div
+      id="overlay"
+      class="hidden fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center p-6 text-center"
+    >
+      <div class="w-16 h-16 border-8 border-black border-t-yellow-400 animate-spin mb-6"></div>
+      <p id="overlay-msg" class="font-black text-xl uppercase italic">Processando</p>
+      <div
+        id="debug-console"
+        class="w-full max-w-lg mt-8 bg-zinc-900 text-green-400 p-6 text-[10px] font-mono h-56 overflow-y-auto border-4 border-black text-left"
+      ></div>
+      <button
+        id="btn-fechar-overlay"
+        class="hidden mt-8 bg-black text-white px-10 py-4 neo-brutalism font-black uppercase text-sm"
+      >
+        Fechar
+      </button>
+    </div>
+
+    <script src="./runtime-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
