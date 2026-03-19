@@ -908,12 +908,30 @@ export class DashboardView {
         const deltaPrefix = deltaValue >= 0 ? '+' : '-';
         const deltaPercent = Math.abs(Number(item.deltaPercent || 0)).toFixed(1);
         const insight = escapeHtml(item.insight || '');
+        const drivers = Array.isArray(item.drivers) ? item.drivers.slice(0, 3) : [];
+        const driversHtml =
+          drivers.length === 0
+            ? ''
+            : `
+              <div class="mt-2 pt-2 border-t border-black/10">
+                <p class="text-[10px] font-black uppercase text-zinc-500 mb-1">Transações que mais impactaram</p>
+                ${drivers
+                  .map((driver) => {
+                    const driverDelta = Number(driver?.delta || 0);
+                    return `<p class="text-[10px] font-bold text-zinc-700">• ${escapeHtml(
+                      String(driver?.title || 'Sem descrição')
+                    )} (${driverDelta >= 0 ? '+' : '-'}${formatCompactCurrency(Math.abs(driverDelta))})</p>`;
+                  })
+                  .join('')}
+              </div>
+            `;
 
         return `
           <div class="border border-black/20 p-2 bg-white/70">
             <p class="text-[11px] font-black uppercase">${category}</p>
             <p class="text-[10px] font-bold text-zinc-700">Atual: ${current} | Anterior: ${previous} | Diferença: ${deltaPrefix}${delta} (${deltaPercent}%)</p>
             ${insight ? `<p class="text-[10px] font-bold text-zinc-600 mt-1">${insight}</p>` : ''}
+            ${driversHtml}
           </div>
         `;
       })

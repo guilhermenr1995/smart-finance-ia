@@ -238,6 +238,19 @@ function normalizeCategoryKey(value) {
     .toLowerCase();
 }
 
+function normalizeTransactionTitleKey(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\bparcela(?:s)?\b/g, ' ')
+    .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function formatCurrencyBRL(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -364,7 +377,7 @@ function sanitizeTopTransactions(rawTransactions) {
     }))
     .filter((transaction) => transaction.value > 0 && transaction.title)
     .sort((left, right) => right.value - left.value)
-    .slice(0, 10);
+    .slice(0, 20);
 }
 
 function sanitizeOutlierTransactions(rawOutliers) {
@@ -683,16 +696,109 @@ function buildDeterministicConsultantReport(currentPeriod, previousPeriod) {
   const fallbackActions = buildFallbackActions(report);
   report.criticalActions = fallbackActions.criticalActions;
   report.dispensableCuts = fallbackActions.dispensableCuts;
+
+  report.increased = report.increased.map((item) => ({
+    ...item,
+    drivers: buildCategoryTransactionDrivers(item.category, current.topTransactions, previous.topTransactions, 'increase')
+  }));
+  report.reduced = report.reduced.map((item) => ({
+    ...item,
+    drivers: buildCategoryTransactionDrivers(item.category, current.topTransactions, previous.topTransactions, 'reduction')
+  }));
+
+  report.increased = report.increased.map((item) => ({
+    ...item,
+    insight: buildDefaultDeltaInsight(item)
+  }));
+  report.reduced = report.reduced.map((item) => ({
+    ...item,
+    insight: buildDefaultDeltaInsight(item)
+  }));
+
   return report;
+}
+
+function buildCategoryTransactionDrivers(category, currentTopTransactions, previousTopTransactions, direction = 'increase') {
+  const normalizedCategory = normalizeCategoryKey(category);
+  if (!normalizedCategory) {
+    return [];
+  }
+
+  const aggregateByTitle = (transactions) => {
+    const map = new Map();
+
+    (transactions || []).forEach((transaction) => {
+      if (normalizeCategoryKey(transaction?.category) !== normalizedCategory) {
+        return;
+      }
+
+      const title = String(transaction?.title || '').trim();
+      const key = normalizeTransactionTitleKey(title) || normalizeCategoryKey(title);
+      if (!key) {
+        return;
+      }
+
+      const current = map.get(key) || {
+        key,
+        title,
+        total: 0
+      };
+
+      current.total += toFiniteNumber(transaction?.value);
+      if (!current.title || title.length > current.title.length) {
+        current.title = title;
+      }
+
+      map.set(key, current);
+    });
+
+    return map;
+  };
+
+  const currentMap = aggregateByTitle(currentTopTransactions);
+  const previousMap = aggregateByTitle(previousTopTransactions);
+  const keys = new Set([...currentMap.keys(), ...previousMap.keys()]);
+
+  const deltas = [...keys].map((key) => {
+    const current = currentMap.get(key);
+    const previous = previousMap.get(key);
+    const currentTotal = toCurrency(current?.total || 0);
+    const previousTotal = toCurrency(previous?.total || 0);
+    const delta = toCurrency(currentTotal - previousTotal);
+
+    return {
+      title: String(current?.title || previous?.title || '').trim() || 'Sem descrição',
+      currentTotal,
+      previousTotal,
+      delta
+    };
+  });
+
+  const filtered =
+    direction === 'reduction'
+      ? deltas.filter((item) => item.delta < -0.01).sort((left, right) => left.delta - right.delta)
+      : deltas.filter((item) => item.delta > 0.01).sort((left, right) => right.delta - left.delta);
+
+  return filtered.slice(0, 3);
 }
 
 function buildDefaultDeltaInsight(item) {
   const deltaValue = formatCurrencyBRL(Math.abs(item.delta));
+  const topDriver = Array.isArray(item.drivers) && item.drivers.length > 0 ? item.drivers[0] : null;
+
   if (item.delta > 0) {
+    if (topDriver) {
+      return `Subiu ${deltaValue} no período. Principal impacto: "${topDriver.title}" (${formatCurrencyBRL(topDriver.delta)} a mais).`;
+    }
+
     return `Subiu ${deltaValue} no período e merece acompanhamento mais próximo.`;
   }
 
   if (item.delta < 0) {
+    if (topDriver) {
+      return `Reduziu ${deltaValue} no período. Principal alívio: "${topDriver.title}" (${formatCurrencyBRL(Math.abs(topDriver.delta))} a menos).`;
+    }
+
     return `Reduziu ${deltaValue} no período, mantendo tendência positiva.`;
   }
 
@@ -879,6 +985,19 @@ function mergeDailyUsage(globalDailyUsage, perUserDailyUsage, userId, dateKey, d
   perUserDailyUsage[userId].importOperationsTotal += importOperations;
   perUserDailyUsage[userId].importedTransactionsTotal += importedTransactions;
   perUserDailyUsage[userId].manualTransactionsTotal += manualTransactions;
+}
+
+async function listAllProjectAuthUsers() {
+  const users = [];
+  let nextPageToken = undefined;
+
+  do {
+    const page = await getAuth().listUsers(1000, nextPageToken);
+    users.push(...(page.users || []));
+    nextPageToken = page.pageToken;
+  } while (nextPageToken);
+
+  return users;
 }
 
 async function reserveConsultantUsage(userId, appId) {
@@ -1163,6 +1282,14 @@ exports.analyzeSpendingInsights = onRequest(
           increased: baseReport.increased,
           reduced: baseReport.reduced,
           categoryHighlights: baseReport.categoryHighlights,
+          increasedDrivers: baseReport.increased.map((item) => ({
+            category: item.category,
+            drivers: item.drivers || []
+          })),
+          reducedDrivers: baseReport.reduced.map((item) => ({
+            category: item.category,
+            drivers: item.drivers || []
+          })),
           topMerchants: baseReport.topMerchants,
           topTransactions: baseReport.topTransactions,
           outlierTransactions: baseReport.outlierTransactions,
@@ -1178,7 +1305,7 @@ exports.analyzeSpendingInsights = onRequest(
         promptText:
           'Analise os dados e retorne estritamente este JSON: ' +
           '{"overview":"...","projectionSummary":"...","increasedInsights":[{"category":"...","insight":"..."}],"reducedInsights":[{"category":"...","insight":"..."}],"categoryInsights":[{"category":"...","insight":"..."}],"criticalActions":["..."],"dispensableCuts":["..."],"smartAlerts":["..."]}. ' +
-          'Regras: textos objetivos, práticos, úteis para reduzir gastos; sem jargão técnico; destaque aumento/redução por categoria, risco de parcelas e oportunidades de corte. Dados: ' +
+          'Regras: textos objetivos, práticos, úteis para reduzir gastos; sem jargão técnico; destaque aumento/redução por categoria, risco de parcelas e oportunidades de corte. Sempre que possível, cite transações/estabelecimentos específicos que puxaram alta ou queda de cada categoria com base nos drivers fornecidos. Dados: ' +
           JSON.stringify(promptPayload),
         temperature: 0.25
       });
@@ -1280,6 +1407,32 @@ exports.getAdminDashboard = onRequest(
         userProfiles.set(doc.id, {
           uid: doc.id,
           ...(doc.data() || {})
+        });
+      });
+
+      const authUsers = await listAllProjectAuthUsers();
+      authUsers.forEach((authUser) => {
+        if (authUser.disabled) {
+          return;
+        }
+
+        const providerIds = (authUser.providerData || [])
+          .map((provider) => String(provider?.providerId || '').trim())
+          .filter(Boolean);
+
+        if (providerIds.length === 0) {
+          return;
+        }
+
+        const existingProfile = userProfiles.get(authUser.uid) || { uid: authUser.uid };
+        userProfiles.set(authUser.uid, {
+          ...existingProfile,
+          uid: authUser.uid,
+          email: String(existingProfile.email || authUser.email || '').trim(),
+          displayName: String(existingProfile.displayName || authUser.displayName || '').trim(),
+          providerIds: providerIds.length > 0 ? providerIds : existingProfile.providerIds || [],
+          createdAt: toIsoOrEmpty(existingProfile.createdAt || authUser.metadata?.creationTime),
+          lastAccessAt: toIsoOrEmpty(existingProfile.lastAccessAt || authUser.metadata?.lastSignInTime)
         });
       });
 

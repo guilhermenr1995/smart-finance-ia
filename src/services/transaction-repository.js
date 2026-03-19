@@ -392,25 +392,11 @@ export class TransactionRepository {
 
     const nowIso = new Date().toISOString();
     const dateKey = getDateKeyInTimezone();
-    const userRef = this.getUserDoc(normalizedUserId);
     const dailyRef = this.getDailyMetricsCollection(normalizedUserId).doc(dateKey);
 
     await this.db.runTransaction(async (transaction) => {
-      const userSnapshot = await transaction.get(userRef);
       const dailySnapshot = await transaction.get(dailyRef);
-      const userData = userSnapshot.exists ? userSnapshot.data() || {} : {};
       const dailyData = dailySnapshot.exists ? dailySnapshot.data() || {} : {};
-
-      const nextUserPayload = {
-        uid: normalizedUserId,
-        aiCategorizationRunsTotal: Number(userData.aiCategorizationRunsTotal || 0) + counters.aiCategorizationRuns,
-        aiConsultantRunsTotal: Number(userData.aiConsultantRunsTotal || 0) + counters.aiConsultantRuns,
-        importOperationsTotal: Number(userData.importOperationsTotal || 0) + counters.importOperations,
-        importedTransactionsTotal: Number(userData.importedTransactionsTotal || 0) + counters.importedTransactions,
-        manualTransactionsTotal: Number(userData.manualTransactionsTotal || 0) + counters.manualTransactions,
-        lastAccessAt: nowIso,
-        lastAccessDateKey: dateKey
-      };
 
       const nextDailyPayload = {
         dateKey,
@@ -426,7 +412,6 @@ export class TransactionRepository {
         nextDailyPayload.createdAt = nowIso;
       }
 
-      transaction.set(userRef, nextUserPayload, { merge: true });
       transaction.set(dailyRef, nextDailyPayload, { merge: true });
     });
   }

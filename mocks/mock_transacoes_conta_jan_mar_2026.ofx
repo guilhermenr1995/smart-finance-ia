@@ -1,0 +1,383 @@
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+  <SIGNONMSGSRSV1>
+    <SONRS>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <DTSERVER>20260328120000[-3:BRT]</DTSERVER>
+      <LANGUAGE>POR</LANGUAGE>
+    </SONRS>
+  </SIGNONMSGSRSV1>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <TRNUID>1001</TRNUID>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <STMTRS>
+        <CURDEF>BRL</CURDEF>
+        <BANKACCTFROM>
+          <BANKID>260</BANKID>
+          <ACCTID>27391300</ACCTID>
+          <ACCTTYPE>CHECKING</ACCTTYPE>
+        </BANKACCTFROM>
+        <BANKTRANLIST>
+          <DTSTART>20260102000000</DTSTART>
+          <DTEND>20260328235959</DTEND>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260102120000</DTPOSTED>
+            <TRNAMT>-103.04</TRNAMT>
+            <FITID>MOCK20260102001</FITID>
+            <NAME>Internet Fibra Max</NAME>
+            <MEMO>Internet Fibra Max</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260105120000</DTPOSTED>
+            <TRNAMT>-148.20</TRNAMT>
+            <FITID>MOCK20260105002</FITID>
+            <NAME>Cafe do Centro</NAME>
+            <MEMO>Cafe do Centro</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260105120000</DTPOSTED>
+            <TRNAMT>-178.94</TRNAMT>
+            <FITID>MOCK20260105003</FITID>
+            <NAME>Auto Pecas Guaxupe</NAME>
+            <MEMO>Auto Pecas Guaxupe</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260107120000</DTPOSTED>
+            <TRNAMT>-151.37</TRNAMT>
+            <FITID>MOCK20260107004</FITID>
+            <NAME>Energia Eletrica Cemig</NAME>
+            <MEMO>Energia Eletrica Cemig</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260107120000</DTPOSTED>
+            <TRNAMT>-26.07</TRNAMT>
+            <FITID>MOCK20260107005</FITID>
+            <NAME>Supermercado Central</NAME>
+            <MEMO>Supermercado Central</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260109120000</DTPOSTED>
+            <TRNAMT>-51.31</TRNAMT>
+            <FITID>MOCK20260109006</FITID>
+            <NAME>Padaria Sabor & Cia</NAME>
+            <MEMO>Padaria Sabor & Cia</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260109120000</DTPOSTED>
+            <TRNAMT>-44.91</TRNAMT>
+            <FITID>MOCK20260109007</FITID>
+            <NAME>Apps e Games Store</NAME>
+            <MEMO>Apps e Games Store</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260111120000</DTPOSTED>
+            <TRNAMT>-54.48</TRNAMT>
+            <FITID>MOCK20260111008</FITID>
+            <NAME>Uber Viagem</NAME>
+            <MEMO>Uber Viagem</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260113120000</DTPOSTED>
+            <TRNAMT>-222.68</TRNAMT>
+            <FITID>MOCK20260113009</FITID>
+            <NAME>Padaria Sabor & Cia</NAME>
+            <MEMO>Padaria Sabor & Cia</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260115120000</DTPOSTED>
+            <TRNAMT>-92.07</TRNAMT>
+            <FITID>MOCK20260115010</FITID>
+            <NAME>Academia Movimento</NAME>
+            <MEMO>Academia Movimento</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260117120000</DTPOSTED>
+            <TRNAMT>-110.40</TRNAMT>
+            <FITID>MOCK20260117011</FITID>
+            <NAME>Seguro Auto Mensal</NAME>
+            <MEMO>Seguro Auto Mensal</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260118120000</DTPOSTED>
+            <TRNAMT>-63.64</TRNAMT>
+            <FITID>MOCK20260118012</FITID>
+            <NAME>App Mobilidade Urb</NAME>
+            <MEMO>App Mobilidade Urb</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260123120000</DTPOSTED>
+            <TRNAMT>-151.37</TRNAMT>
+            <FITID>MOCK20260123013</FITID>
+            <NAME>Pet Shop Amigo</NAME>
+            <MEMO>Pet Shop Amigo</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260127120000</DTPOSTED>
+            <TRNAMT>-148.20</TRNAMT>
+            <FITID>MOCK20260127014</FITID>
+            <NAME>Supermercado Central</NAME>
+            <MEMO>Supermercado Central</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260127120000</DTPOSTED>
+            <TRNAMT>-201.98</TRNAMT>
+            <FITID>MOCK20260127015</FITID>
+            <NAME>Livraria Horizonte</NAME>
+            <MEMO>Livraria Horizonte</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260127120000</DTPOSTED>
+            <TRNAMT>-32.41</TRNAMT>
+            <FITID>MOCK20260127016</FITID>
+            <NAME>Assinatura Musica</NAME>
+            <MEMO>Assinatura Musica</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260128120000</DTPOSTED>
+            <TRNAMT>-92.07</TRNAMT>
+            <FITID>MOCK20260128017</FITID>
+            <NAME>Farmacia Vida</NAME>
+            <MEMO>Farmacia Vida</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260130120000</DTPOSTED>
+            <TRNAMT>-44.97</TRNAMT>
+            <FITID>MOCK20260130018</FITID>
+            <NAME>Cinema Plaza</NAME>
+            <MEMO>Cinema Plaza</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260202120000</DTPOSTED>
+            <TRNAMT>-210.00</TRNAMT>
+            <FITID>MOCK20260202019</FITID>
+            <NAME>Lanchonete Estacao</NAME>
+            <MEMO>Lanchonete Estacao</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260203120000</DTPOSTED>
+            <TRNAMT>-69.98</TRNAMT>
+            <FITID>MOCK20260203020</FITID>
+            <NAME>Loja Casa e Conforto</NAME>
+            <MEMO>Loja Casa e Conforto</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260208120000</DTPOSTED>
+            <TRNAMT>-219.51</TRNAMT>
+            <FITID>MOCK20260208021</FITID>
+            <NAME>Papelaria Alfa</NAME>
+            <MEMO>Papelaria Alfa</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260211120000</DTPOSTED>
+            <TRNAMT>-210.00</TRNAMT>
+            <FITID>MOCK20260211022</FITID>
+            <NAME>Transferencia enviada PIX Maria</NAME>
+            <MEMO>Transferencia enviada PIX Maria</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260218120000</DTPOSTED>
+            <TRNAMT>-139.41</TRNAMT>
+            <FITID>MOCK20260218023</FITID>
+            <NAME>Posto Avenida</NAME>
+            <MEMO>Posto Avenida</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260220120000</DTPOSTED>
+            <TRNAMT>-86.88</TRNAMT>
+            <FITID>MOCK20260220024</FITID>
+            <NAME>Mercado Bairro Sul</NAME>
+            <MEMO>Mercado Bairro Sul</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260223120000</DTPOSTED>
+            <TRNAMT>-182.11</TRNAMT>
+            <FITID>MOCK20260223025</FITID>
+            <NAME>Loja de Roupas Bella</NAME>
+            <MEMO>Loja de Roupas Bella</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260223120000</DTPOSTED>
+            <TRNAMT>-63.64</TRNAMT>
+            <FITID>MOCK20260223026</FITID>
+            <NAME>Farmacia Vida</NAME>
+            <MEMO>Farmacia Vida</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260225120000</DTPOSTED>
+            <TRNAMT>-63.64</TRNAMT>
+            <FITID>MOCK20260225027</FITID>
+            <NAME>Streaming Plus</NAME>
+            <MEMO>Streaming Plus</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260225120000</DTPOSTED>
+            <TRNAMT>-133.07</TRNAMT>
+            <FITID>MOCK20260225028</FITID>
+            <NAME>Feira Organica Sabado</NAME>
+            <MEMO>Feira Organica Sabado</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260226120000</DTPOSTED>
+            <TRNAMT>-216.34</TRNAMT>
+            <FITID>MOCK20260226029</FITID>
+            <NAME>Curso Online Dev</NAME>
+            <MEMO>Curso Online Dev</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260304120000</DTPOSTED>
+            <TRNAMT>-35.58</TRNAMT>
+            <FITID>MOCK20260304030</FITID>
+            <NAME>Restaurante Vila</NAME>
+            <MEMO>Restaurante Vila</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260309120000</DTPOSTED>
+            <TRNAMT>-48.14</TRNAMT>
+            <FITID>MOCK20260309031</FITID>
+            <NAME>Loja Esportes Run</NAME>
+            <MEMO>Loja Esportes Run</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260312120000</DTPOSTED>
+            <TRNAMT>-123.08</TRNAMT>
+            <FITID>MOCK20260312032</FITID>
+            <NAME>Clinica Odonto</NAME>
+            <MEMO>Clinica Odonto</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260312120000</DTPOSTED>
+            <TRNAMT>-110.40</TRNAMT>
+            <FITID>MOCK20260312033</FITID>
+            <NAME>iFood Pedido</NAME>
+            <MEMO>iFood Pedido</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260312120000</DTPOSTED>
+            <TRNAMT>-74.20</TRNAMT>
+            <FITID>MOCK20260312034</FITID>
+            <NAME>Restaurante Vila</NAME>
+            <MEMO>Restaurante Vila</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260314120000</DTPOSTED>
+            <TRNAMT>-86.88</TRNAMT>
+            <FITID>MOCK20260314035</FITID>
+            <NAME>Transferencia enviada PIX Joao</NAME>
+            <MEMO>Transferencia enviada PIX Joao</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260317120000</DTPOSTED>
+            <TRNAMT>-26.07</TRNAMT>
+            <FITID>MOCK20260317036</FITID>
+            <NAME>Eletronicos Smart</NAME>
+            <MEMO>Eletronicos Smart</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260319120000</DTPOSTED>
+            <TRNAMT>-116.74</TRNAMT>
+            <FITID>MOCK20260319037</FITID>
+            <NAME>Posto Avenida</NAME>
+            <MEMO>Posto Avenida</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260319120000</DTPOSTED>
+            <TRNAMT>-106.21</TRNAMT>
+            <FITID>MOCK20260319038</FITID>
+            <NAME>Clube Assinatura</NAME>
+            <MEMO>Clube Assinatura</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260319120000</DTPOSTED>
+            <TRNAMT>-157.71</TRNAMT>
+            <FITID>MOCK20260319039</FITID>
+            <NAME>Agua Saneamento</NAME>
+            <MEMO>Agua Saneamento</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260322120000</DTPOSTED>
+            <TRNAMT>-110.40</TRNAMT>
+            <FITID>MOCK20260322040</FITID>
+            <NAME>Academia Movimento</NAME>
+            <MEMO>Academia Movimento</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260322120000</DTPOSTED>
+            <TRNAMT>-88.90</TRNAMT>
+            <FITID>MOCK20260322041</FITID>
+            <NAME>Material Construcao Forte</NAME>
+            <MEMO>Material Construcao Forte</MEMO>
+          </STMTTRN>
+          <STMTTRN>
+            <TRNTYPE>DEBIT</TRNTYPE>
+            <DTPOSTED>20260328120000</DTPOSTED>
+            <TRNAMT>-92.07</TRNAMT>
+            <FITID>MOCK20260328042</FITID>
+            <NAME>Transferencia enviada PIX Aluguel</NAME>
+            <MEMO>Transferencia enviada PIX Aluguel</MEMO>
+          </STMTTRN>
+        </BANKTRANLIST>
+        <LEDGERBAL>
+          <BALAMT>69.46</BALAMT>
+          <DTASOF>20260328235959</DTASOF>
+        </LEDGERBAL>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>
