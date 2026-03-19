@@ -16,9 +16,10 @@ export async function importCsv(app, file, accountType) {
   try {
     await app.syncDataFromCloud({ force: false, showOverlay: false });
 
-    const fileContent = await file.text();
+    const isPdfFile = /\.pdf$/i.test(file.name || '');
+    const fileContent = isPdfFile ? await file.arrayBuffer() : await file.text();
     const existingHashes = new Set(app.state.transactions.map((transaction) => transaction.hash));
-    const parseResult = app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
+    const parseResult = await app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
 
     if (parseResult.transactions.length === 0) {
       app.overlayView.log('Nenhuma transação nova foi identificada.');

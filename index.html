@@ -124,58 +124,92 @@
             <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
               <div>
                 <p class="text-[11px] font-bold text-zinc-600 mb-3">
-                  Exemplos práticos para quem nunca exportou extrato. O caminho exato pode variar por versão do aplicativo.
+                  Exemplos práticos para quem nunca exportou extrato. O app aceita CSV, OFX e PDF (inclusive formatos do Itaú).
                 </p>
-                <p class="tutorial-swipe-hint md:hidden">Arraste para o lado para ver mais bancos</p>
-                <div class="tutorial-bank-grid">
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Nubank</h4>
-                    <ul class="tutorial-card-list">
-                      <li>Abra <strong>Conta</strong> ou <strong>Cartão</strong>.</li>
-                      <li>Entre em <strong>Extrato</strong>.</li>
-                      <li>Procure <strong>Exportar/Compartilhar</strong> (OFX para conta, CSV para fatura).</li>
-                    </ul>
-                  </article>
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Itaú</h4>
-                    <ul class="tutorial-card-list">
-                      <li>No Internet Banking, vá em <strong>Conta Corrente</strong>.</li>
-                      <li>Acesse <strong>Extrato</strong> no período desejado.</li>
-                      <li>Use <strong>Exportar</strong> (geralmente OFX e, em alguns casos, CSV).</li>
-                    </ul>
-                  </article>
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Bradesco</h4>
-                    <ul class="tutorial-card-list">
-                      <li>Acesse <strong>Extrato por período</strong>.</li>
-                      <li>Toque em <strong>Exportar</strong> no rodapé/menu.</li>
-                      <li>Priorize <strong>OFX</strong> para integração financeira.</li>
-                    </ul>
-                  </article>
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Santander</h4>
-                    <ul class="tutorial-card-list">
-                      <li>Abra <strong>Conta Corrente</strong>.</li>
-                      <li>Consulte o <strong>Extrato</strong> do período.</li>
-                      <li>Use <strong>Exportar/Download</strong> (OFX/CSV conforme disponibilidade).</li>
-                    </ul>
-                  </article>
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Banco do Brasil</h4>
-                    <ul class="tutorial-card-list">
-                      <li>Entre no menu de <strong>Extratos</strong>.</li>
-                      <li>Selecione o período desejado.</li>
-                      <li>Use <strong>Download/Exportação</strong> (OFX é comum).</li>
-                    </ul>
-                  </article>
-                  <article class="tutorial-card">
-                    <h4 class="tutorial-card-title">Caixa e Inter</h4>
-                    <ul class="tutorial-card-list">
-                      <li>Busque por <strong>Extrato detalhado</strong>.</li>
-                      <li>Abra o menu de <strong>compartilhar/exportar</strong>.</li>
-                      <li>Quando não houver CSV, use <strong>OFX</strong>.</li>
-                    </ul>
-                  </article>
+                <div class="tutorial-accordion" role="tablist" aria-label="Guia rápido de exportação por banco">
+                  <details class="tutorial-accordion-item" open>
+                    <summary class="tutorial-accordion-summary">
+                      <span>Nubank</span>
+                      <small>Conta OFX | Cartão CSV</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>Abra <strong>Conta</strong> ou <strong>Cartão</strong>.</li>
+                        <li>Entre em <strong>Extrato/Fatura</strong> e ajuste o período.</li>
+                        <li>Use <strong>Exportar/Compartilhar</strong> e salve em OFX (conta) ou CSV (fatura).</li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <details class="tutorial-accordion-item">
+                    <summary class="tutorial-accordion-summary">
+                      <span>Itaú</span>
+                      <small>Conta e Cartão em PDF</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>No app Itaú: <strong>Conta &gt; Extrato &gt; Período &gt; Compartilhar</strong> e salve em PDF.</li>
+                        <li>Para cartão: <strong>Cartões &gt; Fatura &gt; Baixar/Compartilhar PDF</strong>.</li>
+                        <li>No Internet Banking, quando disponível, use <strong>Exportar OFX/CSV</strong> para importação mais estruturada.</li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <details class="tutorial-accordion-item">
+                    <summary class="tutorial-accordion-summary">
+                      <span>Bradesco</span>
+                      <small>OFX ou PDF</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>Acesse <strong>Extrato por período</strong>.</li>
+                        <li>No menu de ações, escolha <strong>Exportar/Download</strong>.</li>
+                        <li>Priorize OFX; se não houver, exporte PDF detalhado.</li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <details class="tutorial-accordion-item">
+                    <summary class="tutorial-accordion-summary">
+                      <span>Santander</span>
+                      <small>OFX/CSV/PDF</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>Abra <strong>Conta Corrente &gt; Extrato</strong> no período desejado.</li>
+                        <li>Use <strong>Exportar/Download</strong>.</li>
+                        <li>Se OFX/CSV não estiver disponível no app, use o PDF do extrato detalhado.</li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <details class="tutorial-accordion-item">
+                    <summary class="tutorial-accordion-summary">
+                      <span>Banco do Brasil</span>
+                      <small>OFX ou PDF</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>Entre em <strong>Conta &gt; Extratos</strong>.</li>
+                        <li>Selecione o período e abra opções de <strong>Download/Exportação</strong>.</li>
+                        <li>Use OFX quando disponível; senão, PDF do extrato detalhado.</li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <details class="tutorial-accordion-item">
+                    <summary class="tutorial-accordion-summary">
+                      <span>Caixa e Inter</span>
+                      <small>OFX/PDF</small>
+                    </summary>
+                    <div class="tutorial-accordion-body">
+                      <ul class="tutorial-card-list">
+                        <li>Busque por <strong>Extrato detalhado</strong> ou <strong>Movimentações</strong>.</li>
+                        <li>Use o menu de <strong>Compartilhar/Exportar</strong>.</li>
+                        <li>Se CSV não existir, importe OFX ou PDF.</li>
+                      </ul>
+                    </div>
+                  </details>
                 </div>
               </div>
 
@@ -185,7 +219,7 @@
                   <button
                     type="button"
                     class="help-tooltip"
-                    data-tooltip="Use arquivos CSV ou OFX. O app ignora duplicados e já tenta reaproveitar categorias anteriores."
+                    data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados e já tenta reaproveitar categorias anteriores automaticamente."
                     aria-label="Ajuda sobre importação"
                   >
                     ?
@@ -195,14 +229,14 @@
                   <label
                     class="relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
                   >
-                    💳 Crédito (CSV/OFX)
-                    <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
+                    💳 Crédito (CSV/OFX/PDF)
+                    <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
                   </label>
                   <label
                     class="relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-[10px] uppercase text-center cursor-pointer"
                   >
-                    🏦 Conta (CSV/OFX)
-                    <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc" />
+                    🏦 Conta (CSV/OFX/PDF)
+                    <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
                   </label>
                 </div>
                 <button
@@ -324,7 +358,7 @@
             </div>
           </section>
 
-          <section class="bg-white p-4 neo-brutalism">
+          <section class="bg-white p-4 neo-brutalism space-y-5">
             <div class="flex justify-between items-center px-2 py-3 border-b-2 border-black mb-4">
               <div class="flex items-center gap-2">
                 <h3 class="font-black text-xs uppercase italic">Lançamentos Detalhados</h3>
@@ -340,7 +374,11 @@
               <span id="contador-itens" class="text-[9px] font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
             </div>
 
-            <div class="mb-4 border-2 border-black bg-zinc-50 p-3">
+            <div class="mb-1 border-2 border-black bg-zinc-50 p-4 space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+                <p class="text-[10px] font-black uppercase text-zinc-500">Busca inteligente por descrição, valor e categoria</p>
+                <p class="text-[10px] font-bold text-zinc-500">O total encontrado mostra a representatividade sobre a base ativa.</p>
+              </div>
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div class="lg:col-span-3">
                   <div class="flex items-center gap-2 mb-2">
@@ -442,6 +480,7 @@
     </div>
 
     <script src="./runtime-config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>

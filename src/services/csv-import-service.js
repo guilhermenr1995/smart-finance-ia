@@ -55,13 +55,66 @@ function parseOfxAmount(rawValue) {
   return Number.parseFloat(normalized);
 }
 
-export class CsvImportService {
-  constructor() {
-    this.minimumColumns = 3;
+function normalizeForPdfMatching(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function normalizePdfDate(day, month, year) {
+  const fullYear = year < 100 ? 2000 + year : year;
+  return `${String(fullYear).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parsePdfDateToken(dateToken, inferredYear) {
+  const fullDateMatch = String(dateToken || '').match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (fullDateMatch) {
+    const day = Number.parseInt(fullDateMatch[1], 10);
+    const month = Number.parseInt(fullDateMatch[2], 10);
+    const year = Number.parseInt(fullDateMatch[3], 10);
+    if (!Number.isNaN(day) && !Number.isNaN(month) && !Number.isNaN(year)) {
+      return normalizePdfDate(day, month, year);
+    }
   }
 
-  parseFileContent(fileName, fileContent, accountType, existingHashes = new Set()) {
+  const shortDateMatch = String(dateToken || '').match(/^(\d{1,2})[/-](\d{1,2})$/);
+  if (shortDateMatch) {
+    const day = Number.parseInt(shortDateMatch[1], 10);
+    const month = Number.parseInt(shortDateMatch[2], 10);
+    const year = Number.isFinite(inferredYear) ? inferredYear : new Date().getFullYear();
+    if (!Number.isNaN(day) && !Number.isNaN(month)) {
+      return normalizePdfDate(day, month, year);
+    }
+  }
+
+  return '';
+}
+
+function extractPdfAmountTokens(line) {
+  const decimalCommaTokens = String(line || '').match(/(?:R\$\s*)?[-+]?\d{1,3}(?:\.\d{3})*,\d{2}-?/g) || [];
+  if (decimalCommaTokens.length > 0) {
+    return decimalCommaTokens;
+  }
+
+  return String(line || '').match(/(?:R\$\s*)?[-+]?\d+\.\d{2}-?/g) || [];
+}
+
+export class CsvImportService {
+  constructor(config = {}) {
+    this.minimumColumns = 3;
+    this.pdfWorkerUrl =
+      config.pdfWorkerUrl || 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    this.pdfLib = config.pdfLib || null;
+  }
+
+  async parseFileContent(fileName, fileContent, accountType, existingHashes = new Set()) {
     const normalizedName = String(fileName || '').toLowerCase();
+    const isPdf = normalizedName.endsWith('.pdf');
+    if (isPdf) {
+      return this.parsePdfContent(fileContent, fileName, accountType, existingHashes);
+    }
+
     const normalizedContent = String(fileContent || '');
     const looksLikeOfx =
       normalizedName.endsWith('.ofx') ||
@@ -189,6 +242,223 @@ export class CsvImportService {
     return {
       transactions,
       skipped
+    };
+  }
+
+  getPdfLib() {
+    const pdfLib = this.pdfLib || globalThis.pdfjsLib || null;
+    if (!pdfLib || typeof pdfLib.getDocument !== 'function') {
+      throw new Error(
+        'Importação de PDF indisponível no momento. Recarregue a página e tente novamente.'
+      );
+    }
+
+    if (pdfLib.GlobalWorkerOptions) {
+      pdfLib.GlobalWorkerOptions.workerSrc = this.pdfWorkerUrl;
+    }
+
+    return pdfLib;
+  }
+
+  async parsePdfContent(fileContent, fileName, accountType, existingHashes = new Set()) {
+    const pdfLib = this.getPdfLib();
+    const binaryData =
+      fileContent instanceof ArrayBuffer
+        ? new Uint8Array(fileContent)
+        : new Uint8Array(await new Blob([fileContent]).arrayBuffer());
+    const loadingTask = pdfLib.getDocument({ data: binaryData });
+    const pdfDocument = await loadingTask.promise;
+
+    const allLines = [];
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const pageLines = this.extractLinesFromPdfItems(textContent.items || []);
+      allLines.push(...pageLines);
+    }
+
+    const inferredYear = this.resolvePdfYear(fileName, allLines);
+    const transactions = [];
+    let skipped = 0;
+
+    for (let lineIndex = 0; lineIndex < allLines.length; lineIndex += 1) {
+      const currentLine = allLines[lineIndex];
+      let candidate = this.parsePdfLineToTransaction(currentLine, inferredYear, accountType);
+
+      if (!candidate && lineIndex + 1 < allLines.length) {
+        const mergedLine = `${currentLine} ${allLines[lineIndex + 1]}`;
+        candidate = this.parsePdfLineToTransaction(mergedLine, inferredYear, accountType);
+        if (candidate) {
+          lineIndex += 1;
+        }
+      }
+
+      if (!candidate) {
+        skipped += 1;
+        continue;
+      }
+
+      const shouldIgnore =
+        accountType === 'Crédito'
+          ? isIgnoredCreditEntry(candidate.signedValue, candidate.title)
+          : isIncomeOrIgnoredStatement(candidate.signedValue, candidate.title);
+
+      if (shouldIgnore) {
+        skipped += 1;
+        continue;
+      }
+
+      const parsed = {
+        date: candidate.date,
+        title: candidate.title,
+        value: Math.abs(candidate.signedValue),
+        category: detectBaseCategory(candidate.title),
+        accountType
+      };
+
+      const hash = generateTransactionHash(parsed);
+      if (existingHashes.has(hash)) {
+        skipped += 1;
+        continue;
+      }
+
+      existingHashes.add(hash);
+      transactions.push({
+        ...parsed,
+        hash,
+        active: true
+      });
+    }
+
+    return {
+      transactions,
+      skipped
+    };
+  }
+
+  extractLinesFromPdfItems(items) {
+    const linesByY = new Map();
+
+    items.forEach((item) => {
+      const text = String(item?.str || '').trim();
+      if (!text) {
+        return;
+      }
+
+      const x = Number(item?.transform?.[4] || 0);
+      const y = Math.round(Number(item?.transform?.[5] || 0));
+      if (!linesByY.has(y)) {
+        linesByY.set(y, []);
+      }
+      linesByY.get(y).push({ x, text });
+    });
+
+    return [...linesByY.entries()]
+      .sort((left, right) => right[0] - left[0])
+      .map(([, lineItems]) =>
+        lineItems
+          .sort((left, right) => left.x - right.x)
+          .map((item) => item.text)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+      .filter(Boolean);
+  }
+
+  resolvePdfYear(fileName, lines) {
+    const nameYearMatch = String(fileName || '').match(/(20\d{2})/);
+    if (nameYearMatch) {
+      return Number.parseInt(nameYearMatch[1], 10);
+    }
+
+    for (const line of lines) {
+      const lineYearMatch = String(line || '').match(/\b(20\d{2})\b/);
+      if (lineYearMatch) {
+        return Number.parseInt(lineYearMatch[1], 10);
+      }
+    }
+
+    return new Date().getFullYear();
+  }
+
+  parsePdfLineToTransaction(line, inferredYear, accountType) {
+    const normalizedLine = String(line || '').replace(/\s+/g, ' ').trim();
+    if (normalizedLine.length < 8) {
+      return null;
+    }
+
+    const blockedHeaders = /\b(DATA|DESCRICAO|DESCRIÇÃO|SALDO|LANCAMENTO|LANÇAMENTO|HISTORICO|HISTÓRICO|EXTRATO)\b/i;
+    if (blockedHeaders.test(normalizedLine) && !/\d{1,2}[/-]\d{1,2}/.test(normalizedLine)) {
+      return null;
+    }
+
+    const dateTokenMatch = normalizedLine.match(/\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/);
+    if (!dateTokenMatch) {
+      return null;
+    }
+
+    const amountTokens = extractPdfAmountTokens(normalizedLine);
+    if (amountTokens.length === 0) {
+      return null;
+    }
+
+    const hasBalanceMarker = /\b(SALDO|DISPONIVEL|DISPONIBILIDADE|LIMITE)\b/i.test(normalizedLine);
+    let amountToken = amountTokens[0];
+    if (hasBalanceMarker && amountTokens.length >= 2) {
+      amountToken = amountTokens[amountTokens.length - 2];
+    } else if (amountTokens.length >= 2) {
+      amountToken = amountTokens[0];
+    }
+    const parsedAmount = parseOfxAmount(amountToken);
+    if (Number.isNaN(parsedAmount)) {
+      return null;
+    }
+
+    let signedValue = parsedAmount;
+    const normalizedForSignal = normalizeForPdfMatching(normalizedLine);
+
+    if (/^-/.test(amountToken) || /-$/.test(amountToken)) {
+      signedValue = -Math.abs(parsedAmount);
+    }
+
+    if (/\bD\b|\bDEBITO\b/.test(normalizedForSignal)) {
+      signedValue = -Math.abs(parsedAmount);
+    } else if (/\bC\b|\bCREDITO\b/.test(normalizedForSignal) && !/^-/.test(amountToken) && !/-$/.test(amountToken)) {
+      signedValue = Math.abs(parsedAmount);
+    }
+
+    if (
+      accountType !== 'Crédito' &&
+      /\b(PIX ENVIAD|TRANSFERENCIA ENVIAD|COMPRA|PAGAMENTO|DEBITO|TED ENVIAD|DOC ENVIAD|SAQUE|TARIFA|IOF|JUROS|ENCARGO|BOLETO)\b/.test(
+        normalizedForSignal
+      )
+    ) {
+      signedValue = -Math.abs(parsedAmount);
+    }
+
+    const date = parsePdfDateToken(dateTokenMatch[0], inferredYear);
+    if (!date) {
+      return null;
+    }
+
+    let title = normalizedLine
+      .replace(dateTokenMatch[0], ' ')
+      .replace(/(?:R\$\s*)?[-+]?\d{1,3}(?:\.\d{3})*,\d{2}-?/g, ' ')
+      .replace(/(?:R\$\s*)?[-+]?\d+\.\d{2}-?/g, ' ')
+      .replace(/\b[CD]\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    title = title.replace(/^[-:]+/, '').trim();
+    if (!title || /\b(SALDO ANTERIOR|SALDO FINAL|SALDO DO DIA)\b/i.test(title)) {
+      return null;
+    }
+
+    return {
+      date,
+      title,
+      signedValue
     };
   }
 
