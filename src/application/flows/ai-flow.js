@@ -246,8 +246,26 @@ export async function syncCategoriesWithAi(app) {
   app.overlayView.show('Inteligência Artificial: categorizando ciclo...');
 
   try {
+    try {
+      await app.repository.recordUsageMetrics(app.state.user.uid, {
+        aiCategorizationRuns: 1
+      });
+    } catch (usageError) {
+      console.warn('Falha ao registrar uso da sincronização de IA:', usageError);
+    }
+
+    const updateTimestamp = new Date().toISOString();
     const memoryResult = app.categoryMemoryService.suggestCategories(candidates, app.state.transactions);
-    const memoryUpdates = memoryResult.updates.map((item) => ({ docId: item.docId, category: item.category }));
+    const memoryUpdates = memoryResult.updates.map((item) => ({
+      docId: item.docId,
+      category: item.category,
+      metadata: {
+        categorySource: `platform-${String(item.source || 'memory').toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`,
+        categoryAutoAssigned: true,
+        categoryManuallyEdited: false,
+        lastCategoryUpdateAt: updateTimestamp
+      }
+    }));
     const unresolvedCandidates = memoryResult.unresolved;
 
     app.overlayView.log(
@@ -266,7 +284,16 @@ export async function syncCategoriesWithAi(app) {
           app.overlayView.log(`Falha no lote ${index / app.aiService.chunkSize + 1}: ${app.normalizeError(error)}`);
         }
       });
-      aiUpdates = result.updates;
+      aiUpdates = result.updates.map((item) => ({
+        docId: item.docId,
+        category: item.category,
+        metadata: {
+          categorySource: 'platform-ai',
+          categoryAutoAssigned: true,
+          categoryManuallyEdited: false,
+          lastCategoryUpdateAt: updateTimestamp
+        }
+      }));
       failedChunks = result.failedChunks;
     }
 
@@ -288,11 +315,20 @@ export async function syncCategoriesWithAi(app) {
       }
     });
 
-    const updateMap = new Map(updates.map((item) => [item.docId, item.category]));
+    const updateMap = new Map(updates.map((item) => [item.docId, item]));
     app.setTransactionsAndRefresh(
-      app.state.transactions.map((transaction) =>
-        updateMap.has(transaction.docId) ? { ...transaction, category: updateMap.get(transaction.docId) } : transaction
-      )
+      app.state.transactions.map((transaction) => {
+        const update = updateMap.get(transaction.docId);
+        if (!update) {
+          return transaction;
+        }
+
+        return {
+          ...transaction,
+          category: update.category,
+          ...(update.metadata || {})
+        };
+      })
     );
 
     if (failedChunks.length > 0) {
@@ -388,6 +424,14 @@ export async function runAiConsultant(app) {
   if (currentSummary.considered.length === 0 && previousSummary.considered.length === 0) {
     window.alert('Sem gastos suficientes no período atual e anterior para gerar insights.');
     return;
+  }
+
+  try {
+    await app.repository.recordUsageMetrics(app.state.user.uid, {
+      aiConsultantRuns: 1
+    });
+  } catch (usageError) {
+    console.warn('Falha ao registrar uso do Consultor IA:', usageError);
   }
 
   const insightKey = buildConsultantInsightKey(app.state.filters);

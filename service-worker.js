@@ -1,11 +1,13 @@
-const CACHE_NAME = 'smart-finance-shell-v9';
+const CACHE_NAME = 'smart-finance-shell-v10';
 
 const APP_SHELL_FILES = [
   './',
   './index.html',
+  './admin.html',
   './manifest.webmanifest',
   './src/styles.css',
   './src/app.js',
+  './src/admin.js',
   './src/config/app-config.js',
   './src/application/flows/auth-flow.js',
   './src/application/flows/dashboard-flow.js',

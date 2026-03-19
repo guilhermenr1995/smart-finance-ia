@@ -13,6 +13,13 @@
       "novas_demandas.md",
       "playstore_publicacao.md"
     ],
+    "redirects": [
+      {
+        "source": "/admin",
+        "destination": "/admin.html",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "**",

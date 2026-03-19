@@ -1,8 +1,32 @@
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
+const APP_TIMEZONE = 'America/Sao_Paulo';
+
+function getDateKeyInTimezone() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
 
 function normalizeBankAccountName(value) {
   const name = String(value || '').trim();
   return name || DEFAULT_BANK_ACCOUNT;
+}
+
+function normalizeTransactionMetadata(data = {}) {
+  const categorySource = String(data.categorySource || '').trim() || 'manual';
+  const createdAt = String(data.createdAt || '').trim();
+  const lastCategoryUpdateAt = String(data.lastCategoryUpdateAt || '').trim() || createdAt;
+  return {
+    categorySource,
+    categoryAutoAssigned: Boolean(data.categoryAutoAssigned),
+    categoryManuallyEdited: Boolean(data.categoryManuallyEdited),
+    createdBy: data.createdBy === 'manual' ? 'manual' : 'import',
+    createdAt,
+    lastCategoryUpdateAt
+  };
 }
 
 function normalizeCustomCollectionName(value, prefix = 'item') {
@@ -28,6 +52,10 @@ export class TransactionRepository {
     return this.db.collection(`artifacts/${this.appId}/users/${userId}/transacoes`);
   }
 
+  getUserDoc(userId) {
+    return this.db.collection(`artifacts/${this.appId}/users`).doc(userId);
+  }
+
   getCategoryCollection(userId) {
     return this.db.collection(`artifacts/${this.appId}/users/${userId}/categorias`);
   }
@@ -40,6 +68,10 @@ export class TransactionRepository {
     return this.db.collection(`artifacts/${this.appId}/users/${userId}/contas_bancarias`);
   }
 
+  getDailyMetricsCollection(userId) {
+    return this.db.collection(`artifacts/${this.appId}/users/${userId}/metrics_daily`);
+  }
+
   async fetchAll(userId) {
     const snapshot = await this.getCollection(userId).get();
     const transactions = [];
@@ -48,6 +80,7 @@ export class TransactionRepository {
       transactions.push({
         ...data,
         bankAccount: normalizeBankAccountName(data.bankAccount),
+        ...normalizeTransactionMetadata(data),
         docId: doc.id
       });
     });
@@ -158,9 +191,14 @@ export class TransactionRepository {
 
     for (const transaction of transactions) {
       const docRef = collection.doc();
-      currentBatch.set(docRef, transaction);
-      insertedTransactions.push({
+      const normalizedTransaction = {
         ...transaction,
+        ...normalizeTransactionMetadata(transaction),
+        bankAccount: normalizeBankAccountName(transaction.bankAccount)
+      };
+      currentBatch.set(docRef, normalizedTransaction);
+      insertedTransactions.push({
+        ...normalizedTransaction,
         docId: docRef.id
       });
       pendingOperations += 1;
@@ -176,15 +214,25 @@ export class TransactionRepository {
 
   async createTransaction(userId, transaction) {
     const docRef = this.getCollection(userId).doc();
-    await docRef.set(transaction);
-    return {
+    const normalizedTransaction = {
       ...transaction,
+      ...normalizeTransactionMetadata(transaction),
+      bankAccount: normalizeBankAccountName(transaction.bankAccount)
+    };
+    await docRef.set(normalizedTransaction);
+    return {
+      ...normalizedTransaction,
       docId: docRef.id
     };
   }
 
-  async updateCategory(userId, docId, category) {
-    return this.getCollection(userId).doc(docId).update({ category });
+  async updateCategory(userId, docId, category, metadata = {}) {
+    return this.getCollection(userId)
+      .doc(docId)
+      .update({
+        category,
+        ...metadata
+      });
   }
 
   async updateBankAccount(userId, docId, bankAccount) {
@@ -222,7 +270,10 @@ export class TransactionRepository {
 
     for (const update of updates) {
       const docRef = collection.doc(update.docId);
-      currentBatch.update(docRef, { category: update.category });
+      currentBatch.update(docRef, {
+        category: update.category,
+        ...(update.metadata || {})
+      });
       pendingOperations += 1;
 
       if (pendingOperations >= batchSize) {
@@ -276,5 +327,107 @@ export class TransactionRepository {
       );
 
     return name;
+  }
+
+  async upsertUserProfile(user) {
+    const userId = String(user?.uid || '').trim();
+    if (!userId) {
+      return;
+    }
+
+    const profileRef = this.getUserDoc(userId);
+    const nowIso = new Date().toISOString();
+    const dateKey = getDateKeyInTimezone();
+    const providerIds = (user?.providerData || [])
+      .map((provider) => String(provider?.providerId || '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+
+    await this.db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(profileRef);
+      const existing = snapshot.exists ? snapshot.data() || {} : {};
+
+      const payload = {
+        uid: userId,
+        email: String(user?.email || existing.email || '').trim(),
+        displayName: String(user?.displayName || existing.displayName || '').trim(),
+        photoURL: String(user?.photoURL || existing.photoURL || '').trim(),
+        providerIds: providerIds.length > 0 ? providerIds : existing.providerIds || [],
+        lastAccessAt: nowIso,
+        lastAccessDateKey: dateKey
+      };
+
+      if (!snapshot.exists) {
+        payload.createdAt = nowIso;
+        payload.createdDateKey = dateKey;
+        payload.importOperationsTotal = 0;
+        payload.importedTransactionsTotal = 0;
+        payload.manualTransactionsTotal = 0;
+        payload.aiCategorizationRunsTotal = 0;
+        payload.aiConsultantRunsTotal = 0;
+      }
+
+      transaction.set(profileRef, payload, { merge: true });
+    });
+  }
+
+  async recordUsageMetrics(userId, partialCounters = {}) {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) {
+      return;
+    }
+
+    const counters = {
+      aiCategorizationRuns: Math.max(0, Number(partialCounters.aiCategorizationRuns || 0)),
+      aiConsultantRuns: Math.max(0, Number(partialCounters.aiConsultantRuns || 0)),
+      importOperations: Math.max(0, Number(partialCounters.importOperations || 0)),
+      importedTransactions: Math.max(0, Number(partialCounters.importedTransactions || 0)),
+      manualTransactions: Math.max(0, Number(partialCounters.manualTransactions || 0))
+    };
+
+    const hasAnyIncrement = Object.values(counters).some((value) => value > 0);
+    if (!hasAnyIncrement) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const dateKey = getDateKeyInTimezone();
+    const userRef = this.getUserDoc(normalizedUserId);
+    const dailyRef = this.getDailyMetricsCollection(normalizedUserId).doc(dateKey);
+
+    await this.db.runTransaction(async (transaction) => {
+      const userSnapshot = await transaction.get(userRef);
+      const dailySnapshot = await transaction.get(dailyRef);
+      const userData = userSnapshot.exists ? userSnapshot.data() || {} : {};
+      const dailyData = dailySnapshot.exists ? dailySnapshot.data() || {} : {};
+
+      const nextUserPayload = {
+        uid: normalizedUserId,
+        aiCategorizationRunsTotal: Number(userData.aiCategorizationRunsTotal || 0) + counters.aiCategorizationRuns,
+        aiConsultantRunsTotal: Number(userData.aiConsultantRunsTotal || 0) + counters.aiConsultantRuns,
+        importOperationsTotal: Number(userData.importOperationsTotal || 0) + counters.importOperations,
+        importedTransactionsTotal: Number(userData.importedTransactionsTotal || 0) + counters.importedTransactions,
+        manualTransactionsTotal: Number(userData.manualTransactionsTotal || 0) + counters.manualTransactions,
+        lastAccessAt: nowIso,
+        lastAccessDateKey: dateKey
+      };
+
+      const nextDailyPayload = {
+        dateKey,
+        aiCategorizationRuns: Number(dailyData.aiCategorizationRuns || 0) + counters.aiCategorizationRuns,
+        aiConsultantRuns: Number(dailyData.aiConsultantRuns || 0) + counters.aiConsultantRuns,
+        importOperations: Number(dailyData.importOperations || 0) + counters.importOperations,
+        importedTransactions: Number(dailyData.importedTransactions || 0) + counters.importedTransactions,
+        manualTransactions: Number(dailyData.manualTransactions || 0) + counters.manualTransactions,
+        updatedAt: nowIso
+      };
+
+      if (!dailySnapshot.exists) {
+        nextDailyPayload.createdAt = nowIso;
+      }
+
+      transaction.set(userRef, nextUserPayload, { merge: true });
+      transaction.set(dailyRef, nextDailyPayload, { merge: true });
+    });
   }
 }

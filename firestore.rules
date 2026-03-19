@@ -9,8 +9,27 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isNonNegativeNumber(value) {
+      return value is number && value >= 0;
+    }
+
     function hasValidTransactionShape(data) {
-      return data.keys().hasOnly(['hash', 'date', 'title', 'value', 'category', 'accountType', 'bankAccount', 'active'])
+      return data.keys().hasOnly([
+          'hash',
+          'date',
+          'title',
+          'value',
+          'category',
+          'accountType',
+          'bankAccount',
+          'active',
+          'createdBy',
+          'createdAt',
+          'categorySource',
+          'categoryAutoAssigned',
+          'categoryManuallyEdited',
+          'lastCategoryUpdateAt'
+        ])
         && data.hash is string
         && data.date is string
         && data.title is string
@@ -22,6 +41,12 @@ service cloud.firestore {
         && data.category.size() > 0
         && data.category.size() <= 50
         && data.accountType in ['Crédito', 'Conta']
+        && (!('createdBy' in data) || data.createdBy in ['import', 'manual'])
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('categorySource' in data) || (data.categorySource is string && data.categorySource.size() > 0 && data.categorySource.size() <= 60))
+        && (!('categoryAutoAssigned' in data) || data.categoryAutoAssigned is bool)
+        && (!('categoryManuallyEdited' in data) || data.categoryManuallyEdited is bool)
+        && (!('lastCategoryUpdateAt' in data) || (data.lastCategoryUpdateAt is string && data.lastCategoryUpdateAt.size() <= 50))
         && (!('bankAccount' in data) || (
           data.bankAccount is string
           && data.bankAccount.size() > 0
@@ -50,6 +75,68 @@ service cloud.firestore {
         && data.createdAt is string;
     }
 
+    function hasValidUserProfileShape(data) {
+      return data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'providerIds',
+          'createdAt',
+          'lastAccessAt',
+          'createdDateKey',
+          'lastAccessDateKey',
+          'importOperationsTotal',
+          'importedTransactionsTotal',
+          'manualTransactionsTotal',
+          'aiCategorizationRunsTotal',
+          'aiConsultantRunsTotal'
+        ])
+        && (!('uid' in data) || (data.uid is string && data.uid.size() > 0 && data.uid.size() <= 150))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 140))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && (!('providerIds' in data) || (data.providerIds is list && data.providerIds.size() <= 8))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('lastAccessAt' in data) || (data.lastAccessAt is string && data.lastAccessAt.size() <= 50))
+        && (!('createdDateKey' in data) || (data.createdDateKey is string && data.createdDateKey.size() <= 10))
+        && (!('lastAccessDateKey' in data) || (data.lastAccessDateKey is string && data.lastAccessDateKey.size() <= 10))
+        && (!('importOperationsTotal' in data) || isNonNegativeNumber(data.importOperationsTotal))
+        && (!('importedTransactionsTotal' in data) || isNonNegativeNumber(data.importedTransactionsTotal))
+        && (!('manualTransactionsTotal' in data) || isNonNegativeNumber(data.manualTransactionsTotal))
+        && (!('aiCategorizationRunsTotal' in data) || isNonNegativeNumber(data.aiCategorizationRunsTotal))
+        && (!('aiConsultantRunsTotal' in data) || isNonNegativeNumber(data.aiConsultantRunsTotal));
+    }
+
+    function hasValidDailyMetricsShape(data) {
+      return data.keys().hasOnly([
+          'dateKey',
+          'aiCategorizationRuns',
+          'aiConsultantRuns',
+          'importOperations',
+          'importedTransactions',
+          'manualTransactions',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.dateKey is string
+        && data.dateKey.size() == 10
+        && isNonNegativeNumber(data.aiCategorizationRuns)
+        && isNonNegativeNumber(data.aiConsultantRuns)
+        && isNonNegativeNumber(data.importOperations)
+        && isNonNegativeNumber(data.importedTransactions)
+        && isNonNegativeNumber(data.manualTransactions)
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
+    match /artifacts/{appId}/users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidUserProfileShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidUserProfileShape(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
     match /artifacts/{appId}/users/{userId}/transacoes/{transactionId} {
       allow read: if isOwner(userId);
 
@@ -61,8 +148,17 @@ service cloud.firestore {
         && request.resource.data.hash == resource.data.hash
         && request.resource.data.date == resource.data.date
         && request.resource.data.value == resource.data.value
-        && request.resource.data.accountType == resource.data.accountType;
+        && request.resource.data.accountType == resource.data.accountType
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
 
+      allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/metrics_daily/{dateKey} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidDailyMetricsShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidDailyMetricsShape(request.resource.data);
       allow delete: if isOwner(userId);
     }
 

@@ -45,6 +45,24 @@ function resolveManualTransactionDate(app) {
   return /^\d{4}-\d{2}-\d{2}$/.test(filteredEndDate) ? filteredEndDate : fallbackDate;
 }
 
+function buildPlatformCategorySource(rawSource) {
+  const source = String(rawSource || 'memory').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  return `platform-${source || 'memory'}`;
+}
+
+function buildManualCategoryMetadata(existingTransaction, nextCategory, updatedAt) {
+  const previousCategory = String(existingTransaction?.category || '');
+  const changedCategory = previousCategory !== String(nextCategory || '');
+  const wasAutoAssigned = Boolean(existingTransaction?.categoryAutoAssigned);
+
+  return {
+    categorySource: 'manual',
+    categoryAutoAssigned: wasAutoAssigned,
+    categoryManuallyEdited: wasAutoAssigned ? Boolean(existingTransaction?.categoryManuallyEdited) || changedCategory : false,
+    lastCategoryUpdateAt: updatedAt
+  };
+}
+
 export async function importCsv(app, file, accountType, bankAccountName = DEFAULT_BANK_ACCOUNT) {
   if (!file) {
     return;
@@ -66,6 +84,7 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     const fileContent = isPdfFile ? await file.arrayBuffer() : await file.text();
     const existingHashes = new Set(app.state.transactions.map((transaction) => transaction.hash));
     const parseResult = await app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
+    const importedAt = new Date().toISOString();
 
     if (parseResult.transactions.length === 0) {
       app.overlayView.log('Nenhuma transação nova foi identificada.');
@@ -77,12 +96,32 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     const memoryApplied = app.categoryMemoryService.applyMemoryToTransactions(
       parseResult.transactions.map((transaction) => ({
         ...transaction,
-        bankAccount: importBankAccount
+        bankAccount: importBankAccount,
+        createdBy: 'import',
+        createdAt: importedAt,
+        categorySource: 'import-default',
+        categoryAutoAssigned: false,
+        categoryManuallyEdited: false,
+        lastCategoryUpdateAt: importedAt
       })),
       app.state.transactions,
       { onlyOthers: true }
     );
-    const transactionsToInsert = memoryApplied.transactions;
+    const autoAssignedByIndex = new Map(memoryApplied.updates.map((update) => [update.index, update]));
+    const transactionsToInsert = memoryApplied.transactions.map((transaction, index) => {
+      const autoSuggestion = autoAssignedByIndex.get(index);
+      if (!autoSuggestion) {
+        return transaction;
+      }
+
+      return {
+        ...transaction,
+        categorySource: buildPlatformCategorySource(autoSuggestion.source),
+        categoryAutoAssigned: true,
+        categoryManuallyEdited: false,
+        lastCategoryUpdateAt: importedAt
+      };
+    });
 
     if (memoryApplied.updates.length > 0) {
       app.overlayView.log(
@@ -98,6 +137,14 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     });
 
     app.setTransactionsAndRefresh([...app.state.transactions, ...insertedTransactions]);
+    try {
+      await app.repository.recordUsageMetrics(app.state.user.uid, {
+        importOperations: 1,
+        importedTransactions: insertedTransactions.length
+      });
+    } catch (usageError) {
+      console.warn('Falha ao registrar métricas de importação:', usageError);
+    }
 
     app.overlayView.log(
       `Importação concluída: ${transactionsToInsert.length} novos lançamentos na conta "${importBankAccount}", ${parseResult.skipped} ignorados.`
@@ -141,6 +188,7 @@ export async function updateCategory(app, docId, category) {
 
   try {
     const targetTransaction = app.state.transactions.find((transaction) => transaction.docId === docId);
+    const transactionsById = new Map(app.state.transactions.map((transaction) => [transaction.docId, transaction]));
     const updatesByDocId = new Map([[docId, normalizedCategory]]);
 
     if (targetTransaction) {
@@ -182,21 +230,36 @@ export async function updateCategory(app, docId, category) {
       });
     }
 
-    const updates = [...updatesByDocId].map(([nextDocId, nextCategory]) => ({
-      docId: nextDocId,
-      category: nextCategory
-    }));
+    const manualUpdatedAt = new Date().toISOString();
+    const updates = [...updatesByDocId].map(([nextDocId, nextCategory]) => {
+      const currentTransaction = transactionsById.get(nextDocId);
+      return {
+        docId: nextDocId,
+        category: nextCategory,
+        metadata: buildManualCategoryMetadata(currentTransaction, nextCategory, manualUpdatedAt)
+      };
+    });
 
     if (updates.length === 1) {
-      await app.repository.updateCategory(app.state.user.uid, docId, normalizedCategory);
+      await app.repository.updateCategory(app.state.user.uid, docId, normalizedCategory, updates[0].metadata);
     } else {
       await app.repository.batchUpdateCategories(app.state.user.uid, updates, { batchSize: 100 });
     }
 
+    const updatesMap = new Map(updates.map((update) => [update.docId, update]));
     app.setTransactionsAndRefresh(
-      app.state.transactions.map((transaction) =>
-        updatesByDocId.has(transaction.docId) ? { ...transaction, category: updatesByDocId.get(transaction.docId) } : transaction
-      )
+      app.state.transactions.map((transaction) => {
+        const update = updatesMap.get(transaction.docId);
+        if (!update) {
+          return transaction;
+        }
+
+        return {
+          ...transaction,
+          category: update.category,
+          ...(update.metadata || {})
+        };
+      })
     );
   } catch (error) {
     app.authView.showMessage(app.normalizeError(error), 'error');
@@ -317,7 +380,13 @@ export async function createManualTransaction(app, payload = {}) {
     category,
     accountType,
     bankAccount,
-    active: true
+    active: true,
+    createdBy: 'manual',
+    createdAt: new Date().toISOString(),
+    categorySource: 'manual',
+    categoryAutoAssigned: false,
+    categoryManuallyEdited: false,
+    lastCategoryUpdateAt: new Date().toISOString()
   };
   const hash = generateTransactionHash(transaction);
   const alreadyExists = app.state.transactions.some((existing) => existing.hash === hash);
@@ -329,6 +398,13 @@ export async function createManualTransaction(app, payload = {}) {
   try {
     const inserted = await app.repository.createTransaction(app.state.user.uid, { ...transaction, hash });
     app.setTransactionsAndRefresh([...app.state.transactions, inserted]);
+    try {
+      await app.repository.recordUsageMetrics(app.state.user.uid, {
+        manualTransactions: 1
+      });
+    } catch (usageError) {
+      console.warn('Falha ao registrar transação manual em métricas:', usageError);
+    }
     app.authView.showMessage('Transação criada com sucesso.', 'success');
     return true;
   } catch (error) {

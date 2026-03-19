@@ -14,11 +14,15 @@ window.SMART_FINANCE_CONFIG = {
     consultantProxyUrl: 'https://YOUR_CONSULTANT_PROXY_URL.a.run.app',
     allowDirectRequest: false,
     directApiKey: '',
-    model: 'gemini-3.1-flash-lite',
+    model: 'gemini-2.5-flash-lite',
     chunkSize: 14,
     maxRetries: 3,
     baseRetryDelayMs: 450,
     interChunkDelayMs: 180
+  },
+  admin: {
+    dashboardProxyUrl: 'https://YOUR_ADMIN_DASHBOARD_PROXY_URL.a.run.app',
+    allowedEmails: ['guilhermenr1995@gmail.com']
   },
   cache: {
     maxAgeMs: 1000 * 60 * 15

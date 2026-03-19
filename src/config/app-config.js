@@ -19,6 +19,10 @@ const DEFAULT_CONFIG = {
     baseRetryDelayMs: 450,
     interChunkDelayMs: 180
   },
+  admin: {
+    dashboardProxyUrl: '',
+    allowedEmails: ['guilhermenr1995@gmail.com']
+  },
   cache: {
     maxAgeMs: 1000 * 60 * 15
   }
@@ -62,6 +66,13 @@ export function loadAppConfig() {
         runtimeConfig.ai?.apiKey ||
         window.__gemini_api_key ||
         DEFAULT_CONFIG.ai.directApiKey
+    },
+    admin: {
+      ...DEFAULT_CONFIG.admin,
+      ...(runtimeConfig.admin || {}),
+      allowedEmails: Array.isArray(runtimeConfig.admin?.allowedEmails)
+        ? runtimeConfig.admin.allowedEmails
+        : DEFAULT_CONFIG.admin.allowedEmails
     },
     cache: {
       ...DEFAULT_CONFIG.cache,

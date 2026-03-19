@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Smart Finance IA - Painel Gerencial</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body class="font-sans text-zinc-900 bg-zinc-100 min-h-screen">
+    <section id="admin-auth-screen" class="min-h-screen flex items-center justify-center p-6">
+      <div class="w-full max-w-xl bg-white neo-brutalism p-8 space-y-5">
+        <p class="text-[11px] font-black uppercase text-zinc-500">Painel Gerencial • Smart Finance IA</p>
+        <h1 class="text-2xl font-black uppercase italic leading-tight">Acesso administrativo protegido</h1>
+        <p class="text-sm font-bold text-zinc-700">
+          Faça login com sua conta Google administrativa para visualizar métricas de uso da plataforma.
+        </p>
+        <button
+          id="admin-btn-google-login"
+          type="button"
+          class="w-full bg-black text-yellow-300 p-4 neo-brutalism font-black text-xs uppercase tracking-widest"
+        >
+          Entrar com Google
+        </button>
+        <p id="admin-auth-message" class="hidden text-[11px] font-black uppercase text-center"></p>
+      </div>
+    </section>
+
+    <section id="admin-app-screen" class="hidden p-4 pb-12">
+      <div class="max-w-6xl mx-auto space-y-5">
+        <header class="bg-yellow-300 p-6 neo-brutalism flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Painel Gerencial</p>
+            <h1 class="text-2xl font-black italic uppercase tracking-tighter">Smart Finance IA • Gestão da Plataforma</h1>
+            <p id="admin-user-email" class="text-[10px] font-black uppercase mt-2 text-zinc-700"></p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              id="admin-btn-refresh"
+              class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white"
+            >
+              Atualizar dados
+            </button>
+            <a
+              href="./index.html"
+              class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-white inline-flex items-center"
+            >
+              Voltar ao app
+            </a>
+            <button
+              id="admin-btn-logout"
+              class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-black text-white"
+            >
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section id="admin-access-denied" class="hidden bg-red-50 border-2 border-red-700 p-5 neo-brutalism">
+          <h2 class="text-sm font-black uppercase text-red-800">Acesso negado</h2>
+          <p class="text-sm font-bold text-red-700 mt-2">
+            Esta conta não possui permissão para acessar o painel gerencial. Faça login com o e-mail administrador.
+          </p>
+        </section>
+
+        <section id="admin-loading" class="bg-white p-5 neo-brutalism">
+          <p class="text-[11px] font-black uppercase text-zinc-500">Carregando métricas...</p>
+        </section>
+
+        <section id="admin-dashboard-content" class="hidden space-y-5">
+          <section class="bg-white p-5 neo-brutalism">
+            <h2 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">Visão Geral</h2>
+            <div id="admin-summary-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+          </section>
+
+          <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div class="bg-white p-5 neo-brutalism">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
+                Sincronização de Categorias por IA (por dia)
+              </h3>
+              <div id="admin-ai-sync-daily" class="space-y-2"></div>
+            </div>
+            <div class="bg-white p-5 neo-brutalism">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
+                Consultor IA (por dia)
+              </h3>
+              <div id="admin-ai-consultant-daily" class="space-y-2"></div>
+            </div>
+          </section>
+
+          <section class="bg-white p-5 neo-brutalism">
+            <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
+              Top Usuários por Volume de Lançamentos
+            </h3>
+            <div id="admin-top-users" class="space-y-2"></div>
+          </section>
+
+          <section class="bg-white p-5 neo-brutalism space-y-4">
+            <div class="flex items-center justify-between border-b-2 border-black pb-2">
+              <h3 class="font-black text-xs uppercase italic">Usuários e Uso da Plataforma</h3>
+              <p id="admin-users-count" class="text-[10px] font-black uppercase text-zinc-500"></p>
+            </div>
+            <div id="admin-users-table" class="space-y-3"></div>
+          </section>
+        </section>
+      </div>
+    </section>
+
+    <script src="./runtime-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script type="module" src="./src/admin.js"></script>
+  </body>
+</html>

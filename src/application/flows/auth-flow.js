@@ -26,6 +26,12 @@ export async function handleAuthState(app, user) {
     return;
   }
 
+  try {
+    await app.repository.upsertUserProfile(user);
+  } catch (profileError) {
+    console.warn('Falha ao atualizar perfil de uso do usuário:', profileError);
+  }
+
   const cached = app.localCacheService.load(user.uid);
   const hasCachedSnapshot =
     cached.transactions.length > 0 ||

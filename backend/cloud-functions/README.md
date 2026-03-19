@@ -19,6 +19,17 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 - Regra de uso: limite diário previsto no backend (no momento, validação desativada temporariamente).
 - Persistência: salva insight por período/filtro em `artifacts/{appId}/users/{userId}/consultor_insights/{insightKey}`.
 
+### 3) `getAdminDashboard`
+
+- Objetivo: retornar métricas gerenciais da plataforma para painel admin separado.
+- Entrada: `appId`.
+- Saída: visão agregada com:
+  - usuários (cadastro + último acesso),
+  - uso diário de IA (sincronização e consultor),
+  - volume de transações por usuário,
+  - aderência da categorização automática (aceita vs revisada manualmente).
+- Segurança: acesso permitido somente para e-mail admin autorizado, autenticado via Google.
+
 ## Segurança aplicada
 
 - Firebase Auth obrigatório (header `Authorization: Bearer <id_token>`).
@@ -30,7 +41,7 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 
 ```text
 backend/cloud-functions/
-  index.js              # implementação das duas funções HTTP
+  index.js              # implementação das funções HTTP
   package.json          # dependências da function
   .env.example          # exemplo de variáveis locais
   .env                  # variáveis reais (NÃO versionar)
@@ -55,7 +66,7 @@ backend/cloud-functions/
 
 4. Preencher variáveis:
    - `GEMINI_API_KEY=...`
-   - `GEMINI_MODEL=gemini-3.1-flash-lite` (ou modelo disponível no seu projeto)
+  - `GEMINI_MODEL=gemini-2.5-flash-lite` (ou modelo disponível no seu projeto)
    - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash` (opcional, recomendado)
 
 5. Voltar para a raiz:
@@ -74,6 +85,7 @@ Ou apenas uma função específica:
 ```bash
 firebase deploy --only functions:categorizeTransactions
 firebase deploy --only functions:analyzeSpendingInsights
+firebase deploy --only functions:getAdminDashboard
 ```
 
 ## Configuração do frontend
@@ -86,11 +98,17 @@ ai: {
   consultantProxyUrl: 'https://.../analyzespendinginsights...',
   allowDirectRequest: false,
   directApiKey: ''
+},
+admin: {
+  dashboardProxyUrl: 'https://.../getadmindashboard...'
 }
 ```
 
 Se `consultantProxyUrl` não for informado, o frontend tenta derivar automaticamente a URL trocando
 `categorizetransactions` por `analyzespendinginsights`.
+
+Para o painel admin, se `dashboardProxyUrl` não for informado, o frontend tenta derivar automaticamente
+trocando `analyzespendinginsights` ou `categorizetransactions` por `getadmindashboard`.
 
 ## Contrato da API
 
@@ -147,6 +165,45 @@ Body (resumido):
 }
 ```
 
+### `POST getAdminDashboard`
+
+Body:
+
+```json
+{
+  "appId": "smart-finance-production-v1"
+}
+```
+
+Resposta (resumo):
+
+```json
+{
+  "generatedAt": "2026-03-19T12:00:00.000Z",
+  "totals": {
+    "users": 18,
+    "activeUsers7d": 11,
+    "importedTransactions": 1520,
+    "aiCategorizationRuns": 94,
+    "aiConsultantRuns": 27,
+    "automationAcceptedRate": 82.4
+  },
+  "dailyUsage": {
+    "aiCategorizationRunsByDay": [{ "dateKey": "2026-03-19", "count": 9 }],
+    "aiConsultantRunsByDay": [{ "dateKey": "2026-03-19", "count": 4 }]
+  },
+  "users": [
+    {
+      "email": "cliente@dominio.com",
+      "createdAt": "2026-03-10T10:00:00.000Z",
+      "lastAccessAt": "2026-03-19T08:12:00.000Z",
+      "transactions": { "imported": 120, "total": 125 },
+      "automation": { "autoAcceptedTransactions": 88, "autoOverriddenTransactions": 14 }
+    }
+  ]
+}
+```
+
 Resposta:
 
 ```json
@@ -175,6 +232,7 @@ Resposta:
 - `500 Missing GEMINI_API_KEY environment variable`: `.env` ausente ou incompleto.
 - Erro de CORS: origem não está em `ALLOWED_ORIGINS`.
 - `404 model not found`: ajuste `GEMINI_MODEL` ou use `GEMINI_FALLBACK_MODELS` para fallback automático.
+- `403 Forbidden` em `getAdminDashboard`: usuário autenticado sem e-mail admin Google permitido.
 
 ## Observação
 

@@ -1,5 +1,6 @@
 export class AuthView {
   constructor() {
+    this.allowedAdminEmails = new Set(['guilhermenr1995@gmail.com']);
     this.authScreen = document.getElementById('auth-screen');
     this.appScreen = document.getElementById('app-screen');
 
@@ -12,6 +13,7 @@ export class AuthView {
     this.googleButton = document.getElementById('btn-google');
     this.resetPasswordButton = document.getElementById('btn-reset-password');
     this.logoutButton = document.getElementById('btn-logout');
+    this.adminPanelButton = document.getElementById('btn-admin-panel');
 
     this.authStatus = document.getElementById('auth-status');
     this.userEmail = document.getElementById('user-email');
@@ -54,10 +56,15 @@ export class AuthView {
 
   setAuthenticated(user) {
     const isAuthenticated = Boolean(user);
+    const normalizedEmail = String(user?.email || '').trim().toLowerCase();
+    const isAdmin = this.allowedAdminEmails.has(normalizedEmail);
 
     this.authScreen.classList.toggle('hidden', isAuthenticated);
     this.appScreen.classList.toggle('hidden', !isAuthenticated);
     this.logoutButton.classList.toggle('hidden', !isAuthenticated);
+    if (this.adminPanelButton) {
+      this.adminPanelButton.classList.toggle('hidden', !isAuthenticated || !isAdmin);
+    }
 
     if (isAuthenticated) {
       this.authStatus.innerText = 'Online';
