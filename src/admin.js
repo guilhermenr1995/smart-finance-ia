@@ -1,13 +1,23 @@
 import { loadAppConfig } from './config/app-config.js';
 
 const DEFAULT_ADMIN_EMAILS = ['guilhermenr1995@gmail.com'];
+const CHART_WINDOW_DAYS = 21;
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function formatPercent(value) {
-  return `${Number(value || 0).toFixed(1)}%`;
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatPercent(value, digits = 1) {
+  return `${toNumber(value).toFixed(digits)}%`;
+}
+
+function formatInteger(value) {
+  return Math.round(toNumber(value)).toLocaleString('pt-BR');
 }
 
 function formatDateTime(value) {
@@ -24,23 +34,193 @@ function formatDateTime(value) {
   return parsed.toLocaleString('pt-BR');
 }
 
+function parseIsoDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDateKeyShort(dateKey) {
+  const raw = String(dateKey || '').trim();
+  if (!raw) {
+    return '--';
+  }
+
+  const parsed = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+
+  return parsed.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function getDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDateKey() {
+  return getDateKey(new Date());
+}
+
+function buildDateRangeEndingAt(endDateKey, days) {
+  const parsedEnd = new Date(`${String(endDateKey || '').trim()}T00:00:00`);
+  const endDate = Number.isNaN(parsedEnd.getTime()) ? new Date() : parsedEnd;
+  const range = [];
+
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date(endDate);
+    date.setDate(endDate.getDate() - offset);
+    range.push(getDateKey(date));
+  }
+
+  return range;
+}
+
+function buildSeriesMap(items = []) {
+  const map = new Map();
+  if (!Array.isArray(items)) {
+    return map;
+  }
+
+  items.forEach((item) => {
+    const dateKey = String(item?.dateKey || '').trim();
+    if (!dateKey) {
+      return;
+    }
+
+    map.set(dateKey, Math.max(0, Math.round(toNumber(item?.count))));
+  });
+
+  return map;
+}
+
+function buildDailySeries({ seriesByKey = {}, days = CHART_WINDOW_DAYS } = {}) {
+  const entries = Object.entries(seriesByKey);
+  const maps = Object.fromEntries(entries.map(([key, items]) => [key, buildSeriesMap(items)]));
+
+  const dateCandidates = entries.flatMap(([key]) => [...(maps[key]?.keys() || [])]);
+  const endDateKey = dateCandidates.sort().at(-1) || getTodayDateKey();
+  const range = buildDateRangeEndingAt(endDateKey, days);
+
+  return range.map((dateKey) => {
+    const point = { dateKey };
+    entries.forEach(([key]) => {
+      point[key] = maps[key]?.get(dateKey) || 0;
+    });
+    return point;
+  });
+}
+
+function sumSeriesByKey(series, key) {
+  return (Array.isArray(series) ? series : []).reduce((accumulator, item) => {
+    return accumulator + Math.max(0, Math.round(toNumber(item?.[key])));
+  }, 0);
+}
+
 function renderDailyMetricList(items = [], emptyMessage) {
   if (!Array.isArray(items) || items.length === 0) {
-    return `<p class="text-[11px] font-bold text-zinc-600">${emptyMessage}</p>`;
+    return `<p class="text-sm font-bold text-zinc-600">${emptyMessage}</p>`;
   }
 
   return items
-    .slice(-45)
+    .slice(-14)
     .reverse()
     .map(
       (item) => `
-        <div class="border border-black/20 bg-zinc-50 p-2 flex items-center justify-between gap-2">
-          <p class="text-[11px] font-black uppercase">${item.dateKey}</p>
-          <p class="text-[11px] font-black">${Number(item.count || 0)} uso(s)</p>
+        <div class="border border-black/20 bg-zinc-50 p-2 flex items-center justify-between gap-2 rounded-sm">
+          <p class="text-xs font-black uppercase">${item.dateKey}</p>
+          <p class="text-sm font-black">${formatInteger(item.count || 0)} uso(s)</p>
         </div>
       `
     )
     .join('');
+}
+
+function renderDualDailyChart({
+  series,
+  leftKey,
+  rightKey,
+  leftLabel,
+  rightLabel,
+  leftClass,
+  rightClass,
+  emptyMessage
+}) {
+  const safeSeries = Array.isArray(series) ? series : [];
+  const hasAnyUsage = safeSeries.some((item) => toNumber(item[leftKey]) > 0 || toNumber(item[rightKey]) > 0);
+
+  if (!hasAnyUsage) {
+    return `<p class="text-sm font-bold text-zinc-600">${emptyMessage}</p>`;
+  }
+
+  const maxValue = Math.max(
+    ...safeSeries.map((item) => Math.max(toNumber(item[leftKey]), toNumber(item[rightKey]))),
+    1
+  );
+
+  const leftTotal = sumSeriesByKey(safeSeries, leftKey);
+  const rightTotal = sumSeriesByKey(safeSeries, rightKey);
+  const combinedSeries = safeSeries.map((item) => ({
+    dateKey: item.dateKey,
+    total: toNumber(item[leftKey]) + toNumber(item[rightKey])
+  }));
+  const peakDay = [...combinedSeries].sort((left, right) => right.total - left.total)[0] || {
+    dateKey: '-',
+    total: 0
+  };
+
+  const bars = safeSeries
+    .map((item) => {
+      const leftValue = toNumber(item[leftKey]);
+      const rightValue = toNumber(item[rightKey]);
+      const leftHeight = Math.max(4, Math.round((leftValue / maxValue) * 100));
+      const rightHeight = Math.max(4, Math.round((rightValue / maxValue) * 100));
+
+      return `
+        <div class="admin-chart-column">
+          <div class="admin-chart-bars-wrap">
+            <div class="admin-chart-bar ${leftClass}" style="height:${leftHeight}%" title="${leftLabel}: ${formatInteger(leftValue)}"></div>
+            <div class="admin-chart-bar ${rightClass}" style="height:${rightHeight}%" title="${rightLabel}: ${formatInteger(rightValue)}"></div>
+          </div>
+          <p class="admin-chart-date">${formatDateKeyShort(item.dateKey)}</p>
+          <p class="admin-chart-value">${formatInteger(leftValue + rightValue)}</p>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="admin-chart-shell space-y-3">
+      <div class="admin-chart-legend">
+        <span><i class="admin-legend-dot ${leftClass}"></i>${leftLabel}</span>
+        <span><i class="admin-legend-dot ${rightClass}"></i>${rightLabel}</span>
+      </div>
+      <div class="admin-chart-scroll">
+        <div class="admin-chart-grid">${bars}</div>
+      </div>
+      <div class="admin-chart-summary-grid">
+        <div class="admin-chart-summary-card">
+          <p>Total ${leftLabel}</p>
+          <strong>${formatInteger(leftTotal)}</strong>
+        </div>
+        <div class="admin-chart-summary-card">
+          <p>Total ${rightLabel}</p>
+          <strong>${formatInteger(rightTotal)}</strong>
+        </div>
+        <div class="admin-chart-summary-card">
+          <p>Pico diário combinado</p>
+          <strong>${formatDateKeyShort(peakDay.dateKey)} • ${formatInteger(peakDay.total)}</strong>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function resolveAdminDashboardUrl(config) {
@@ -80,7 +260,16 @@ class AdminDashboardApp {
     this.loadingPanel = document.getElementById('admin-loading');
     this.accessDeniedPanel = document.getElementById('admin-access-denied');
     this.dashboardContent = document.getElementById('admin-dashboard-content');
+
+    this.generatedAtLabel = document.getElementById('admin-generated-at');
     this.summaryCards = document.getElementById('admin-summary-cards');
+    this.kpiStrip = document.getElementById('admin-kpi-strip');
+    this.aiUsageChart = document.getElementById('admin-ai-usage-chart');
+    this.importChart = document.getElementById('admin-import-chart');
+    this.healthBars = document.getElementById('admin-health-bars');
+    this.operationalInsights = document.getElementById('admin-operational-insights');
+    this.opportunityUsers = document.getElementById('admin-opportunity-users');
+
     this.aiSyncDaily = document.getElementById('admin-ai-sync-daily');
     this.aiConsultantDaily = document.getElementById('admin-ai-consultant-daily');
     this.topUsers = document.getElementById('admin-top-users');
@@ -207,7 +396,16 @@ class AdminDashboardApp {
 
       this.renderDashboard(payload);
     } catch (error) {
-      this.summaryCards.innerHTML = `<p class="text-sm font-black text-red-700">${error?.message || 'Erro ao carregar painel.'}</p>`;
+      const errorMessage = `<p class="text-sm font-black text-red-700">${error?.message || 'Erro ao carregar painel.'}</p>`;
+
+      this.summaryCards.innerHTML = errorMessage;
+      this.kpiStrip.innerHTML = '';
+      this.generatedAtLabel.innerText = '';
+      this.aiUsageChart.innerHTML = '';
+      this.importChart.innerHTML = '';
+      this.healthBars.innerHTML = '';
+      this.operationalInsights.innerHTML = '';
+      this.opportunityUsers.innerHTML = '';
       this.aiSyncDaily.innerHTML = '';
       this.aiConsultantDaily.innerHTML = '';
       this.topUsers.innerHTML = '';
@@ -223,48 +421,80 @@ class AdminDashboardApp {
     const totals = payload?.totals || {};
     const highlights = payload?.highlights || {};
     const users = Array.isArray(payload?.users) ? payload.users : [];
-    const aiSyncDaily = payload?.dailyUsage?.aiCategorizationRunsByDay || [];
-    const aiConsultantDaily = payload?.dailyUsage?.aiConsultantRunsByDay || [];
-    const topUsersByVolume = Array.isArray(highlights.topUsersByVolume) ? highlights.topUsersByVolume : [];
+    const dailyUsage = payload?.dailyUsage || {};
+
+    const aiSyncDaily = Array.isArray(dailyUsage.aiCategorizationRunsByDay)
+      ? dailyUsage.aiCategorizationRunsByDay
+      : [];
+    const aiConsultantDaily = Array.isArray(dailyUsage.aiConsultantRunsByDay)
+      ? dailyUsage.aiConsultantRunsByDay
+      : [];
+    const importOperationsDaily = Array.isArray(dailyUsage.importOperationsByDay)
+      ? dailyUsage.importOperationsByDay
+      : [];
+    const importedTransactionsDaily = Array.isArray(dailyUsage.importedTransactionsByDay)
+      ? dailyUsage.importedTransactionsByDay
+      : [];
+    const manualTransactionsDaily = Array.isArray(dailyUsage.manualTransactionsByDay)
+      ? dailyUsage.manualTransactionsByDay
+      : [];
+
+    const totalUsers = toNumber(totals.users);
+    const totalTransactions = toNumber(totals.transactions);
+    const totalImported = toNumber(totals.importedTransactions);
+    const totalManual = toNumber(totals.manualTransactions);
+    const totalPending = toNumber(totals.pendingCategorization);
+    const totalAiRuns = toNumber(totals.aiCategorizationRuns) + toNumber(totals.aiConsultantRuns);
+    const active30d = toNumber(totals.activeUsers30d);
+    const active7d = toNumber(totals.activeUsers7d);
+    const acceptedRate = toNumber(totals.automationAcceptedRate);
+    const overrideRate = toNumber(totals.automationOverrideRate);
+
+    const activeRate30d = totalUsers > 0 ? (active30d / totalUsers) * 100 : 0;
+    const importedShare = totalTransactions > 0 ? (totalImported / totalTransactions) * 100 : 0;
+    const pendingShare = totalTransactions > 0 ? (totalPending / totalTransactions) * 100 : 0;
+    const aiRunsPerActiveUser = active30d > 0 ? totalAiRuns / active30d : 0;
 
     const cards = [
       {
         label: 'Usuários cadastrados',
-        value: Number(totals.users || 0),
-        helper: `Ativos 7d: ${Number(totals.activeUsers7d || 0)}`
+        value: formatInteger(totalUsers),
+        helper: `Ativos 30d: ${formatInteger(active30d)} (${formatPercent(activeRate30d)})`
       },
       {
-        label: 'Transações importadas',
-        value: Number(totals.importedTransactions || 0),
-        helper: `Manuais: ${Number(totals.manualTransactions || 0)}`
+        label: 'Transações totais',
+        value: formatInteger(totalTransactions),
+        helper: `Importadas: ${formatInteger(totalImported)} • Manuais: ${formatInteger(totalManual)}`
       },
       {
-        label: 'Sincronizações IA',
-        value: Number(totals.aiCategorizationRuns || 0),
-        helper: `Consultor IA: ${Number(totals.aiConsultantRuns || 0)}`
+        label: 'Uso IA acumulado',
+        value: formatInteger(totalAiRuns),
+        helper: `Sync IA: ${formatInteger(totals.aiCategorizationRuns)} • Consultor: ${formatInteger(
+          totals.aiConsultantRuns
+        )}`
       },
       {
-        label: 'Aderência automação',
-        value: formatPercent(totals.automationAcceptedRate || 0),
-        helper: `Revisão manual: ${formatPercent(totals.automationOverrideRate || 0)}`
+        label: 'Aderência da automação',
+        value: formatPercent(acceptedRate),
+        helper: `Revisão manual: ${formatPercent(overrideRate)}`
       },
       {
-        label: 'Pendentes categoria',
-        value: Number(totals.pendingCategorization || 0),
-        helper: `Usuários afetados: ${Number(highlights.usersWithPendingCategorization || 0)}`
+        label: 'Pendências de categoria',
+        value: formatInteger(totalPending),
+        helper: `${formatPercent(pendingShare)} da base ativa`
+      },
+      {
+        label: 'Usuários ativos 7 dias',
+        value: formatInteger(active7d),
+        helper: `Inativos 30d: ${formatInteger(Math.max(totalUsers - active30d, 0))}`
       },
       {
         label: 'Média transações/usuário',
-        value: Number(totals.averageTransactionsPerUser || 0).toFixed(1),
-        helper: `Total base: ${Number(totals.transactions || 0)}`
+        value: toNumber(totals.averageTransactionsPerUser).toFixed(1),
+        helper: `Sem transações: ${formatInteger(highlights.usersWithNoTransactions || 0)}`
       },
       {
-        label: 'Usuários ativos 30d',
-        value: Number(totals.activeUsers30d || 0),
-        helper: `Sem transações: ${Number(highlights.usersWithNoTransactions || 0)}`
-      },
-      {
-        label: 'Última geração',
+        label: 'Última atualização',
         value: formatDateTime(payload.generatedAt),
         helper: `App: ${payload.appId || '-'}`
       }
@@ -273,18 +503,139 @@ class AdminDashboardApp {
     this.summaryCards.innerHTML = cards
       .map(
         (card) => `
-          <div class="bg-zinc-50 border-2 border-black p-3">
-            <p class="text-[10px] font-black uppercase text-zinc-500">${card.label}</p>
-            <p class="text-2xl font-black mt-2">${card.value}</p>
-            <p class="text-[10px] font-bold text-zinc-600 mt-1">${card.helper}</p>
+          <article class="admin-metric-card bg-zinc-50 border-2 border-black p-3">
+            <p class="admin-metric-label">${card.label}</p>
+            <p class="admin-metric-value">${card.value}</p>
+            <p class="admin-metric-helper">${card.helper}</p>
+          </article>
+        `
+      )
+      .join('');
+
+    const kpis = [
+      {
+        label: 'Participação de importação',
+        value: formatPercent(importedShare),
+        helper: 'Quanto da base veio da importação'
+      },
+      {
+        label: 'Chamadas IA por usuário ativo (30d)',
+        value: aiRunsPerActiveUser.toFixed(1),
+        helper: 'Pressão operacional de IA por usuário engajado'
+      },
+      {
+        label: 'Operações de importação (21d)',
+        value: formatInteger(sumSeriesByKey(buildDailySeries({ seriesByKey: { importOps: importOperationsDaily } }), 'importOps')),
+        helper: 'Volume recente de ingestão de dados'
+      }
+    ];
+
+    this.kpiStrip.innerHTML = kpis
+      .map(
+        (kpi) => `
+          <article class="admin-kpi-chip">
+            <p>${kpi.label}</p>
+            <strong>${kpi.value}</strong>
+            <small>${kpi.helper}</small>
+          </article>
+        `
+      )
+      .join('');
+
+    this.generatedAtLabel.innerText = `Atualizado em ${formatDateTime(payload.generatedAt)}`;
+
+    const aiSeries = buildDailySeries({
+      seriesByKey: {
+        sync: aiSyncDaily,
+        consultant: aiConsultantDaily
+      }
+    });
+
+    this.aiUsageChart.innerHTML = renderDualDailyChart({
+      series: aiSeries,
+      leftKey: 'sync',
+      rightKey: 'consultant',
+      leftLabel: 'Sync IA',
+      rightLabel: 'Consultor IA',
+      leftClass: 'admin-bar-yellow',
+      rightClass: 'admin-bar-indigo',
+      emptyMessage: 'Sem uso de IA nos últimos dias.'
+    });
+
+    const importSeries = buildDailySeries({
+      seriesByKey: {
+        imported: importedTransactionsDaily,
+        manual: manualTransactionsDaily
+      }
+    });
+
+    this.importChart.innerHTML = renderDualDailyChart({
+      series: importSeries,
+      leftKey: 'imported',
+      rightKey: 'manual',
+      leftLabel: 'Importadas',
+      rightLabel: 'Manuais',
+      leftClass: 'admin-bar-emerald',
+      rightClass: 'admin-bar-zinc',
+      emptyMessage: 'Sem movimentação de importação/manual no período recente.'
+    });
+
+    const healthRows = [
+      {
+        label: 'Aderência da automação',
+        value: acceptedRate,
+        helper: `${formatInteger(totals.autoAcceptedTransactions)} transações aceitas automaticamente`,
+        className: 'admin-health-fill-emerald'
+      },
+      {
+        label: 'Revisão manual pós-automação',
+        value: overrideRate,
+        helper: `${formatInteger(totals.autoOverriddenTransactions)} transações revisadas pelo usuário`,
+        className: 'admin-health-fill-rose'
+      },
+      {
+        label: 'Pendência de categoria na base',
+        value: pendingShare,
+        helper: `${formatInteger(totalPending)} transações aguardando categorização`,
+        className: 'admin-health-fill-amber'
+      }
+    ];
+
+    this.healthBars.innerHTML = healthRows
+      .map(
+        (row) => `
+          <div class="admin-health-row">
+            <div class="flex items-end justify-between gap-2">
+              <p class="admin-health-label">${row.label}</p>
+              <p class="admin-health-value">${formatPercent(row.value)}</p>
+            </div>
+            <div class="admin-health-track">
+              <div class="admin-health-fill ${row.className}" style="width:${Math.max(0, Math.min(row.value, 100))}%"></div>
+            </div>
+            <p class="admin-health-helper">${row.helper}</p>
           </div>
         `
       )
       .join('');
 
+    const operationalInsights = [
+      `Usuários com pendências de categoria: ${formatInteger(highlights.usersWithPendingCategorization || 0)}.`,
+      `Base importada representa ${formatPercent(importedShare)} das transações totais.`,
+      `Taxa de usuários ativos (30 dias): ${formatPercent(activeRate30d)}.`
+    ];
+
+    this.operationalInsights.innerHTML = operationalInsights
+      .map((text) => `<p class="admin-insight-line">${text}</p>`)
+      .join('');
+
     this.aiSyncDaily.innerHTML = renderDailyMetricList(aiSyncDaily, 'Sem uso de sincronização de IA registrado.');
     this.aiConsultantDaily.innerHTML = renderDailyMetricList(aiConsultantDaily, 'Sem uso de Consultor IA registrado.');
+
+    const topUsersByVolume = Array.isArray(highlights.topUsersByVolume) ? highlights.topUsersByVolume : [];
     this.topUsers.innerHTML = this.renderTopUsers(topUsersByVolume);
+
+    const opportunities = this.buildOpportunityUsers(users);
+    this.opportunityUsers.innerHTML = this.renderOpportunityUsers(opportunities);
 
     this.usersCount.innerText = `${users.length} usuário(s)`;
     this.usersTable.innerHTML = this.renderUsers(users);
@@ -292,20 +643,104 @@ class AdminDashboardApp {
 
   renderTopUsers(users) {
     if (!Array.isArray(users) || users.length === 0) {
-      return '<p class="text-[11px] font-bold text-zinc-600">Sem dados suficientes para ranking.</p>';
+      return '<p class="text-sm font-bold text-zinc-600">Sem dados suficientes para ranking.</p>';
     }
+
+    const maxVolume = Math.max(...users.map((user) => toNumber(user.totalTransactions)), 1);
 
     return users
       .slice(0, 10)
-      .map(
-        (user, index) => `
-          <div class="border border-black/20 bg-zinc-50 p-2 flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <p class="text-[11px] font-black uppercase">${index + 1}. ${user.email || user.uid}</p>
-              <p class="text-[10px] font-bold text-zinc-600">Importadas: ${Number(user.importedTransactions || 0)} | Manuais: ${Number(user.manualTransactions || 0)}</p>
+      .map((user, index) => {
+        const total = toNumber(user.totalTransactions);
+        const width = Math.max(6, Math.round((total / maxVolume) * 100));
+
+        return `
+          <article class="admin-ranking-card">
+            <div class="flex items-center justify-between gap-2">
+              <p class="admin-ranking-title">${index + 1}. ${user.email || user.uid}</p>
+              <p class="admin-ranking-total">${formatInteger(total)}</p>
             </div>
-            <p class="text-[11px] font-black">${Number(user.totalTransactions || 0)} lançamentos</p>
-          </div>
+            <div class="admin-ranking-track">
+              <div class="admin-ranking-fill" style="width:${width}%"></div>
+            </div>
+            <p class="admin-ranking-helper">Importadas: ${formatInteger(user.importedTransactions || 0)} • Manuais: ${formatInteger(
+              user.manualTransactions || 0
+            )}</p>
+          </article>
+        `;
+      })
+      .join('');
+  }
+
+  buildOpportunityUsers(users) {
+    const now = new Date();
+
+    return (Array.isArray(users) ? users : [])
+      .map((user) => {
+        const transactions = user.transactions || {};
+        const automation = user.automation || {};
+        const issues = [];
+
+        const pending = toNumber(transactions.pendingCategorization);
+        if (pending >= 5) {
+          issues.push({
+            score: Math.min(40, pending),
+            label: `Pendências altas (${formatInteger(pending)} transações sem categoria).`
+          });
+        }
+
+        const autoCategorizedTotal = toNumber(automation.autoCategorizedTotal);
+        const acceptedRate = toNumber(automation.acceptedRate);
+        if (autoCategorizedTotal >= 8 && acceptedRate < 70) {
+          issues.push({
+            score: 35,
+            label: `Baixa aderência da automação (${formatPercent(acceptedRate)} de aceite).`
+          });
+        }
+
+        const lastAccess = parseIsoDate(user.lastAccessAt);
+        const daysWithoutAccess = lastAccess
+          ? Math.floor((now.getTime() - lastAccess.getTime()) / 86400000)
+          : Number.POSITIVE_INFINITY;
+
+        if (daysWithoutAccess >= 30 && toNumber(transactions.total) > 0) {
+          issues.push({
+            score: 25,
+            label: `Sem acessar há ${Number.isFinite(daysWithoutAccess) ? daysWithoutAccess : 'muitos'} dias.`
+          });
+        }
+
+        return {
+          uid: user.uid,
+          email: user.email || 'Sem e-mail',
+          displayName: user.displayName || 'Sem nome',
+          score: issues.reduce((accumulator, issue) => accumulator + issue.score, 0),
+          issues
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 8);
+  }
+
+  renderOpportunityUsers(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return '<p class="text-sm font-bold text-zinc-600">Sem alertas críticos neste momento. Operação estável.</p>';
+    }
+
+    return items
+      .map(
+        (item) => `
+          <article class="admin-opportunity-card">
+            <div class="flex items-center justify-between gap-2">
+              <p class="admin-opportunity-title">${item.displayName}</p>
+              <span class="admin-opportunity-score">Prioridade ${Math.round(item.score)}</span>
+            </div>
+            <p class="admin-opportunity-email">${item.email}</p>
+            <div class="space-y-1 mt-2">
+              ${item.issues.map((issue) => `<p class="admin-opportunity-issue">• ${issue.label}</p>`).join('')}
+            </div>
+          </article>
         `
       )
       .join('');
@@ -313,7 +748,7 @@ class AdminDashboardApp {
 
   renderUsers(users) {
     if (!Array.isArray(users) || users.length === 0) {
-      return '<p class="text-[11px] font-bold text-zinc-600">Nenhum usuário encontrado para este appId.</p>';
+      return '<p class="text-sm font-bold text-zinc-600">Nenhum usuário encontrado para este appId.</p>';
     }
 
     return users
@@ -323,35 +758,63 @@ class AdminDashboardApp {
         const transactions = user.transactions || {};
         const aiUsage = user.aiUsage || {};
         const automation = user.automation || {};
+        const pending = toNumber(transactions.pendingCategorization);
+        const pendingClass = pending > 0 ? 'text-amber-700' : 'text-emerald-700';
 
         return `
-          <article class="border-2 border-black bg-zinc-50 p-3 space-y-2">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <article class="admin-user-card">
+            <div class="admin-user-header">
               <div>
-                <p class="text-[12px] font-black uppercase">${name}</p>
-                <p class="text-[10px] font-bold text-zinc-600">${email}</p>
+                <p class="admin-user-name">${name}</p>
+                <p class="admin-user-email">${email}</p>
               </div>
-              <p class="text-[10px] font-black uppercase text-zinc-500">UID: ${user.uid}</p>
+              <p class="admin-user-uid">UID: ${user.uid}</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-[10px] font-bold">
-              <p><span class="text-zinc-500 uppercase font-black">Cadastro:</span> ${formatDateTime(user.createdAt)}</p>
-              <p><span class="text-zinc-500 uppercase font-black">Último acesso:</span> ${formatDateTime(user.lastAccessAt)}</p>
-              <p><span class="text-zinc-500 uppercase font-black">Importadas:</span> ${Number(transactions.imported || 0)}</p>
-              <p><span class="text-zinc-500 uppercase font-black">Totais base:</span> ${Number(transactions.total || 0)}</p>
-              <p><span class="text-zinc-500 uppercase font-black">Sync IA:</span> ${Number(aiUsage.categorizationRunsTotal || 0)}</p>
-              <p><span class="text-zinc-500 uppercase font-black">Consultor IA:</span> ${Number(aiUsage.consultantRunsTotal || 0)}</p>
-              <p>
-                <span class="text-zinc-500 uppercase font-black">Auto aceitas:</span>
-                ${Number(automation.autoAcceptedTransactions || 0)}
-              </p>
-              <p>
-                <span class="text-zinc-500 uppercase font-black">Auto revisadas:</span>
-                ${Number(automation.autoOverriddenTransactions || 0)}
-              </p>
+
+            <div class="admin-user-grid">
+              <div>
+                <p class="admin-user-label">Cadastro</p>
+                <p class="admin-user-value">${formatDateTime(user.createdAt)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Último acesso</p>
+                <p class="admin-user-value">${formatDateTime(user.lastAccessAt)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Transações</p>
+                <p class="admin-user-value">${formatInteger(transactions.total || 0)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Pendências</p>
+                <p class="admin-user-value ${pendingClass}">${formatInteger(pending)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Sync IA</p>
+                <p class="admin-user-value">${formatInteger(aiUsage.categorizationRunsTotal || 0)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Consultor IA</p>
+                <p class="admin-user-value">${formatInteger(aiUsage.consultantRunsTotal || 0)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Auto aceitas</p>
+                <p class="admin-user-value">${formatInteger(automation.autoAcceptedTransactions || 0)}</p>
+              </div>
+              <div>
+                <p class="admin-user-label">Auto revisadas</p>
+                <p class="admin-user-value">${formatInteger(automation.autoOverriddenTransactions || 0)}</p>
+              </div>
             </div>
-            <div class="bg-white border border-black/20 p-2 text-[10px] font-bold">
-              <p class="uppercase font-black text-zinc-500 mb-1">Taxa de aderência da categorização automática</p>
-              <p>${formatPercent(automation.acceptedRate || 0)}</p>
+
+            <div class="admin-user-footer">
+              <p class="admin-user-label">Taxa de aderência da categorização automática</p>
+              <div class="admin-user-progress-track">
+                <div class="admin-user-progress-fill" style="width:${Math.max(
+                  0,
+                  Math.min(toNumber(automation.acceptedRate), 100)
+                )}%"></div>
+              </div>
+              <p class="admin-user-value">${formatPercent(automation.acceptedRate || 0)}</p>
             </div>
           </article>
         `;

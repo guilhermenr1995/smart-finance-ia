@@ -65,41 +65,78 @@
         </section>
 
         <section id="admin-loading" class="bg-white p-5 neo-brutalism">
-          <p class="text-[11px] font-black uppercase text-zinc-500">Carregando métricas...</p>
+          <p class="text-xs font-black uppercase text-zinc-500">Carregando métricas...</p>
         </section>
 
         <section id="admin-dashboard-content" class="hidden space-y-5">
-          <section class="bg-white p-5 neo-brutalism">
-            <h2 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">Visão Geral</h2>
-            <div id="admin-summary-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+          <section class="admin-overview-panel bg-white p-5 neo-brutalism space-y-4">
+            <div class="flex items-center justify-between gap-2 border-b-2 border-black pb-2">
+              <h2 class="font-black text-xs uppercase italic">Resumo Executivo</h2>
+              <p id="admin-generated-at" class="text-xs font-bold text-zinc-500"></p>
+            </div>
+            <div id="admin-summary-cards" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3"></div>
+            <div id="admin-kpi-strip" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
           </section>
 
-          <section class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <section class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-5">
+            <div class="bg-white p-5 neo-brutalism space-y-4">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2">
+                Tendência de Uso da IA (últimos 21 dias)
+              </h3>
+              <div id="admin-ai-usage-chart"></div>
+            </div>
+            <div class="bg-white p-5 neo-brutalism space-y-4">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2">
+                Saúde Operacional
+              </h3>
+              <div id="admin-health-bars" class="space-y-3"></div>
+              <div id="admin-operational-insights" class="space-y-2"></div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <div class="bg-white p-5 neo-brutalism space-y-4">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2">
+                Importações x Lançamentos Manuais (últimos 21 dias)
+              </h3>
+              <div id="admin-import-chart"></div>
+            </div>
+            <div class="bg-white p-5 neo-brutalism space-y-4">
+              <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2">
+                Oportunidades e Alertas
+              </h3>
+              <div id="admin-opportunity-users" class="space-y-2"></div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-1 xl:grid-cols-2 gap-5">
             <div class="bg-white p-5 neo-brutalism">
               <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
-                Sincronização de Categorias por IA (por dia)
+                Top Usuários por Volume de Lançamentos
               </h3>
-              <div id="admin-ai-sync-daily" class="space-y-2"></div>
+              <div id="admin-top-users" class="space-y-2"></div>
             </div>
             <div class="bg-white p-5 neo-brutalism">
               <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
-                Consultor IA (por dia)
+                Uso Diário (detalhe)
               </h3>
-              <div id="admin-ai-consultant-daily" class="space-y-2"></div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p class="text-xs font-black uppercase text-zinc-500 mb-2">Sincronização IA</p>
+                  <div id="admin-ai-sync-daily" class="space-y-2"></div>
+                </div>
+                <div>
+                  <p class="text-xs font-black uppercase text-zinc-500 mb-2">Consultor IA</p>
+                  <div id="admin-ai-consultant-daily" class="space-y-2"></div>
+                </div>
+              </div>
             </div>
-          </section>
-
-          <section class="bg-white p-5 neo-brutalism">
-            <h3 class="font-black text-xs uppercase italic border-b-2 border-black pb-2 mb-4">
-              Top Usuários por Volume de Lançamentos
-            </h3>
-            <div id="admin-top-users" class="space-y-2"></div>
           </section>
 
           <section class="bg-white p-5 neo-brutalism space-y-4">
             <div class="flex items-center justify-between border-b-2 border-black pb-2">
               <h3 class="font-black text-xs uppercase italic">Usuários e Uso da Plataforma</h3>
-              <p id="admin-users-count" class="text-[10px] font-black uppercase text-zinc-500"></p>
+              <p id="admin-users-count" class="text-xs font-black uppercase text-zinc-500"></p>
             </div>
             <div id="admin-users-table" class="space-y-3"></div>
           </section>

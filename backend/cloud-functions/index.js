@@ -1569,6 +1569,18 @@ exports.getAdminDashboard = onRequest(
         dateKey: record.dateKey,
         count: record.aiConsultantRuns
       }));
+      const importOperationsByDay = dailyRecords.map((record) => ({
+        dateKey: record.dateKey,
+        count: record.importOperations
+      }));
+      const importedTransactionsByDay = dailyRecords.map((record) => ({
+        dateKey: record.dateKey,
+        count: record.importedTransactions
+      }));
+      const manualTransactionsByDay = dailyRecords.map((record) => ({
+        dateKey: record.dateKey,
+        count: record.manualTransactions
+      }));
 
       const topUsersByVolume = [...users]
         .sort((left, right) => right.transactions.total - left.transactions.total)
@@ -1595,7 +1607,10 @@ exports.getAdminDashboard = onRequest(
         },
         dailyUsage: {
           aiCategorizationRunsByDay,
-          aiConsultantRunsByDay
+          aiConsultantRunsByDay,
+          importOperationsByDay,
+          importedTransactionsByDay,
+          manualTransactionsByDay
         },
         highlights: {
           usersWithNoTransactions: users.filter((user) => user.transactions.total === 0).length,
