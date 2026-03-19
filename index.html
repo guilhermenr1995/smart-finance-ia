@@ -426,14 +426,14 @@
             </div>
 
             <div class="search-panel mb-1 border-2 border-black bg-zinc-50 p-4 space-y-4">
-              <div class="space-y-1">
-                <p class="text-xs font-black uppercase text-zinc-600">Busca inteligente por descrição, valor e categoria</p>
-                <p class="text-sm font-bold text-zinc-600">Veja o total encontrado e a representatividade sobre sua base ativa.</p>
+              <div class="search-panel-heading space-y-1">
+                <p class="search-panel-title">Busca inteligente por descrição, valor e categoria</p>
+                <p class="search-panel-subtitle">Veja o total encontrado e a representatividade sobre sua base ativa.</p>
               </div>
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div class="lg:col-span-3">
                   <div class="flex items-center gap-2 mb-2">
-                    <label class="field-label">Buscar Por</label>
+                    <label class="field-label search-field-label">Buscar por</label>
                     <button
                       type="button"
                       class="help-tooltip"
@@ -445,7 +445,7 @@
                   </div>
                   <select
                     id="search-mode"
-                    class="input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
+                    class="search-control input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
                   >
                     <option value="description">Descrição</option>
                     <option value="value">Valor</option>
@@ -453,42 +453,42 @@
                   </select>
                 </div>
                 <div class="lg:col-span-7">
-                  <label class="field-label">Busca nos Lançamentos</label>
+                  <label class="field-label search-field-label">Termo da busca</label>
                   <input
                     id="search-term"
                     type="text"
                     placeholder="Digite descrição ou valor para localizar transações"
-                    class="input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
+                    class="search-control input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
                   />
                 </div>
                 <div class="lg:col-span-2">
                   <button
                     id="btn-clear-search"
-                    class="w-full px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white h-fit"
+                    class="search-clear-btn w-full px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white h-fit"
                   >
                     Limpar busca
                   </button>
                 </div>
               </div>
-              <label class="mt-1 inline-flex items-center gap-2 text-xs font-black uppercase text-zinc-600 cursor-pointer">
+              <label class="search-global-toggle mt-1 inline-flex items-center gap-2 text-xs font-black text-zinc-600 cursor-pointer">
                 <input id="search-use-global-base" type="checkbox" class="w-4 h-4 accent-black" />
                 Buscar em toda a base do cliente (ignora período superior)
               </label>
             </div>
 
-            <div id="search-summary-panel" class="hidden mb-4 bg-zinc-900 text-white border-2 border-black p-4">
-              <p id="search-summary-title" class="text-xs font-black uppercase tracking-wide text-yellow-300"></p>
+            <div id="search-summary-panel" class="search-summary-panel hidden mb-4 bg-zinc-900 text-white border-2 border-black p-4">
+              <p id="search-summary-title" class="search-summary-title text-xs font-black tracking-wide text-yellow-300"></p>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                 <div>
-                  <p class="text-xs font-black uppercase opacity-70">Total Encontrado</p>
+                  <p class="search-summary-label text-xs font-black opacity-70">Total Encontrado</p>
                   <p id="search-summary-matched-value" class="text-lg font-black">R$ 0,00</p>
                 </div>
                 <div>
-                  <p id="search-summary-base-label" class="text-xs font-black uppercase opacity-70">Base Ativa</p>
+                  <p id="search-summary-base-label" class="search-summary-label text-xs font-black opacity-70">Base Ativa</p>
                   <p id="search-summary-base-value" class="text-lg font-black">R$ 0,00</p>
                 </div>
                 <div>
-                  <p class="text-xs font-black uppercase opacity-70">Representatividade</p>
+                  <p class="search-summary-label text-xs font-black opacity-70">Representatividade</p>
                   <p id="search-summary-share" class="text-lg font-black">0,00%</p>
                 </div>
               </div>

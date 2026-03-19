@@ -229,6 +229,75 @@ select.edit-mode {
 
 .search-panel {
   margin-top: 2px;
+  border-color: #111827;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.search-panel-heading {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.search-panel-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.search-panel-subtitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.search-field-label {
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: #374151;
+}
+
+.search-control {
+  border: 2px solid #111827 !important;
+  background: #ffffff !important;
+  border-radius: 2px;
+  font-size: 0.96rem;
+  line-height: 1.35;
+  padding: 9px 12px !important;
+}
+
+.search-control:focus {
+  outline: none;
+  box-shadow: 3px 3px 0 #111827;
+}
+
+.search-clear-btn {
+  min-height: 46px;
+  font-size: 0.8rem !important;
+}
+
+.search-global-toggle {
+  text-transform: none;
+  line-height: 1.4;
+  font-size: 0.86rem !important;
+}
+
+.search-summary-panel {
+  background: #111827;
+}
+
+.search-summary-title {
+  font-size: 0.84rem !important;
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+
+.search-summary-label {
+  font-size: 0.76rem !important;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .transaction-card {
@@ -816,6 +885,46 @@ select.edit-mode {
   .search-panel {
     padding: 14px;
     gap: 14px;
+  }
+
+  .search-panel-heading {
+    padding-bottom: 10px;
+  }
+
+  .search-panel-title {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .search-panel-subtitle {
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .search-field-label {
+    font-size: 0.84rem;
+  }
+
+  .search-control {
+    font-size: 1rem;
+    min-height: 48px;
+  }
+
+  .search-clear-btn {
+    min-height: 48px;
+    font-size: 0.84rem !important;
+  }
+
+  .search-global-toggle {
+    font-size: 0.9rem !important;
+  }
+
+  .search-summary-title {
+    font-size: 0.94rem !important;
+  }
+
+  .search-summary-label {
+    font-size: 0.84rem !important;
   }
 
   .field-label {
