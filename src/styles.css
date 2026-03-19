@@ -38,11 +38,204 @@ select.edit-mode {
   filter: grayscale(1);
 }
 
+.dashboard-shell {
+  --sf-gap: 16px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.dashboard-header-main {
+  min-width: 0;
+}
+
+.dashboard-brand-title {
+  font-size: clamp(1.4rem, 1.8vw, 1.85rem);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+
+.dashboard-status-line {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3f3f46;
+}
+
+.dashboard-user-line {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #374151;
+  word-break: break-word;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dashboard-section {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.dashboard-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #111827;
+}
+
+.dashboard-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-step-badge {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #111827;
+  background: #facc15;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dashboard-section-title {
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-style: italic;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.dashboard-section-subtitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #52525b;
+  text-align: right;
+  max-width: 35ch;
+}
+
+.dashboard-helper-text {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #52525b;
+  font-weight: 600;
+}
+
+.dashboard-upload-card {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #71717a;
+}
+
+.input-line {
+  min-height: 44px;
+}
+
+.dashboard-summary-section .dashboard-section-head {
+  border-bottom: none;
+}
+
+.dashboard-summary-grid {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.dashboard-total-value {
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.dashboard-cycle-caption {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #facc15;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-ignored-card {
+  min-width: 180px;
+}
+
+.dashboard-ignored-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #a1a1aa;
+}
+
+.dashboard-ignored-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #d4d4d8;
+}
+
+.dashboard-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.73rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #3f3f46;
+}
+
+.search-panel {
+  margin-top: 2px;
+}
+
 .transaction-card {
   border: 2px solid #111827;
   box-shadow: 3px 3px 0 #111827;
   background: #f8fafc;
-  padding: 12px;
+  padding: 14px;
 }
 
 .transaction-head {
@@ -53,16 +246,17 @@ select.edit-mode {
 }
 
 .transaction-meta {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #64748b;
+  line-height: 1.35;
 }
 
 .transaction-title {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
   font-weight: 800;
   color: #0f172a;
@@ -86,10 +280,11 @@ select.edit-mode {
 }
 
 .transaction-value {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   white-space: nowrap;
   color: #09090b;
+  line-height: 1.15;
 }
 
 .transaction-foot {
@@ -106,14 +301,14 @@ select.edit-mode {
 
 .transaction-badge {
   display: inline-block;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid #111827;
   background: #fef08a;
   color: #111827;
-  padding: 3px 7px;
+  padding: 4px 8px;
 }
 
 .transaction-badge-neutral {
@@ -142,10 +337,11 @@ select.edit-mode {
   text-align: left;
   border: 2px solid #111827;
   background: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 8px 10px;
+  padding: 10px 10px;
+  min-height: 44px;
 }
 
 .transaction-bank-account-btn {
@@ -153,30 +349,32 @@ select.edit-mode {
   text-align: left;
   border: 2px solid #111827;
   background: #eff6ff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 8px 10px;
+  padding: 10px 10px;
+  min-height: 44px;
 }
 
 .transaction-toggle-btn {
   border: 2px solid #111827;
   background: #111827;
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 8px 10px;
+  padding: 10px 10px;
+  min-height: 44px;
 }
 
 .help-tooltip {
   position: relative;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border: 2px solid #111827;
   background: #facc15;
   color: #111827;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   display: inline-flex;
@@ -185,6 +383,11 @@ select.edit-mode {
   cursor: help;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.help-tooltip.is-open {
+  background: #111827;
+  color: #f8fafc;
 }
 
 .help-tooltip::after {
@@ -512,6 +715,19 @@ select.edit-mode {
     min-width: 0;
   }
 
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-header-actions {
+    justify-content: flex-start;
+  }
+
+  .dashboard-section-subtitle {
+    max-width: 100%;
+  }
+
 }
 
 @media (min-width: 768px) {
@@ -540,6 +756,96 @@ select.edit-mode {
 }
 
 @media (max-width: 767px) {
+  .dashboard-shell {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .dashboard-header {
+    gap: 12px;
+  }
+
+  .dashboard-header-actions > * {
+    flex: 1 1 auto;
+    text-align: center;
+    min-height: 42px;
+  }
+
+  .dashboard-section {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .dashboard-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dashboard-section-subtitle {
+    text-align: left;
+    font-size: 0.85rem;
+  }
+
+  .dashboard-helper-text {
+    font-size: 0.95rem;
+  }
+
+  .dashboard-upload-card {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dashboard-summary-grid {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .dashboard-ignored-card {
+    min-width: 0;
+  }
+
+  .dashboard-legend-row {
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+
+  .search-panel {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .field-label {
+    font-size: 0.78rem;
+  }
+
+  .input-line {
+    min-height: 46px;
+  }
+
+  #app-screen .text-\[8px\] {
+    font-size: 0.74rem !important;
+    line-height: 1.35;
+  }
+
+  #app-screen .text-\[9px\] {
+    font-size: 0.78rem !important;
+    line-height: 1.35;
+  }
+
+  #app-screen .text-\[10px\] {
+    font-size: 0.84rem !important;
+    line-height: 1.38;
+  }
+
+  #app-screen .text-\[11px\] {
+    font-size: 0.9rem !important;
+    line-height: 1.4;
+  }
+
   .tutorial-accordion {
     grid-template-columns: 1fr;
   }
@@ -557,14 +863,41 @@ select.edit-mode {
     position: fixed;
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    bottom: 14px;
     width: auto;
     min-width: 0;
     transform: none;
-    padding: 12px;
-    font-size: 12px;
+    padding: 14px 12px;
+    font-size: 13px;
     line-height: 1.45;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
     z-index: 10001;
+  }
+
+  .transaction-card {
+    padding: 14px 12px;
+  }
+
+  .transaction-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .transaction-value {
+    font-size: 1.2rem;
+    white-space: normal;
+  }
+
+  .transaction-title {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .transaction-meta {
+    font-size: 0.77rem;
+  }
+
+  .transaction-badge {
+    font-size: 0.72rem;
   }
 }
