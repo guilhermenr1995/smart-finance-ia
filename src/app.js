@@ -94,10 +94,15 @@ class SmartFinanceApplication {
     this.dashboardView.bindEvents({
       onFiltersChange: (partialFilters) => {
         this.state.updateFilters(partialFilters);
+        this.dashboardView.resetPagination();
         this.refreshDashboard();
       },
       onSearchChange: (partialSearch) => {
         this.state.updateSearch(partialSearch);
+        this.dashboardView.resetPagination();
+        this.refreshDashboard();
+      },
+      onPaginationChange: () => {
         this.refreshDashboard();
       },
       onImportFile: (file, accountType, bankAccountName) => this.importCsv(file, accountType, bankAccountName),

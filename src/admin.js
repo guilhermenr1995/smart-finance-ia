@@ -2,8 +2,13 @@ import { loadAppConfig } from './config/app-config.js';
 
 const DEFAULT_ADMIN_EMAILS = ['guilhermenr1995@gmail.com'];
 const CHART_WINDOW_DAYS = 21;
+const DEFAULT_USERS_PAGE_SIZE = 10;
 
 function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeSearchTerm(value) {
   return String(value || '').trim().toLowerCase();
 }
 
@@ -177,11 +182,13 @@ function renderDualDailyChart({
   };
 
   const bars = safeSeries
-    .map((item) => {
+    .map((item, index) => {
       const leftValue = toNumber(item[leftKey]);
       const rightValue = toNumber(item[rightKey]);
       const leftHeight = Math.max(4, Math.round((leftValue / maxValue) * 100));
       const rightHeight = Math.max(4, Math.round((rightValue / maxValue) * 100));
+      const labelInterval = safeSeries.length >= 18 ? 3 : 2;
+      const showDateLabel = index === 0 || index === safeSeries.length - 1 || index % labelInterval === 0;
 
       return `
         <div class="admin-chart-column">
@@ -189,8 +196,7 @@ function renderDualDailyChart({
             <div class="admin-chart-bar ${leftClass}" style="height:${leftHeight}%" title="${leftLabel}: ${formatInteger(leftValue)}"></div>
             <div class="admin-chart-bar ${rightClass}" style="height:${rightHeight}%" title="${rightLabel}: ${formatInteger(rightValue)}"></div>
           </div>
-          <p class="admin-chart-date">${formatDateKeyShort(item.dateKey)}</p>
-          <p class="admin-chart-value">${formatInteger(leftValue + rightValue)}</p>
+          <p class="admin-chart-date ${showDateLabel ? '' : 'admin-chart-date-muted'}">${showDateLabel ? formatDateKeyShort(item.dateKey) : '•'}</p>
         </div>
       `;
     })
@@ -275,10 +281,31 @@ class AdminDashboardApp {
     this.topUsers = document.getElementById('admin-top-users');
     this.usersCount = document.getElementById('admin-users-count');
     this.usersTable = document.getElementById('admin-users-table');
+    this.usersSearchInput = document.getElementById('admin-users-search');
+    this.usersSearchClearButton = document.getElementById('admin-users-search-clear');
+    this.usersPageSizeSelect = document.getElementById('admin-users-page-size');
+    this.usersPaginationPanel = document.getElementById('admin-users-pagination');
+    this.usersPaginationRange = document.getElementById('admin-users-pagination-range');
+    this.usersPaginationStatus = document.getElementById('admin-users-pagination-status');
+    this.usersPaginationPrevButton = document.getElementById('admin-users-pagination-prev');
+    this.usersPaginationNextButton = document.getElementById('admin-users-pagination-next');
 
     this.googleLoginButton = document.getElementById('admin-btn-google-login');
     this.refreshButton = document.getElementById('admin-btn-refresh');
     this.logoutButton = document.getElementById('admin-btn-logout');
+
+    this.usersState = {
+      allUsers: [],
+      filteredUsers: [],
+      query: '',
+      page: 1,
+      pageSize: DEFAULT_USERS_PAGE_SIZE,
+      totalPages: 1
+    };
+
+    if (this.usersPageSizeSelect) {
+      this.usersPageSizeSelect.value = String(DEFAULT_USERS_PAGE_SIZE);
+    }
   }
 
   async init() {
@@ -323,6 +350,50 @@ class AdminDashboardApp {
         return;
       }
       await this.loadAdminDashboard(user);
+    });
+
+    this.usersSearchInput?.addEventListener('input', () => {
+      this.usersState.query = this.usersSearchInput.value;
+      this.usersState.page = 1;
+      this.renderUsersSection();
+    });
+
+    this.usersSearchClearButton?.addEventListener('click', () => {
+      if (this.usersSearchInput) {
+        this.usersSearchInput.value = '';
+      }
+      this.usersState.query = '';
+      this.usersState.page = 1;
+      this.renderUsersSection();
+    });
+
+    this.usersPageSizeSelect?.addEventListener('change', () => {
+      const selectedPageSize = Number(this.usersPageSizeSelect.value);
+      if (!Number.isFinite(selectedPageSize) || selectedPageSize <= 0) {
+        return;
+      }
+
+      this.usersState.pageSize = selectedPageSize;
+      this.usersState.page = 1;
+      this.renderUsersSection();
+    });
+
+    this.usersPaginationPrevButton?.addEventListener('click', () => {
+      if (this.usersState.page <= 1) {
+        return;
+      }
+
+      this.usersState.page -= 1;
+      this.renderUsersSection();
+    });
+
+    this.usersPaginationNextButton?.addEventListener('click', () => {
+      if (this.usersState.page >= this.usersState.totalPages) {
+        return;
+      }
+
+      this.usersState.page += 1;
+      this.renderUsersSection();
     });
   }
 
@@ -411,6 +482,12 @@ class AdminDashboardApp {
       this.topUsers.innerHTML = '';
       this.usersTable.innerHTML = '';
       this.usersCount.innerText = '0 usuários';
+      this.usersState.allUsers = [];
+      this.usersState.filteredUsers = [];
+      this.usersState.totalPages = 1;
+      if (this.usersPaginationPanel) {
+        this.usersPaginationPanel.classList.add('hidden');
+      }
     } finally {
       this.loadingPanel.classList.add('hidden');
       this.dashboardContent.classList.remove('hidden');
@@ -637,8 +714,106 @@ class AdminDashboardApp {
     const opportunities = this.buildOpportunityUsers(users);
     this.opportunityUsers.innerHTML = this.renderOpportunityUsers(opportunities);
 
-    this.usersCount.innerText = `${users.length} usuário(s)`;
-    this.usersTable.innerHTML = this.renderUsers(users);
+    this.usersState.allUsers = users;
+    this.usersState.page = 1;
+    this.renderUsersSection();
+  }
+
+  filterUsersByEmail(users, query) {
+    const normalizedQuery = normalizeSearchTerm(query);
+    if (!normalizedQuery) {
+      return Array.isArray(users) ? users : [];
+    }
+
+    return (Array.isArray(users) ? users : []).filter((user) =>
+      normalizeEmail(user?.email || '').includes(normalizedQuery)
+    );
+  }
+
+  paginateUsers(users) {
+    const safeUsers = Array.isArray(users) ? users : [];
+    const totalItems = safeUsers.length;
+    const pageSize = Math.max(1, Math.round(toNumber(this.usersState.pageSize || DEFAULT_USERS_PAGE_SIZE)));
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const currentPage = Math.max(1, Math.min(Math.round(toNumber(this.usersState.page || 1)), totalPages));
+    const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+    this.usersState.page = currentPage;
+    this.usersState.pageSize = pageSize;
+    this.usersState.totalPages = totalPages;
+
+    return {
+      totalItems,
+      totalPages,
+      currentPage,
+      pageSize,
+      startIndex,
+      endIndex,
+      pageItems: safeUsers.slice(startIndex, endIndex),
+      hasPrevious: currentPage > 1,
+      hasNext: currentPage < totalPages
+    };
+  }
+
+  renderUsersSection() {
+    const allUsers = Array.isArray(this.usersState.allUsers) ? this.usersState.allUsers : [];
+    const query = this.usersState.query || '';
+    const filteredUsers = this.filterUsersByEmail(allUsers, query);
+    this.usersState.filteredUsers = filteredUsers;
+
+    const pagination = this.paginateUsers(filteredUsers);
+    const totalAll = allUsers.length;
+    const totalFiltered = filteredUsers.length;
+    const hasQuery = normalizeSearchTerm(query).length > 0;
+
+    this.usersCount.innerText = hasQuery
+      ? `${formatInteger(totalFiltered)} de ${formatInteger(totalAll)} usuário(s)`
+      : `${formatInteger(totalFiltered)} usuário(s)`;
+
+    if (totalFiltered === 0) {
+      const noResultMessage = hasQuery
+        ? 'Nenhum usuário encontrado com este e-mail.'
+        : 'Nenhum usuário encontrado para este appId.';
+      this.usersTable.innerHTML = `<p class="text-sm font-bold text-zinc-600">${noResultMessage}</p>`;
+    } else {
+      this.usersTable.innerHTML = this.renderUsers(pagination.pageItems);
+    }
+
+    this.renderUsersPagination(pagination, totalFiltered);
+  }
+
+  renderUsersPagination(meta, totalFiltered) {
+    if (!this.usersPaginationPanel) {
+      return;
+    }
+
+    if (!meta || totalFiltered <= 0) {
+      this.usersPaginationPanel.classList.add('hidden');
+      this.usersPaginationRange.innerText = 'Mostrando 0-0 de 0';
+      this.usersPaginationStatus.innerText = 'Página 1 de 1';
+      if (this.usersPaginationPrevButton) {
+        this.usersPaginationPrevButton.disabled = true;
+      }
+      if (this.usersPaginationNextButton) {
+        this.usersPaginationNextButton.disabled = true;
+      }
+      return;
+    }
+
+    this.usersPaginationPanel.classList.remove('hidden');
+    this.usersPaginationRange.innerText = `Mostrando ${meta.startIndex + 1}-${meta.endIndex} de ${meta.totalItems}`;
+    this.usersPaginationStatus.innerText = `Página ${meta.currentPage} de ${meta.totalPages}`;
+
+    if (this.usersPageSizeSelect && this.usersPageSizeSelect.value !== String(meta.pageSize)) {
+      this.usersPageSizeSelect.value = String(meta.pageSize);
+    }
+    if (this.usersPaginationPrevButton) {
+      this.usersPaginationPrevButton.disabled = !meta.hasPrevious;
+    }
+    if (this.usersPaginationNextButton) {
+      this.usersPaginationNextButton.disabled = !meta.hasNext;
+    }
   }
 
   renderTopUsers(users) {

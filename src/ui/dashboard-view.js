@@ -12,6 +12,82 @@ function normalizeForSearch(value) {
 }
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
+const DEFAULT_PAGE_SIZE = 30;
+const BANK_GUIDE_STORAGE_KEY = 'smart-finance-bank-guide';
+const BANK_EXPORT_GUIDES = {
+  nubank: {
+    label: 'Nubank',
+    formats: 'Conta OFX | Cartão CSV',
+    steps: [
+      'Abra Conta ou Cartão no app.',
+      'Entre em Extrato/Fatura e ajuste o período.',
+      'Use Exportar/Compartilhar e salve em OFX (conta) ou CSV (fatura).'
+    ]
+  },
+  itau: {
+    label: 'Itaú',
+    formats: 'Conta e Cartão em PDF | OFX no internet banking (quando disponível)',
+    steps: [
+      'No app: Conta > Extrato > selecione o período > Compartilhar/Salvar PDF.',
+      'Para cartão: Cartões > Fatura > Baixar/Compartilhar PDF.',
+      'No internet banking web, procure por Extrato com opção de exportação OFX para importação estruturada.'
+    ]
+  },
+  bradesco: {
+    label: 'Bradesco',
+    formats: 'OFX ou PDF',
+    steps: [
+      'Acesse Extrato por período na conta desejada.',
+      'Abra o menu de ações e escolha Exportar/Download.',
+      'Priorize OFX; se não houver, use o PDF detalhado.'
+    ]
+  },
+  santander: {
+    label: 'Santander',
+    formats: 'OFX/CSV/PDF',
+    steps: [
+      'Entre em Conta Corrente > Extrato no período desejado.',
+      'Use Exportar/Download no extrato.',
+      'Se OFX/CSV não estiver disponível no app, use o PDF detalhado.'
+    ]
+  },
+  'banco-do-brasil': {
+    label: 'Banco do Brasil',
+    formats: 'OFX ou PDF',
+    steps: [
+      'Acesse Conta > Extratos e selecione o período.',
+      'Use Download/Exportação do extrato.',
+      'Priorize OFX; caso não exista, utilize o PDF detalhado.'
+    ]
+  },
+  caixa: {
+    label: 'Caixa',
+    formats: 'OFX/PDF',
+    steps: [
+      'Abra Extrato detalhado ou Movimentações da conta.',
+      'No menu do extrato, escolha Compartilhar/Exportar.',
+      'Se CSV não existir, importe OFX ou PDF detalhado.'
+    ]
+  },
+  inter: {
+    label: 'Inter',
+    formats: 'OFX/PDF',
+    steps: [
+      'Entre em Extrato/Movimentações e defina o período.',
+      'Use Compartilhar/Exportar no extrato.',
+      'Caso CSV não esteja disponível, use OFX ou PDF.'
+    ]
+  },
+  outros: {
+    label: 'Outros bancos',
+    formats: 'CSV/OFX/PDF',
+    steps: [
+      'Procure por Extrato, Movimentações ou Histórico no período desejado.',
+      'Use opções como Exportar, Download ou Compartilhar.',
+      'Priorize OFX, depois CSV; se não houver, use PDF detalhado.'
+    ]
+  }
+};
 
 function normalizeBankAccountName(value) {
   const name = String(value || '').trim();
@@ -36,6 +112,13 @@ export class DashboardView {
 
     this.creditFileInput = document.getElementById('file-credit');
     this.accountFileInput = document.getElementById('file-account');
+    this.bankGuideSelect = document.getElementById('bank-guide-select');
+    this.openBankGuideButton = document.getElementById('btn-open-bank-guide');
+    this.bankGuideModal = document.getElementById('bank-guide-modal');
+    this.bankGuideTitle = document.getElementById('bank-guide-title');
+    this.bankGuideFormat = document.getElementById('bank-guide-format');
+    this.bankGuideSteps = document.getElementById('bank-guide-steps');
+    this.bankGuideCloseButton = document.getElementById('bank-guide-close');
     this.importBankAccountButton = document.getElementById('import-bank-account-button');
     this.importBankAccountValue = document.getElementById('import-bank-account-value');
     this.aiButton = document.getElementById('btn-ai-sync');
@@ -59,6 +142,12 @@ export class DashboardView {
     this.searchSummaryMatchedValue = document.getElementById('search-summary-matched-value');
     this.searchSummaryBaseValue = document.getElementById('search-summary-base-value');
     this.searchSummaryShare = document.getElementById('search-summary-share');
+    this.transactionsPaginationPanel = document.getElementById('transactions-pagination');
+    this.paginationRangeLabel = document.getElementById('pagination-range');
+    this.paginationStatusLabel = document.getElementById('pagination-status');
+    this.paginationPrevButton = document.getElementById('pagination-prev');
+    this.paginationNextButton = document.getElementById('pagination-next');
+    this.paginationPageSizeSelect = document.getElementById('pagination-page-size');
     this.aiPendingLabel = document.getElementById('label-ia-count');
     this.addTransactionButton = document.getElementById('btn-add-transaction');
 
@@ -97,8 +186,16 @@ export class DashboardView {
     this.activeTooltipTrigger = null;
     this.isBusy = false;
     this.consultantHasRemaining = true;
+    this.pagination = {
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      totalPages: 1,
+      totalItems: 0
+    };
 
     this.initCategoryFilter();
+    this.initPagination();
+    this.initBankGuide();
     this.bindTooltipInteractions();
   }
 
@@ -191,6 +288,29 @@ export class DashboardView {
     this.setImportBankAccount(this.selectedImportBankAccount);
   }
 
+  initPagination() {
+    if (this.paginationPageSizeSelect) {
+      this.paginationPageSizeSelect.value = String(DEFAULT_PAGE_SIZE);
+    }
+  }
+
+  initBankGuide() {
+    if (!this.bankGuideSelect) {
+      return;
+    }
+
+    const options = Object.entries(BANK_EXPORT_GUIDES).map(
+      ([key, guide]) => `<option value="${escapeHtml(key)}">${escapeHtml(guide.label)}</option>`
+    );
+    this.bankGuideSelect.innerHTML = options.join('');
+    const lastBankGuide = this.getStoredBankGuideKey();
+    this.bankGuideSelect.value = BANK_EXPORT_GUIDES[lastBankGuide] ? lastBankGuide : 'nubank';
+  }
+
+  resetPagination() {
+    this.pagination.page = 1;
+  }
+
   bindEvents(handlers) {
     this.handlers = handlers;
 
@@ -231,6 +351,35 @@ export class DashboardView {
       handlers.onSearchChange({ term: '' });
     });
 
+    this.paginationPageSizeSelect?.addEventListener('change', () => {
+      const selectedPageSize = Number(this.paginationPageSizeSelect.value);
+      if (!Number.isFinite(selectedPageSize) || selectedPageSize <= 0) {
+        return;
+      }
+
+      this.pagination.pageSize = selectedPageSize;
+      this.pagination.page = 1;
+      handlers.onPaginationChange?.();
+    });
+
+    this.paginationPrevButton?.addEventListener('click', () => {
+      if (this.pagination.page <= 1) {
+        return;
+      }
+
+      this.pagination.page -= 1;
+      handlers.onPaginationChange?.();
+    });
+
+    this.paginationNextButton?.addEventListener('click', () => {
+      if (this.pagination.page >= this.pagination.totalPages) {
+        return;
+      }
+
+      this.pagination.page += 1;
+      handlers.onPaginationChange?.();
+    });
+
     Object.entries(this.accountFilterButtons).forEach(([accountType, button]) => {
       button.addEventListener('click', () => {
         handlers.onFiltersChange({ accountType });
@@ -247,6 +396,24 @@ export class DashboardView {
       const [file] = this.accountFileInput.files || [];
       handlers.onImportFile(file, 'Conta', this.selectedImportBankAccount);
       this.accountFileInput.value = '';
+    });
+
+    this.openBankGuideButton?.addEventListener('click', () => {
+      this.openBankGuideModal(this.bankGuideSelect?.value);
+    });
+
+    this.bankGuideSelect?.addEventListener('change', () => {
+      this.storeBankGuideKey(this.bankGuideSelect?.value);
+    });
+
+    this.bankGuideCloseButton?.addEventListener('click', () => {
+      this.closeBankGuideModal();
+    });
+
+    this.bankGuideModal?.addEventListener('click', (event) => {
+      if (event.target === this.bankGuideModal) {
+        this.closeBankGuideModal();
+      }
     });
 
     this.importBankAccountButton?.addEventListener('click', () => {
@@ -490,6 +657,7 @@ export class DashboardView {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         this.closeTooltip();
+        this.closeBankGuideModal();
       }
     });
 
@@ -511,6 +679,54 @@ export class DashboardView {
     this.activeTooltipTrigger = null;
   }
 
+  openBankGuideModal(bankKey) {
+    if (!this.bankGuideModal || !this.bankGuideTitle || !this.bankGuideFormat || !this.bankGuideSteps) {
+      return;
+    }
+
+    const normalizedKey = String(bankKey || 'nubank').trim();
+    const guide = BANK_EXPORT_GUIDES[normalizedKey] || BANK_EXPORT_GUIDES.nubank;
+    this.storeBankGuideKey(normalizedKey);
+
+    this.bankGuideTitle.innerText = guide.label;
+    this.bankGuideFormat.innerText = guide.formats;
+    this.bankGuideSteps.innerHTML = (Array.isArray(guide.steps) ? guide.steps : [])
+      .map(
+        (step, index) => `
+          <li class="bank-guide-step-item">
+            <span class="bank-guide-step-index">${index + 1}</span>
+            <p class="bank-guide-step-text">${escapeHtml(step)}</p>
+          </li>
+        `
+      )
+      .join('');
+    this.bankGuideModal.classList.remove('hidden');
+  }
+
+  closeBankGuideModal() {
+    this.bankGuideModal?.classList.add('hidden');
+  }
+
+  getStoredBankGuideKey() {
+    try {
+      return String(window.localStorage.getItem(BANK_GUIDE_STORAGE_KEY) || '').trim().toLowerCase();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  storeBankGuideKey(bankKey) {
+    try {
+      const normalizedKey = String(bankKey || '').trim().toLowerCase();
+      if (!BANK_EXPORT_GUIDES[normalizedKey]) {
+        return;
+      }
+      window.localStorage.setItem(BANK_GUIDE_STORAGE_KEY, normalizedKey);
+    } catch (error) {
+      // Local storage may be blocked in some private browsers.
+    }
+  }
+
   setBusy(isBusy) {
     this.isBusy = isBusy;
     this.aiButton.disabled = isBusy;
@@ -521,6 +737,15 @@ export class DashboardView {
     }
     if (this.addTransactionButton) {
       this.addTransactionButton.disabled = isBusy;
+    }
+    if (this.paginationPageSizeSelect) {
+      this.paginationPageSizeSelect.disabled = isBusy;
+    }
+    if (this.paginationPrevButton) {
+      this.paginationPrevButton.disabled = isBusy || this.pagination.page <= 1;
+    }
+    if (this.paginationNextButton) {
+      this.paginationNextButton.disabled = isBusy || this.pagination.page >= this.pagination.totalPages;
     }
     this.aiConsultantButton.disabled = isBusy || !this.consultantHasRemaining;
   }
@@ -690,16 +915,82 @@ export class DashboardView {
     this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
     this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
 
+    const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
+    const paginationMeta = this.paginateTransactions(orderedTableTransactions);
+
     this.renderCategoryChart(summary, previousSummary);
     this.renderCategoryStats(summary, previousSummary);
-    this.renderTransactions(tableTransactions);
+    this.renderTransactions(paginationMeta.pageItems);
+    this.renderTransactionsPagination(paginationMeta);
     this.renderSearchTotals(searchTotals);
     this.renderAiConsultant(aiConsultant);
 
-    this.itemsCounter.innerText = search.term.trim()
+    const baseCounterLabel = search.term.trim()
       ? `${tableTransactions.length} RESULTADOS (${search.useGlobalBase ? 'BASE TOTAL' : 'PERÍODO FILTRADO'})`
       : `${tableTransactions.length} LANÇAMENTOS`;
+    this.itemsCounter.innerText =
+      tableTransactions.length > 0
+        ? `${baseCounterLabel} • PÁGINA ${paginationMeta.currentPage}/${paginationMeta.totalPages}`
+        : baseCounterLabel;
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
+  }
+
+  paginateTransactions(orderedTransactions = []) {
+    const totalItems = orderedTransactions.length;
+    const safePageSize = Math.max(1, Number(this.pagination.pageSize || DEFAULT_PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+    const currentPage = Math.max(1, Math.min(Number(this.pagination.page || 1), totalPages));
+    const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * safePageSize;
+    const endIndex = Math.min(startIndex + safePageSize, totalItems);
+
+    this.pagination.page = currentPage;
+    this.pagination.pageSize = safePageSize;
+    this.pagination.totalPages = totalPages;
+    this.pagination.totalItems = totalItems;
+
+    return {
+      totalItems,
+      totalPages,
+      currentPage,
+      pageSize: safePageSize,
+      startIndex,
+      endIndex,
+      pageItems: orderedTransactions.slice(startIndex, endIndex),
+      hasPrevious: currentPage > 1,
+      hasNext: currentPage < totalPages
+    };
+  }
+
+  renderTransactionsPagination(meta) {
+    if (!this.transactionsPaginationPanel) {
+      return;
+    }
+
+    if (!meta || meta.totalItems <= 0) {
+      this.transactionsPaginationPanel.classList.add('hidden');
+      this.paginationRangeLabel.innerText = 'Mostrando 0-0 de 0';
+      this.paginationStatusLabel.innerText = 'Página 1 de 1';
+      if (this.paginationPrevButton) {
+        this.paginationPrevButton.disabled = true;
+      }
+      if (this.paginationNextButton) {
+        this.paginationNextButton.disabled = true;
+      }
+      return;
+    }
+
+    this.transactionsPaginationPanel.classList.remove('hidden');
+    this.paginationRangeLabel.innerText = `Mostrando ${meta.startIndex + 1}-${meta.endIndex} de ${meta.totalItems}`;
+    this.paginationStatusLabel.innerText = `Página ${meta.currentPage} de ${meta.totalPages}`;
+    if (this.paginationPageSizeSelect && this.paginationPageSizeSelect.value !== String(meta.pageSize)) {
+      this.paginationPageSizeSelect.value = String(meta.pageSize);
+    }
+    if (this.paginationPrevButton) {
+      this.paginationPrevButton.disabled = !meta.hasPrevious;
+    }
+    if (this.paginationNextButton) {
+      this.paginationNextButton.disabled = !meta.hasNext;
+    }
   }
 
   renderSearchTotals(searchTotals = {}) {
@@ -1152,9 +1443,7 @@ export class DashboardView {
   }
 
   renderTransactions(transactions) {
-    const ordered = sortTransactionsByDateDesc(transactions);
-
-    this.tableBody.innerHTML = ordered
+    this.tableBody.innerHTML = transactions
       .map((transaction) => {
         const displayCategory = getDisplayCategory(transaction);
         const installmentOverride = displayCategory === 'Parcelas' && transaction.category !== 'Parcelas';

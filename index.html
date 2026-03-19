@@ -127,96 +127,40 @@
               <p class="dashboard-section-subtitle">Escolha seu banco, exporte o arquivo e importe aqui.</p>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-5">
-              <div>
-                <p class="dashboard-helper-text mb-3">
-                  Guia rápido para exportar extrato nos principais bancos. O app aceita CSV, OFX e PDF.
-                </p>
-                <div class="tutorial-accordion" role="tablist" aria-label="Guia rápido de exportação por banco">
-                  <details class="tutorial-accordion-item" open>
-                    <summary class="tutorial-accordion-summary">
-                      <span>Nubank</span>
-                      <small>Conta OFX | Cartão CSV</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>Abra <strong>Conta</strong> ou <strong>Cartão</strong>.</li>
-                        <li>Entre em <strong>Extrato/Fatura</strong> e ajuste o período.</li>
-                        <li>Use <strong>Exportar/Compartilhar</strong> e salve em OFX (conta) ou CSV (fatura).</li>
-                      </ul>
-                    </div>
-                  </details>
-
-                  <details class="tutorial-accordion-item">
-                    <summary class="tutorial-accordion-summary">
-                      <span>Itaú</span>
-                      <small>Conta e Cartão em PDF</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>No app Itaú: <strong>Conta &gt; Extrato &gt; Período &gt; Compartilhar</strong> e salve em PDF.</li>
-                        <li>Para cartão: <strong>Cartões &gt; Fatura &gt; Baixar/Compartilhar PDF</strong>.</li>
-                        <li>No Internet Banking, quando disponível, use <strong>Exportar OFX/CSV</strong> para importação mais estruturada.</li>
-                      </ul>
-                    </div>
-                  </details>
-
-                  <details class="tutorial-accordion-item">
-                    <summary class="tutorial-accordion-summary">
-                      <span>Bradesco</span>
-                      <small>OFX ou PDF</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>Acesse <strong>Extrato por período</strong>.</li>
-                        <li>No menu de ações, escolha <strong>Exportar/Download</strong>.</li>
-                        <li>Priorize OFX; se não houver, exporte PDF detalhado.</li>
-                      </ul>
-                    </div>
-                  </details>
-
-                  <details class="tutorial-accordion-item">
-                    <summary class="tutorial-accordion-summary">
-                      <span>Santander</span>
-                      <small>OFX/CSV/PDF</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>Abra <strong>Conta Corrente &gt; Extrato</strong> no período desejado.</li>
-                        <li>Use <strong>Exportar/Download</strong>.</li>
-                        <li>Se OFX/CSV não estiver disponível no app, use o PDF do extrato detalhado.</li>
-                      </ul>
-                    </div>
-                  </details>
-
-                  <details class="tutorial-accordion-item">
-                    <summary class="tutorial-accordion-summary">
-                      <span>Banco do Brasil</span>
-                      <small>OFX ou PDF</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>Entre em <strong>Conta &gt; Extratos</strong>.</li>
-                        <li>Selecione o período e abra opções de <strong>Download/Exportação</strong>.</li>
-                        <li>Use OFX quando disponível; senão, PDF do extrato detalhado.</li>
-                      </ul>
-                    </div>
-                  </details>
-
-                  <details class="tutorial-accordion-item">
-                    <summary class="tutorial-accordion-summary">
-                      <span>Caixa e Inter</span>
-                      <small>OFX/PDF</small>
-                    </summary>
-                    <div class="tutorial-accordion-body">
-                      <ul class="tutorial-card-list">
-                        <li>Busque por <strong>Extrato detalhado</strong> ou <strong>Movimentações</strong>.</li>
-                        <li>Use o menu de <strong>Compartilhar/Exportar</strong>.</li>
-                        <li>Se CSV não existir, importe OFX ou PDF.</li>
-                      </ul>
-                    </div>
-                  </details>
+            <div class="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-5">
+              <div class="import-guide-panel bg-zinc-50 border-2 border-black p-4 space-y-4">
+                <div class="space-y-1">
+                  <p class="import-guide-title">Guia rápido de exportação</p>
+                  <p class="import-guide-caption">
+                    Selecione o banco e veja os passos em uma janela rápida, sem poluir a tela.
+                  </p>
                 </div>
+                <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
+                  <div>
+                    <label for="bank-guide-select" class="field-label mb-2">Banco</label>
+                    <select id="bank-guide-select" class="w-full font-black border-2 border-black bg-white py-2 px-3 text-sm">
+                      <option value="nubank">Nubank</option>
+                      <option value="itau">Itaú</option>
+                      <option value="bradesco">Bradesco</option>
+                      <option value="santander">Santander</option>
+                      <option value="banco-do-brasil">Banco do Brasil</option>
+                      <option value="caixa">Caixa</option>
+                      <option value="inter">Inter</option>
+                      <option value="outros">Outros bancos</option>
+                    </select>
+                  </div>
+                  <button
+                    id="btn-open-bank-guide"
+                    type="button"
+                    class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-yellow-300 min-h-[44px]"
+                  >
+                    Ver passos
+                  </button>
+                </div>
+                <p class="import-guide-tip">
+                  Prioridade de qualidade para importação: <strong>OFX</strong>, depois <strong>CSV</strong> e, se necessário,
+                  <strong>PDF detalhado</strong>.
+                </p>
               </div>
 
               <div class="space-y-3">
@@ -494,6 +438,26 @@
               </div>
             </div>
 
+            <div id="transactions-pagination" class="transactions-pagination hidden mb-3">
+              <div class="transactions-pagination-info">
+                <p id="pagination-range" class="transactions-pagination-range">Mostrando 0-0 de 0</p>
+                <p id="pagination-status" class="transactions-pagination-status">Página 1 de 1</p>
+              </div>
+              <div class="transactions-pagination-controls">
+                <label class="transactions-pagination-size-label" for="pagination-page-size">Itens por página</label>
+                <select id="pagination-page-size" class="transactions-pagination-select">
+                  <option value="20">20</option>
+                  <option value="30" selected>30</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+                <div class="transactions-pagination-nav">
+                  <button id="pagination-prev" class="transactions-pagination-btn" type="button">Anterior</button>
+                  <button id="pagination-next" class="transactions-pagination-btn" type="button">Próxima</button>
+                </div>
+              </div>
+            </div>
+
             <div id="tabela-corpo" class="space-y-3"></div>
           </section>
         </div>
@@ -560,6 +524,19 @@
             Salvar transação
           </button>
         </form>
+      </div>
+    </div>
+
+    <div id="bank-guide-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-lg bg-white neo-brutalism p-5 space-y-4 bank-guide-modal-card">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p id="bank-guide-format" class="text-[10px] font-black uppercase text-zinc-500"></p>
+            <h3 id="bank-guide-title" class="font-black text-sm uppercase mt-1">Guia de Exportação</h3>
+          </div>
+          <button id="bank-guide-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <ol id="bank-guide-steps" class="bank-guide-steps"></ol>
       </div>
     </div>
 
