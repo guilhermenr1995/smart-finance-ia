@@ -11,6 +11,13 @@ function normalizeForSearch(value) {
     .trim();
 }
 
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
+
+function normalizeBankAccountName(value) {
+  const name = String(value || '').trim();
+  return name || DEFAULT_BANK_ACCOUNT;
+}
+
 export class DashboardView {
   constructor() {
     this.startDateInput = document.getElementById('data-inicio');
@@ -29,6 +36,8 @@ export class DashboardView {
 
     this.creditFileInput = document.getElementById('file-credit');
     this.accountFileInput = document.getElementById('file-account');
+    this.importBankAccountButton = document.getElementById('import-bank-account-button');
+    this.importBankAccountValue = document.getElementById('import-bank-account-value');
     this.aiButton = document.getElementById('btn-ai-sync');
     this.aiConsultantButton = document.getElementById('btn-ai-consultant');
     this.aiConsultantUsageLabel = document.getElementById('label-ai-consultant-usage');
@@ -57,10 +66,20 @@ export class DashboardView {
     this.categoryPickerList = document.getElementById('category-picker-list');
     this.categoryPickerCreateButton = document.getElementById('category-picker-create');
     this.categoryPickerCloseButton = document.getElementById('category-picker-close');
+    this.bankAccountPickerModal = document.getElementById('bank-account-picker-modal');
+    this.bankAccountPickerTitle = document.getElementById('bank-account-picker-title');
+    this.bankAccountPickerInput = document.getElementById('bank-account-picker-input');
+    this.bankAccountPickerList = document.getElementById('bank-account-picker-list');
+    this.bankAccountPickerCreateButton = document.getElementById('bank-account-picker-create');
+    this.bankAccountPickerCloseButton = document.getElementById('bank-account-picker-close');
 
     this.handlers = null;
     this.availableCategories = [...CATEGORIES];
+    this.availableBankAccounts = [DEFAULT_BANK_ACCOUNT];
+    this.selectedImportBankAccount = DEFAULT_BANK_ACCOUNT;
     this.activePickerDocId = null;
+    this.activeBankAccountPickerDocId = null;
+    this.isImportBankAccountPickerMode = false;
     this.activeTooltipTrigger = null;
     this.isBusy = false;
     this.consultantHasRemaining = true;
@@ -91,6 +110,35 @@ export class DashboardView {
     this.initCategoryFilter();
   }
 
+  setAvailableBankAccounts(bankAccounts) {
+    const normalized = (bankAccounts || []).map((name) => normalizeBankAccountName(name));
+    const unique = [...new Set([DEFAULT_BANK_ACCOUNT, ...normalized])].sort((left, right) => {
+      if (left.toLowerCase() === DEFAULT_BANK_ACCOUNT.toLowerCase()) {
+        return -1;
+      }
+      if (right.toLowerCase() === DEFAULT_BANK_ACCOUNT.toLowerCase()) {
+        return 1;
+      }
+
+      return left.localeCompare(right, 'pt-BR');
+    });
+
+    this.availableBankAccounts = unique;
+
+    if (!this.availableBankAccounts.includes(this.selectedImportBankAccount)) {
+      this.setImportBankAccount(DEFAULT_BANK_ACCOUNT);
+    } else {
+      this.setImportBankAccount(this.selectedImportBankAccount);
+    }
+  }
+
+  setImportBankAccount(bankAccountName) {
+    this.selectedImportBankAccount = normalizeBankAccountName(bankAccountName);
+    if (this.importBankAccountValue) {
+      this.importBankAccountValue.innerText = this.selectedImportBankAccount;
+    }
+  }
+
   setInitialFilters(filters, search = {}) {
     this.startDateInput.value = filters.startDate;
     this.endDateInput.value = filters.endDate;
@@ -104,6 +152,7 @@ export class DashboardView {
       this.searchUseGlobalBaseCheckbox.checked = Boolean(search.useGlobalBase);
     }
     this.clearSearchButton.disabled = !this.searchTermInput.value.trim();
+    this.setImportBankAccount(this.selectedImportBankAccount);
   }
 
   bindEvents(handlers) {
@@ -154,14 +203,21 @@ export class DashboardView {
 
     this.creditFileInput.addEventListener('change', () => {
       const [file] = this.creditFileInput.files || [];
-      handlers.onImportFile(file, 'Crédito');
+      handlers.onImportFile(file, 'Crédito', this.selectedImportBankAccount);
       this.creditFileInput.value = '';
     });
 
     this.accountFileInput.addEventListener('change', () => {
       const [file] = this.accountFileInput.files || [];
-      handlers.onImportFile(file, 'Conta');
+      handlers.onImportFile(file, 'Conta', this.selectedImportBankAccount);
       this.accountFileInput.value = '';
+    });
+
+    this.importBankAccountButton?.addEventListener('click', () => {
+      this.openBankAccountPicker({
+        forImport: true,
+        currentBankAccount: this.selectedImportBankAccount
+      });
     });
 
     this.aiButton.addEventListener('click', () => {
@@ -183,11 +239,20 @@ export class DashboardView {
       }
 
       const openPickerTarget = event.target.closest('[data-action="open-category-picker"]');
-      if (!openPickerTarget) {
+      if (openPickerTarget) {
+        this.openCategoryPicker(openPickerTarget.dataset.docId, openPickerTarget.dataset.currentCategory);
         return;
       }
 
-      this.openCategoryPicker(openPickerTarget.dataset.docId, openPickerTarget.dataset.currentCategory);
+      const openBankAccountPickerTarget = event.target.closest('[data-action="open-bank-account-picker"]');
+      if (!openBankAccountPickerTarget) {
+        return;
+      }
+
+      this.openBankAccountPicker({
+        docId: openBankAccountPickerTarget.dataset.docId,
+        currentBankAccount: openBankAccountPickerTarget.dataset.currentBankAccount
+      });
     });
 
     this.categoryPickerCloseButton.addEventListener('click', () => {
@@ -230,6 +295,74 @@ export class DashboardView {
       });
 
       this.closeCategoryPicker();
+    });
+
+    this.bankAccountPickerCloseButton.addEventListener('click', () => {
+      this.closeBankAccountPicker();
+    });
+
+    this.bankAccountPickerModal.addEventListener('click', (event) => {
+      if (event.target === this.bankAccountPickerModal) {
+        this.closeBankAccountPicker();
+      }
+    });
+
+    this.bankAccountPickerInput.addEventListener('input', () => {
+      this.renderBankAccountPickerOptions();
+    });
+
+    this.bankAccountPickerList.addEventListener('click', async (event) => {
+      const target = event.target.closest('[data-action="choose-bank-account"]');
+      if (!target) {
+        return;
+      }
+
+      const selectedBankAccount = target.dataset.bankAccount;
+      if (this.isImportBankAccountPickerMode) {
+        this.setImportBankAccount(selectedBankAccount);
+        this.closeBankAccountPicker();
+        return;
+      }
+
+      if (!this.activeBankAccountPickerDocId) {
+        return;
+      }
+
+      await this.handlers.onBankAccountUpdate({
+        docId: this.activeBankAccountPickerDocId,
+        bankAccount: selectedBankAccount
+      });
+
+      this.closeBankAccountPicker();
+    });
+
+    this.bankAccountPickerCreateButton.addEventListener('click', async () => {
+      const name = this.bankAccountPickerInput.value.trim();
+      if (!name) {
+        return;
+      }
+
+      if (this.isImportBankAccountPickerMode) {
+        const createdName = await this.handlers.onCreateBankAccount({
+          bankAccountName: name
+        });
+        if (createdName) {
+          this.setImportBankAccount(createdName);
+        }
+        this.closeBankAccountPicker();
+        return;
+      }
+
+      if (!this.activeBankAccountPickerDocId) {
+        return;
+      }
+
+      await this.handlers.onCreateAndAssignBankAccount({
+        docId: this.activeBankAccountPickerDocId,
+        bankAccountName: name
+      });
+
+      this.closeBankAccountPicker();
     });
   }
 
@@ -282,6 +415,9 @@ export class DashboardView {
     this.aiButton.disabled = isBusy;
     this.creditFileInput.disabled = isBusy;
     this.accountFileInput.disabled = isBusy;
+    if (this.importBankAccountButton) {
+      this.importBankAccountButton.disabled = isBusy;
+    }
     this.aiConsultantButton.disabled = isBusy || !this.consultantHasRemaining;
   }
 
@@ -341,6 +477,55 @@ export class DashboardView {
     }
   }
 
+  openBankAccountPicker({ docId = null, currentBankAccount = DEFAULT_BANK_ACCOUNT, forImport = false } = {}) {
+    this.activeBankAccountPickerDocId = docId;
+    this.isImportBankAccountPickerMode = Boolean(forImport);
+    this.bankAccountPickerTitle.innerText = forImport ? 'Conta Bancária da Importação' : 'Selecionar Conta Bancária';
+    this.bankAccountPickerInput.value = normalizeBankAccountName(currentBankAccount);
+    this.renderBankAccountPickerOptions();
+    this.bankAccountPickerModal.classList.remove('hidden');
+    this.bankAccountPickerInput.focus();
+    this.bankAccountPickerInput.select();
+  }
+
+  closeBankAccountPicker() {
+    this.activeBankAccountPickerDocId = null;
+    this.isImportBankAccountPickerMode = false;
+    this.bankAccountPickerModal.classList.add('hidden');
+  }
+
+  renderBankAccountPickerOptions() {
+    const query = this.bankAccountPickerInput.value.trim();
+    const normalizedQuery = normalizeForSearch(query);
+
+    const filtered = this.availableBankAccounts.filter((bankAccount) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return normalizeForSearch(bankAccount).includes(normalizedQuery);
+    });
+
+    this.bankAccountPickerList.innerHTML = filtered
+      .map(
+        (bankAccount) =>
+          `<button data-action="choose-bank-account" data-bank-account="${escapeHtml(bankAccount)}" class="w-full text-left px-3 py-2 border border-black text-xs font-black uppercase hover:bg-yellow-200">${escapeHtml(bankAccount)}</button>`
+      )
+      .join('');
+
+    const hasExact = this.availableBankAccounts.some(
+      (bankAccount) => normalizeForSearch(bankAccount) === normalizeForSearch(query)
+    );
+    const shouldShowCreate = query.length > 0 && !hasExact;
+    this.bankAccountPickerCreateButton.classList.toggle('hidden', !shouldShowCreate);
+    this.bankAccountPickerCreateButton.innerText = `+ Criar "${query}"`;
+
+    if (!this.bankAccountPickerList.innerHTML) {
+      this.bankAccountPickerList.innerHTML =
+        '<p class="text-[11px] font-black uppercase text-zinc-500">Nenhuma conta bancária encontrada.</p>';
+    }
+  }
+
   render({
     filters,
     search,
@@ -350,9 +535,11 @@ export class DashboardView {
     searchTotals,
     pendingAiCount,
     categories,
+    bankAccounts,
     aiConsultant
   }) {
     this.setAvailableCategories(categories);
+    this.setAvailableBankAccounts(bankAccounts);
     this.setAccountFilterButton(filters.accountType);
     if (this.categoryFilterSelect) {
       this.categoryFilterSelect.value = filters.category;
@@ -583,6 +770,7 @@ export class DashboardView {
         const installmentOverride = displayCategory === 'Parcelas' && transaction.category !== 'Parcelas';
         const usageLabel = transaction.active === false ? 'Ignorado' : 'Ativo';
         const usageButtonLabel = transaction.active === false ? 'Reativar' : 'Ignorar';
+        const bankAccount = escapeHtml(transaction.bankAccount || DEFAULT_BANK_ACCOUNT);
 
         return `
           <article class="transaction-card transition-all ${transaction.active === false ? 'row-inactive' : ''}">
@@ -597,6 +785,7 @@ export class DashboardView {
             <div class="transaction-foot">
               <div class="transaction-badges">
                 <span class="transaction-badge">${usageLabel}</span>
+                <span class="transaction-badge transaction-badge-bank">Conta: ${bankAccount}</span>
                 ${
                   installmentOverride
                     ? '<span class="transaction-badge transaction-badge-neutral">Mix: Parcelas</span>'
@@ -604,15 +793,26 @@ export class DashboardView {
                 }
               </div>
               <div class="transaction-actions">
-                <button
-                  data-action="open-category-picker"
-                  data-doc-id="${escapeHtml(transaction.docId)}"
-                  data-current-category="${escapeHtml(transaction.category)}"
-                  class="transaction-category-btn"
-                  title="Editar categoria deste lançamento"
-                >
-                  ${escapeHtml(transaction.category)}
-                </button>
+                <div class="transaction-picker-grid">
+                  <button
+                    data-action="open-category-picker"
+                    data-doc-id="${escapeHtml(transaction.docId)}"
+                    data-current-category="${escapeHtml(transaction.category)}"
+                    class="transaction-category-btn"
+                    title="Editar categoria deste lançamento"
+                  >
+                    ${escapeHtml(transaction.category)}
+                  </button>
+                  <button
+                    data-action="open-bank-account-picker"
+                    data-doc-id="${escapeHtml(transaction.docId)}"
+                    data-current-bank-account="${bankAccount}"
+                    class="transaction-bank-account-btn"
+                    title="Editar conta bancária deste lançamento"
+                  >
+                    ${bankAccount}
+                  </button>
+                </div>
                 <button
                   data-action="toggle-active"
                   data-doc-id="${escapeHtml(transaction.docId)}"

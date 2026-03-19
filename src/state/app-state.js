@@ -1,5 +1,7 @@
 import { buildCycleBoundaries, getDefaultCycleRange } from '../utils/date-utils.js';
 
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
+
 export class AppState {
   constructor() {
     const defaultRange = getDefaultCycleRange();
@@ -7,6 +9,7 @@ export class AppState {
     this.user = null;
     this.transactions = [];
     this.userCategories = [];
+    this.userBankAccounts = [DEFAULT_BANK_ACCOUNT];
     this.search = {
       mode: 'description',
       term: '',
@@ -41,6 +44,28 @@ export class AppState {
 
   setUserCategories(categories) {
     this.userCategories = categories;
+  }
+
+  setUserBankAccounts(bankAccounts) {
+    const validNames = (bankAccounts || [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean);
+    const unique = [...new Set(validNames)];
+
+    if (!unique.some((name) => name.toLowerCase() === DEFAULT_BANK_ACCOUNT.toLowerCase())) {
+      unique.unshift(DEFAULT_BANK_ACCOUNT);
+    }
+
+    this.userBankAccounts = unique.sort((left, right) => {
+      if (left.toLowerCase() === DEFAULT_BANK_ACCOUNT.toLowerCase()) {
+        return -1;
+      }
+      if (right.toLowerCase() === DEFAULT_BANK_ACCOUNT.toLowerCase()) {
+        return 1;
+      }
+
+      return left.localeCompare(right, 'pt-BR');
+    });
   }
 
   updateSearch(partialSearch) {

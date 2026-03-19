@@ -6,6 +6,8 @@ import {
   isIncomeOrIgnoredStatement
 } from '../utils/transaction-utils.js';
 
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
+
 function extractOfxTagValue(block, tagName) {
   const closeTagPattern = new RegExp(`<${tagName}>([\\s\\S]*?)</${tagName}>`, 'i');
   const closeTagMatch = block.match(closeTagPattern);
@@ -222,7 +224,8 @@ export class CsvImportService {
         title,
         value: Math.abs(value),
         category: detectBaseCategory(title),
-        accountType
+        accountType,
+        bankAccount: DEFAULT_BANK_ACCOUNT
       };
 
       const hash = generateTransactionHash(parsed);
@@ -313,7 +316,8 @@ export class CsvImportService {
         title: candidate.title,
         value: Math.abs(candidate.signedValue),
         category: detectBaseCategory(candidate.title),
-        accountType
+        accountType,
+        bankAccount: DEFAULT_BANK_ACCOUNT
       };
 
       const hash = generateTransactionHash(parsed);
@@ -476,7 +480,8 @@ export class CsvImportService {
       title,
       value: Math.abs(value),
       category: detectBaseCategory(title),
-      accountType
+      accountType,
+      bankAccount: DEFAULT_BANK_ACCOUNT
     };
   }
 
@@ -494,7 +499,8 @@ export class CsvImportService {
       title,
       value: Math.abs(value),
       category: detectBaseCategory(title),
-      accountType
+      accountType,
+      bankAccount: DEFAULT_BANK_ACCOUNT
     };
   }
 }

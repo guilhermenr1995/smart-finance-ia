@@ -6,6 +6,7 @@ export function persistTransactionsCache(app) {
   app.localCacheService.save(app.state.user.uid, {
     transactions: app.state.transactions,
     categories: app.state.userCategories,
+    bankAccounts: app.state.userBankAccounts,
     consultantInsights: Object.values(app.state.aiConsultant.historyByKey || {})
   });
 }
@@ -39,12 +40,14 @@ export async function syncDataFromCloud(app, options = {}) {
       return [];
     });
 
-    const [transactions, categories, consultantInsights] = await Promise.all([
+    const [transactions, categories, bankAccounts, consultantInsights] = await Promise.all([
       app.repository.fetchAll(app.state.user.uid),
       app.repository.fetchCategories(app.state.user.uid),
+      app.repository.fetchBankAccounts(app.state.user.uid),
       consultantInsightsPromise
     ]);
     app.state.setUserCategories(categories);
+    app.state.setUserBankAccounts(bankAccounts);
     app.state.setAiConsultantHistory(consultantInsights);
     setTransactionsAndRefresh(app, transactions);
     if (showOverlay) {

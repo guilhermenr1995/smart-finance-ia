@@ -10,7 +10,7 @@ service cloud.firestore {
     }
 
     function hasValidTransactionShape(data) {
-      return data.keys().hasOnly(['hash', 'date', 'title', 'value', 'category', 'accountType', 'active'])
+      return data.keys().hasOnly(['hash', 'date', 'title', 'value', 'category', 'accountType', 'bankAccount', 'active'])
         && data.hash is string
         && data.date is string
         && data.title is string
@@ -20,6 +20,11 @@ service cloud.firestore {
         && data.category.size() > 0
         && data.category.size() <= 50
         && data.accountType in ['Crédito', 'Conta']
+        && (!('bankAccount' in data) || (
+          data.bankAccount is string
+          && data.bankAccount.size() > 0
+          && data.bankAccount.size() <= 60
+        ))
         && data.active is bool;
     }
 
@@ -28,6 +33,16 @@ service cloud.firestore {
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 50
+        && data.normalizedName is string
+        && data.normalizedName.size() <= 80
+        && data.createdAt is string;
+    }
+
+    function hasValidBankAccountShape(data) {
+      return data.keys().hasOnly(['name', 'normalizedName', 'createdAt'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 60
         && data.normalizedName is string
         && data.normalizedName.size() <= 80
         && data.createdAt is string;
@@ -54,6 +69,13 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidCategoryShape(request.resource.data);
       allow update: if isOwner(userId) && hasValidCategoryShape(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/contas_bancarias/{bankAccountId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidBankAccountShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidBankAccountShape(request.resource.data);
       allow delete: if isOwner(userId);
     }
 

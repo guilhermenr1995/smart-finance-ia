@@ -48,6 +48,7 @@ export function refreshDashboard(app) {
   const previousSummary = app.queryService.buildSummary(previousVisibleTransactions);
 
   const availableCategories = [...new Set([...CATEGORIES, ...app.state.userCategories])];
+  const availableBankAccounts = app.state.userBankAccounts || ['Padrão'];
 
   app.dashboardView.render({
     filters: app.state.filters,
@@ -67,6 +68,7 @@ export function refreshDashboard(app) {
     },
     pendingAiCount,
     categories: availableCategories,
+    bankAccounts: availableBankAccounts,
     aiConsultant: {
       ...app.state.aiConsultant,
       report: activeInsight?.insights || null

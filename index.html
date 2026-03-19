@@ -239,6 +239,25 @@
                     <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
                   </label>
                 </div>
+                <div class="bg-zinc-50 border-2 border-black p-3 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-[10px] font-black uppercase text-zinc-600">Conta Bancária da Importação</p>
+                    <button
+                      type="button"
+                      class="help-tooltip"
+                      data-tooltip="Todas as transações importadas entrarão na conta bancária selecionada abaixo."
+                      aria-label="Ajuda sobre conta bancária da importação"
+                    >
+                      ?
+                    </button>
+                  </div>
+                  <button
+                    id="import-bank-account-button"
+                    class="w-full px-3 py-2 border-2 border-black text-left font-black text-[11px] uppercase bg-white hover:bg-yellow-100"
+                  >
+                    🏦 Conta: <span id="import-bank-account-value">Padrão</span>
+                  </button>
+                </div>
                 <button
                   id="btn-ai-sync"
                   class="w-full bg-black text-yellow-300 p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
@@ -458,6 +477,18 @@
         <input id="category-picker-input" type="text" placeholder="Buscar ou criar categoria" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" />
         <button id="category-picker-create" class="hidden w-full px-3 py-2 border-2 border-black font-black text-[11px] uppercase bg-yellow-200"></button>
         <div id="category-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <div id="bank-account-picker-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-md bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 id="bank-account-picker-title" class="font-black text-sm uppercase">Selecionar Conta Bancária</h3>
+          <button id="bank-account-picker-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <input id="bank-account-picker-input" type="text" placeholder="Buscar ou criar conta bancária" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" />
+        <button id="bank-account-picker-create" class="hidden w-full px-3 py-2 border-2 border-black font-black text-[11px] uppercase bg-yellow-200"></button>
+        <div id="bank-account-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-finance-shell-v7';
+const CACHE_NAME = 'smart-finance-shell-v8';
 
 const APP_SHELL_FILES = [
   './',

@@ -17,6 +17,7 @@ export async function handleAuthState(app, user) {
   if (!user) {
     app.state.setTransactions([]);
     app.state.setUserCategories([]);
+    app.state.setUserBankAccounts(['Padrão']);
     app.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false });
     app.state.setAiConsultantReport(null);
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
@@ -26,9 +27,16 @@ export async function handleAuthState(app, user) {
   }
 
   const cached = app.localCacheService.load(user.uid);
-  if (cached.transactions.length > 0) {
+  const hasCachedSnapshot =
+    cached.transactions.length > 0 ||
+    (cached.categories || []).length > 0 ||
+    (cached.bankAccounts || []).length > 0 ||
+    (cached.consultantInsights || []).length > 0;
+
+  if (hasCachedSnapshot) {
     app.state.setTransactions(cached.transactions);
     app.state.setUserCategories(cached.categories || []);
+    app.state.setUserBankAccounts(cached.bankAccounts || ['Padrão']);
     app.state.setAiConsultantHistory(cached.consultantInsights || []);
     app.refreshDashboard();
   }

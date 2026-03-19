@@ -1,3 +1,10 @@
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
+
+function normalizeBankAccountName(value) {
+  const name = String(value || '').trim();
+  return name || DEFAULT_BANK_ACCOUNT;
+}
+
 export class LocalCacheService {
   constructor(config = {}) {
     this.keyPrefix = config.keyPrefix || 'smart-finance-cache-v1';
@@ -13,6 +20,7 @@ export class LocalCacheService {
       return {
         transactions: [],
         categories: [],
+        bankAccounts: [DEFAULT_BANK_ACCOUNT],
         consultantInsights: [],
         lastSyncedAt: 0
       };
@@ -24,20 +32,30 @@ export class LocalCacheService {
         return {
           transactions: [],
           categories: [],
+          bankAccounts: [DEFAULT_BANK_ACCOUNT],
           consultantInsights: [],
           lastSyncedAt: 0
         };
       }
 
       const parsed = JSON.parse(raw);
-      const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+      const transactions = Array.isArray(parsed?.transactions)
+        ? parsed.transactions.map((transaction) => ({
+            ...transaction,
+            bankAccount: normalizeBankAccountName(transaction?.bankAccount)
+          }))
+        : [];
       const categories = Array.isArray(parsed?.categories) ? parsed.categories : [];
+      const bankAccounts = Array.isArray(parsed?.bankAccounts)
+        ? [...new Set(parsed.bankAccounts.map((name) => normalizeBankAccountName(name)))]
+        : [DEFAULT_BANK_ACCOUNT];
       const consultantInsights = Array.isArray(parsed?.consultantInsights) ? parsed.consultantInsights : [];
       const lastSyncedAt = Number(parsed?.lastSyncedAt || 0);
 
       return {
         transactions,
         categories,
+        bankAccounts,
         consultantInsights,
         lastSyncedAt
       };
@@ -46,6 +64,7 @@ export class LocalCacheService {
       return {
         transactions: [],
         categories: [],
+        bankAccounts: [DEFAULT_BANK_ACCOUNT],
         consultantInsights: [],
         lastSyncedAt: 0
       };
@@ -59,11 +78,15 @@ export class LocalCacheService {
 
     const transactions = Array.isArray(data?.transactions) ? data.transactions : [];
     const categories = Array.isArray(data?.categories) ? data.categories : [];
+    const bankAccounts = Array.isArray(data?.bankAccounts)
+      ? [...new Set(data.bankAccounts.map((name) => normalizeBankAccountName(name)))]
+      : [DEFAULT_BANK_ACCOUNT];
     const consultantInsights = Array.isArray(data?.consultantInsights) ? data.consultantInsights : [];
 
     const cachePayload = {
       transactions,
       categories,
+      bankAccounts,
       consultantInsights,
       lastSyncedAt: Date.now()
     };

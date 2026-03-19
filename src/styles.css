@@ -104,11 +104,21 @@ select.edit-mode {
   background: #e4e4e7;
 }
 
+.transaction-badge-bank {
+  background: #dbeafe;
+}
+
 .transaction-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 8px;
   align-items: center;
+}
+
+.transaction-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .transaction-category-btn {
@@ -116,6 +126,17 @@ select.edit-mode {
   text-align: left;
   border: 2px solid #111827;
   background: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 8px 10px;
+}
+
+.transaction-bank-account-btn {
+  width: 100%;
+  text-align: left;
+  border: 2px solid #111827;
+  background: #eff6ff;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -492,7 +513,11 @@ select.edit-mode {
 
   .transaction-actions {
     justify-self: end;
-    min-width: 340px;
+    min-width: 360px;
+  }
+
+  .transaction-picker-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
 }

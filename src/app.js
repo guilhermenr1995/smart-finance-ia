@@ -23,7 +23,15 @@ import {
 } from './application/flows/auth-flow.js';
 import { getVisibleTransactions, getTableTransactions, refreshDashboard } from './application/flows/dashboard-flow.js';
 import { persistTransactionsCache, setTransactionsAndRefresh, syncDataFromCloud } from './application/flows/data-sync-flow.js';
-import { importCsv, toggleActive, updateCategory, createAndAssignCategory } from './application/flows/transaction-flow.js';
+import {
+  importCsv,
+  toggleActive,
+  updateCategory,
+  createAndAssignCategory,
+  updateBankAccount,
+  createBankAccount,
+  createAndAssignBankAccount
+} from './application/flows/transaction-flow.js';
 import {
   syncCategoriesWithAi,
   buildConsultantPeriodSnapshot,
@@ -90,12 +98,16 @@ class SmartFinanceApplication {
         this.state.updateSearch(partialSearch);
         this.refreshDashboard();
       },
-      onImportFile: (file, accountType) => this.importCsv(file, accountType),
+      onImportFile: (file, accountType, bankAccountName) => this.importCsv(file, accountType, bankAccountName),
       onAiCategorization: () => this.syncCategoriesWithAi(),
       onAiConsultant: () => this.runAiConsultant(),
       onToggleActive: ({ docId, currentState }) => this.toggleActive(docId, currentState),
       onCategoryUpdate: ({ docId, category }) => this.updateCategory(docId, category),
-      onCreateCategory: ({ docId, categoryName }) => this.createAndAssignCategory(docId, categoryName)
+      onCreateCategory: ({ docId, categoryName }) => this.createAndAssignCategory(docId, categoryName),
+      onBankAccountUpdate: ({ docId, bankAccount }) => this.updateBankAccount(docId, bankAccount),
+      onCreateBankAccount: ({ bankAccountName }) => this.createBankAccount(bankAccountName),
+      onCreateAndAssignBankAccount: ({ docId, bankAccountName }) =>
+        this.createAndAssignBankAccount(docId, bankAccountName)
     });
 
     this.installButton.addEventListener('click', async () => {
@@ -151,8 +163,8 @@ class SmartFinanceApplication {
     return syncDataFromCloud(this, options);
   }
 
-  async importCsv(file, accountType) {
-    return importCsv(this, file, accountType);
+  async importCsv(file, accountType, bankAccountName) {
+    return importCsv(this, file, accountType, bankAccountName);
   }
 
   async toggleActive(docId, currentState) {
@@ -165,6 +177,18 @@ class SmartFinanceApplication {
 
   async createAndAssignCategory(docId, categoryName) {
     return createAndAssignCategory(this, docId, categoryName);
+  }
+
+  async updateBankAccount(docId, bankAccountName) {
+    return updateBankAccount(this, docId, bankAccountName);
+  }
+
+  async createBankAccount(bankAccountName) {
+    return createBankAccount(this, bankAccountName);
+  }
+
+  async createAndAssignBankAccount(docId, bankAccountName) {
+    return createAndAssignBankAccount(this, docId, bankAccountName);
   }
 
   async syncCategoriesWithAi() {

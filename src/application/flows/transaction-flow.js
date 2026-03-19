@@ -1,6 +1,13 @@
 import { getInstallmentGroupKey, getInstallmentInfo, getTransactionTitleMatchKey } from '../../utils/transaction-utils.js';
 
-export async function importCsv(app, file, accountType) {
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
+
+function normalizeBankAccountName(value) {
+  const name = String(value || '').trim();
+  return name || DEFAULT_BANK_ACCOUNT;
+}
+
+export async function importCsv(app, file, accountType, bankAccountName = DEFAULT_BANK_ACCOUNT) {
   if (!file) {
     return;
   }
@@ -15,6 +22,7 @@ export async function importCsv(app, file, accountType) {
 
   try {
     await app.syncDataFromCloud({ force: false, showOverlay: false });
+    const importBankAccount = normalizeBankAccountName(bankAccountName);
 
     const isPdfFile = /\.pdf$/i.test(file.name || '');
     const fileContent = isPdfFile ? await file.arrayBuffer() : await file.text();
@@ -29,7 +37,10 @@ export async function importCsv(app, file, accountType) {
     }
 
     const memoryApplied = app.categoryMemoryService.applyMemoryToTransactions(
-      parseResult.transactions,
+      parseResult.transactions.map((transaction) => ({
+        ...transaction,
+        bankAccount: importBankAccount
+      })),
       app.state.transactions,
       { onlyOthers: true }
     );
@@ -51,7 +62,7 @@ export async function importCsv(app, file, accountType) {
     app.setTransactionsAndRefresh([...app.state.transactions, ...insertedTransactions]);
 
     app.overlayView.log(
-      `Importação concluída: ${transactionsToInsert.length} novos lançamentos, ${parseResult.skipped} ignorados.`
+      `Importação concluída: ${transactionsToInsert.length} novos lançamentos na conta "${importBankAccount}", ${parseResult.skipped} ignorados.`
     );
     setTimeout(() => app.overlayView.hide(), 900);
   } catch (error) {
@@ -175,4 +186,65 @@ export async function createAndAssignCategory(app, docId, categoryName) {
   } catch (error) {
     app.authView.showMessage(app.normalizeError(error), 'error');
   }
+}
+
+export async function updateBankAccount(app, docId, bankAccountName) {
+  if (!app.state.user) {
+    return;
+  }
+
+  const normalizedBankAccount = normalizeBankAccountName(bankAccountName);
+  if (!normalizedBankAccount) {
+    app.authView.showMessage('Conta bancária inválida.', 'error');
+    return;
+  }
+
+  try {
+    await app.repository.updateBankAccount(app.state.user.uid, docId, normalizedBankAccount);
+    app.setTransactionsAndRefresh(
+      app.state.transactions.map((transaction) =>
+        transaction.docId === docId ? { ...transaction, bankAccount: normalizedBankAccount } : transaction
+      )
+    );
+  } catch (error) {
+    app.authView.showMessage(app.normalizeError(error), 'error');
+  }
+}
+
+export async function createBankAccount(app, bankAccountName) {
+  if (!app.state.user) {
+    return null;
+  }
+
+  const name = normalizeBankAccountName(bankAccountName);
+  if (!name) {
+    app.authView.showMessage('Informe um nome para a conta bancária.', 'error');
+    return null;
+  }
+
+  try {
+    const createdName = await app.repository.createBankAccount(app.state.user.uid, name);
+    if (!app.state.userBankAccounts.some((account) => account.toLowerCase() === createdName.toLowerCase())) {
+      app.state.setUserBankAccounts([...app.state.userBankAccounts, createdName]);
+      app.refreshDashboard();
+    }
+
+    return createdName;
+  } catch (error) {
+    app.authView.showMessage(app.normalizeError(error), 'error');
+    return null;
+  }
+}
+
+export async function createAndAssignBankAccount(app, docId, bankAccountName) {
+  if (!app.state.user) {
+    return;
+  }
+
+  const createdName = await createBankAccount(app, bankAccountName);
+  if (!createdName) {
+    return;
+  }
+
+  await updateBankAccount(app, docId, createdName);
 }
