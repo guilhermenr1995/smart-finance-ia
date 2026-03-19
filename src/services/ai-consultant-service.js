@@ -43,7 +43,8 @@ export class AiConsultantService {
     return {
       insights: data.insights,
       usage: data.usage || null,
-      storedInsight: data.storedInsight || null
+      storedInsight: data.storedInsight || null,
+      warning: data.warning || null
     };
   }
 

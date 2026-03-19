@@ -87,6 +87,29 @@ export class TransactionRepository {
     return insights;
   }
 
+  async fetchConsultantInsightByKey(userId, insightKey) {
+    const key = String(insightKey || '').trim();
+    if (!key) {
+      return null;
+    }
+
+    const doc = await this.getConsultantInsightsCollection(userId).doc(key).get();
+    if (!doc.exists) {
+      return null;
+    }
+
+    const data = doc.data();
+    if (!data?.insights || typeof data.insights !== 'object') {
+      return null;
+    }
+
+    return {
+      ...data,
+      key: data.key || key,
+      docId: doc.id
+    };
+  }
+
   async fetchBankAccounts(userId) {
     const snapshot = await this.getBankAccountCollection(userId).get();
     const names = [DEFAULT_BANK_ACCOUNT];
@@ -151,12 +174,25 @@ export class TransactionRepository {
     return insertedTransactions;
   }
 
+  async createTransaction(userId, transaction) {
+    const docRef = this.getCollection(userId).doc();
+    await docRef.set(transaction);
+    return {
+      ...transaction,
+      docId: docRef.id
+    };
+  }
+
   async updateCategory(userId, docId, category) {
     return this.getCollection(userId).doc(docId).update({ category });
   }
 
   async updateBankAccount(userId, docId, bankAccount) {
     return this.getCollection(userId).doc(docId).update({ bankAccount: normalizeBankAccountName(bankAccount) });
+  }
+
+  async updateTitle(userId, docId, title) {
+    return this.getCollection(userId).doc(docId).update({ title: String(title || '').trim() });
   }
 
   async toggleActive(userId, docId, currentState) {

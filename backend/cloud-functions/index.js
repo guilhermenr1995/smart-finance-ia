@@ -189,6 +189,556 @@ function getDateKeyInTimezone() {
   }).format(new Date());
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function toCurrency(value) {
+  return Number(toFiniteNumber(value).toFixed(2));
+}
+
+function toPercent(value) {
+  return Number(toFiniteNumber(value).toFixed(2));
+}
+
+function normalizeCategoryKey(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function formatCurrencyBRL(value) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(toFiniteNumber(value));
+}
+
+function calculateGrowthPercent(currentValue, previousValue) {
+  const current = toFiniteNumber(currentValue);
+  const previous = toFiniteNumber(previousValue);
+  if (previous <= 0) {
+    return current > 0 ? 100 : 0;
+  }
+
+  return toPercent(((current - previous) / previous) * 100);
+}
+
+function parseInputDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return new Date();
+  }
+
+  if (raw.includes('-')) {
+    const [year, month, day] = raw.split('-').map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
+  if (raw.includes('/')) {
+    const [day, month, year] = raw.split('/').map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
+  return new Date(raw);
+}
+
+function getDaysInMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function formatMonthYear(date) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric'
+  }).format(date);
+}
+
+function sanitizeCategoryMetrics(rawMetrics, fallbackBreakdown, totalPeriod) {
+  if (Array.isArray(rawMetrics) && rawMetrics.length > 0) {
+    return rawMetrics
+      .map((metric) => {
+        const category = String(metric?.category || '').trim() || 'Sem categoria';
+        const total = toCurrency(metric?.total);
+        const transactions = Math.max(0, Math.round(toFiniteNumber(metric?.transactions)));
+        const ticketAverage = transactions > 0 ? toCurrency(total / transactions) : 0;
+        const share = totalPeriod > 0 ? toPercent((total / totalPeriod) * 100) : 0;
+
+        return {
+          category,
+          total,
+          transactions,
+          ticketAverage: toCurrency(metric?.ticketAverage || ticketAverage),
+          share: toPercent(metric?.share ?? share)
+        };
+      })
+      .sort((left, right) => right.total - left.total);
+  }
+
+  if (!Array.isArray(fallbackBreakdown)) {
+    return [];
+  }
+
+  return fallbackBreakdown
+    .map((item) => {
+      const category = String(item?.category || '').trim() || 'Sem categoria';
+      const total = toCurrency(item?.total);
+      const share = totalPeriod > 0 ? toPercent((total / totalPeriod) * 100) : 0;
+      return {
+        category,
+        total,
+        transactions: 0,
+        ticketAverage: 0,
+        share
+      };
+    })
+    .sort((left, right) => right.total - left.total);
+}
+
+function sanitizeTopMerchants(rawMerchants, totalPeriod) {
+  if (!Array.isArray(rawMerchants)) {
+    return [];
+  }
+
+  return rawMerchants
+    .map((merchant) => {
+      const total = toCurrency(merchant?.total);
+      const transactions = Math.max(0, Math.round(toFiniteNumber(merchant?.transactions)));
+      const share = totalPeriod > 0 ? toPercent((total / totalPeriod) * 100) : 0;
+
+      return {
+        merchant: String(merchant?.merchant || '').trim() || 'Sem identificação',
+        total,
+        transactions,
+        ticketAverage: toCurrency(merchant?.ticketAverage || (transactions > 0 ? total / transactions : 0)),
+        share: toPercent(merchant?.share ?? share)
+      };
+    })
+    .sort((left, right) => right.total - left.total)
+    .slice(0, 10);
+}
+
+function sanitizeTopTransactions(rawTransactions) {
+  if (!Array.isArray(rawTransactions)) {
+    return [];
+  }
+
+  return rawTransactions
+    .map((transaction) => ({
+      date: String(transaction?.date || '').trim(),
+      title: String(transaction?.title || '').trim(),
+      category: String(transaction?.category || '').trim() || 'Outros',
+      accountType: String(transaction?.accountType || '').trim() || 'Conta',
+      value: toCurrency(transaction?.value)
+    }))
+    .filter((transaction) => transaction.value > 0 && transaction.title)
+    .sort((left, right) => right.value - left.value)
+    .slice(0, 10);
+}
+
+function sanitizeOutlierTransactions(rawOutliers) {
+  if (!Array.isArray(rawOutliers)) {
+    return [];
+  }
+
+  return rawOutliers
+    .map((transaction) => ({
+      date: String(transaction?.date || '').trim(),
+      title: String(transaction?.title || '').trim(),
+      category: String(transaction?.category || '').trim() || 'Outros',
+      value: toCurrency(transaction?.value)
+    }))
+    .filter((transaction) => transaction.value > 0 && transaction.title)
+    .sort((left, right) => right.value - left.value)
+    .slice(0, 10);
+}
+
+function normalizeDeterministicPeriod(period = {}) {
+  const deterministic = period?.deterministic || {};
+  const fallbackTotal = Array.isArray(period.categoryBreakdown)
+    ? period.categoryBreakdown.reduce((sum, item) => sum + toFiniteNumber(item?.total), 0)
+    : 0;
+
+  const totalPeriod = toCurrency(deterministic.totalPeriod || period.total || fallbackTotal);
+  const periodDays = Math.max(1, Math.round(toFiniteNumber(deterministic.periodDays, 30)));
+  const totalInstallments = toCurrency(deterministic.totalInstallments);
+  const newConsumption = toCurrency(
+    deterministic.newConsumption !== undefined ? deterministic.newConsumption : totalPeriod - totalInstallments
+  );
+  const dailyAverage = toCurrency(deterministic.dailyAverage || newConsumption / Math.max(periodDays, 1));
+  const behavioralAverage = toCurrency(
+    deterministic.behavioralAverage || deterministic.mediaComportamental || dailyAverage
+  );
+  const outlierThreshold = toCurrency(deterministic.outlierThreshold);
+
+  const categoryMetrics = sanitizeCategoryMetrics(deterministic.categoryMetrics, period.categoryBreakdown, totalPeriod);
+  const topMerchants = sanitizeTopMerchants(deterministic.topMerchants, totalPeriod);
+  const topTransactions = sanitizeTopTransactions(period.topTransactions);
+  const outlierTransactions = sanitizeOutlierTransactions(deterministic.outlierTransactions);
+  const smartAlerts = uniqueNonEmpty(Array.isArray(deterministic.smartAlerts) ? deterministic.smartAlerts : []);
+
+  const endDate = parseInputDate(period.endDate);
+  const currentMonthDays = Math.max(28, Math.round(toFiniteNumber(deterministic?.projections?.currentMonthDays, getDaysInMonth(endDate))));
+  const daysRemainingInMonth = Math.max(
+    0,
+    Math.round(toFiniteNumber(deterministic?.projections?.daysRemainingInMonth, currentMonthDays - endDate.getDate()))
+  );
+
+  const projectedAdditionalEndOfMonth = toCurrency(
+    deterministic?.projections?.projectedAdditionalEndOfMonth !== undefined
+      ? deterministic.projections.projectedAdditionalEndOfMonth
+      : behavioralAverage * daysRemainingInMonth
+  );
+  const projectedEndOfMonth = toCurrency(
+    deterministic?.projections?.projectedEndOfMonth !== undefined
+      ? deterministic.projections.projectedEndOfMonth
+      : totalPeriod + projectedAdditionalEndOfMonth
+  );
+
+  const nextMonthDate = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 1);
+  const nextMonthDays = Math.max(
+    28,
+    Math.round(toFiniteNumber(deterministic?.projections?.nextMonthDays, getDaysInMonth(nextMonthDate)))
+  );
+  const estimatedInstallmentsPerDay = toCurrency(totalInstallments / Math.max(periodDays, 1));
+  const projectedNextMonthInstallments = toCurrency(
+    deterministic?.projections?.projectedNextMonthInstallments !== undefined
+      ? deterministic.projections.projectedNextMonthInstallments
+      : estimatedInstallmentsPerDay * nextMonthDays
+  );
+  const projectedNextMonthConsumption = toCurrency(
+    deterministic?.projections?.projectedNextMonthConsumption !== undefined
+      ? deterministic.projections.projectedNextMonthConsumption
+      : behavioralAverage * nextMonthDays
+  );
+  const projectedNextMonthTotal = toCurrency(
+    deterministic?.projections?.projectedNextMonthTotal !== undefined
+      ? deterministic.projections.projectedNextMonthTotal
+      : projectedNextMonthInstallments + projectedNextMonthConsumption
+  );
+
+  return {
+    startDate: String(period.startDate || ''),
+    endDate: String(period.endDate || ''),
+    totalPeriod,
+    periodDays,
+    transactionsConsidered: Math.max(0, Math.round(toFiniteNumber(deterministic.transactionsConsidered, period.count))),
+    totalInstallments,
+    newConsumption,
+    dailyAverage,
+    behavioralAverage,
+    outlierThreshold,
+    categoryMetrics,
+    topMerchants,
+    topTransactions,
+    outlierTransactions,
+    smartAlerts,
+    projections: {
+      currentMonthDays,
+      daysRemainingInMonth,
+      projectedAdditionalEndOfMonth,
+      projectedEndOfMonth,
+      nextMonthDays,
+      projectedNextMonthInstallments,
+      projectedNextMonthConsumption,
+      projectedNextMonthTotal,
+      currentMonthLabel: formatMonthYear(endDate),
+      nextMonthLabel: formatMonthYear(nextMonthDate)
+    }
+  };
+}
+
+function buildCategoryComparisons(currentMetrics, previousMetrics) {
+  const currentMap = new Map();
+  const previousMap = new Map();
+
+  (currentMetrics || []).forEach((metric) => {
+    currentMap.set(metric.category, metric);
+  });
+  (previousMetrics || []).forEach((metric) => {
+    previousMap.set(metric.category, metric);
+  });
+
+  const categories = new Set([...currentMap.keys(), ...previousMap.keys()]);
+  const deltas = [];
+
+  categories.forEach((category) => {
+    const current = currentMap.get(category) || {
+      category,
+      total: 0,
+      transactions: 0,
+      ticketAverage: 0,
+      share: 0
+    };
+    const previous = previousMap.get(category) || {
+      category,
+      total: 0,
+      transactions: 0,
+      ticketAverage: 0,
+      share: 0
+    };
+
+    const delta = toCurrency(current.total - previous.total);
+    deltas.push({
+      category,
+      current: toCurrency(current.total),
+      previous: toCurrency(previous.total),
+      delta,
+      deltaPercent: calculateGrowthPercent(current.total, previous.total),
+      share: toPercent(current.share || 0),
+      transactions: Math.max(0, Math.round(toFiniteNumber(current.transactions))),
+      ticketAverage: toCurrency(current.ticketAverage)
+    });
+  });
+
+  const increased = deltas
+    .filter((item) => item.delta > 0.01)
+    .sort((left, right) => right.delta - left.delta)
+    .slice(0, 6);
+
+  const reduced = deltas
+    .filter((item) => item.delta < -0.01)
+    .sort((left, right) => left.delta - right.delta)
+    .slice(0, 6);
+
+  const categoryHighlights = deltas
+    .filter((item) => item.current > 0 || item.previous > 0)
+    .sort((left, right) => right.current - left.current)
+    .slice(0, 8);
+
+  return {
+    increased,
+    reduced,
+    categoryHighlights
+  };
+}
+
+function buildDeterministicOverview(current, previous, totalDelta, totalDeltaPercent) {
+  if (previous.totalPeriod <= 0 && current.totalPeriod > 0) {
+    return `No período atual, você registrou ${formatCurrencyBRL(current.totalPeriod)} em despesas. Ainda não há base anterior equivalente para comparação direta.`;
+  }
+
+  if (Math.abs(totalDelta) <= 0.01) {
+    return `Seu gasto ficou praticamente estável em ${formatCurrencyBRL(current.totalPeriod)} no período atual.`;
+  }
+
+  const direction = totalDelta > 0 ? 'acima' : 'abaixo';
+  return `Você fechou o período com ${formatCurrencyBRL(current.totalPeriod)}, ${formatCurrencyBRL(Math.abs(totalDelta))} (${Math.abs(
+    totalDeltaPercent
+  ).toFixed(1)}%) ${direction} do período anterior.`;
+}
+
+function buildFallbackActions(baseReport) {
+  const criticalActions = [];
+  const dispensableCuts = [];
+
+  if (baseReport.increased[0]) {
+    criticalActions.push(
+      `Defina um limite semanal para ${baseReport.increased[0].category} e acompanhe diariamente para evitar novo pico.`
+    );
+  }
+  if (baseReport.increased[1]) {
+    criticalActions.push(
+      `Revise os lançamentos de ${baseReport.increased[1].category}; houve aumento de ${formatCurrencyBRL(
+        baseReport.increased[1].delta
+      )} no período.`
+    );
+  }
+  if (baseReport.indicators.installmentsShare >= 35) {
+    criticalActions.push(
+      `Seu comprometimento com parcelas está em ${baseReport.indicators.installmentsShare.toFixed(
+        1
+      )}% do total. Priorize reduzir novas compras parceladas.`
+    );
+  }
+
+  if (baseReport.categoryHighlights[0]) {
+    dispensableCuts.push(
+      `Busque reduzir em 10% os gastos de ${baseReport.categoryHighlights[0].category} para aliviar o próximo ciclo.`
+    );
+  }
+  if (baseReport.categoryHighlights[1]) {
+    dispensableCuts.push(
+      `Consolide compras em ${baseReport.categoryHighlights[1].category} para diminuir gastos recorrentes pequenos.`
+    );
+  }
+  if (baseReport.outlierTransactions[0]) {
+    dispensableCuts.push(
+      `Evite compras pontuais de alto valor como "${baseReport.outlierTransactions[0].title}" fora de planejamento.`
+    );
+  }
+
+  return {
+    criticalActions: criticalActions.slice(0, 4),
+    dispensableCuts: dispensableCuts.slice(0, 4)
+  };
+}
+
+function buildDefaultProjectionSummary(current) {
+  return `Mantendo o padrão atual, a projeção de fechamento de ${current.projections.currentMonthLabel} é ${formatCurrencyBRL(
+    current.projections.projectedEndOfMonth
+  )}, e para ${current.projections.nextMonthLabel} é ${formatCurrencyBRL(current.projections.projectedNextMonthTotal)}.`;
+}
+
+function buildDeterministicConsultantReport(currentPeriod, previousPeriod) {
+  const current = normalizeDeterministicPeriod(currentPeriod);
+  const previous = normalizeDeterministicPeriod(previousPeriod);
+  const totalDelta = toCurrency(current.totalPeriod - previous.totalPeriod);
+  const totalDeltaPercent = calculateGrowthPercent(current.totalPeriod, previous.totalPeriod);
+  const installmentsShare = current.totalPeriod > 0 ? toPercent((current.totalInstallments / current.totalPeriod) * 100) : 0;
+  const comparisons = buildCategoryComparisons(current.categoryMetrics, previous.categoryMetrics);
+
+  const smartAlerts = [
+    ...current.smartAlerts,
+    ...(totalDeltaPercent >= 20 ? ['O gasto total está acima de 20% em relação ao período anterior.'] : []),
+    ...(installmentsShare >= 35
+      ? ['Parcelamentos estão elevados para o período e podem reduzir a margem de consumo dos próximos meses.']
+      : []),
+    ...(current.outlierTransactions.length > 0
+      ? [`Foram detectadas ${current.outlierTransactions.length} compra(s) fora do padrão de valor.`]
+      : [])
+  ];
+
+  const report = {
+    overview: buildDeterministicOverview(current, previous, totalDelta, totalDeltaPercent),
+    projectionSummary: buildDefaultProjectionSummary(current),
+    indicators: {
+      periodDays: current.periodDays,
+      transactionsCount: current.transactionsConsidered,
+      totalPeriod: current.totalPeriod,
+      previousTotalPeriod: previous.totalPeriod,
+      totalDelta,
+      totalDeltaPercent,
+      totalInstallments: current.totalInstallments,
+      newConsumption: current.newConsumption,
+      dailyAverage: current.dailyAverage,
+      behavioralAverage: current.behavioralAverage,
+      installmentsShare,
+      outlierThreshold: current.outlierThreshold
+    },
+    projections: {
+      endOfMonth: {
+        monthLabel: current.projections.currentMonthLabel,
+        daysRemaining: current.projections.daysRemainingInMonth,
+        projectedAdditional: current.projections.projectedAdditionalEndOfMonth,
+        projectedTotal: current.projections.projectedEndOfMonth
+      },
+      nextMonth: {
+        monthLabel: current.projections.nextMonthLabel,
+        days: current.projections.nextMonthDays,
+        projectedInstallments: current.projections.projectedNextMonthInstallments,
+        projectedConsumption: current.projections.projectedNextMonthConsumption,
+        projectedTotal: current.projections.projectedNextMonthTotal
+      }
+    },
+    increased: comparisons.increased.map((item) => ({
+      ...item,
+      insight: buildDefaultDeltaInsight(item)
+    })),
+    reduced: comparisons.reduced.map((item) => ({
+      ...item,
+      insight: buildDefaultDeltaInsight(item)
+    })),
+    categoryHighlights: comparisons.categoryHighlights.map((item) => ({
+      ...item,
+      insight: buildDefaultCategoryInsight(item)
+    })),
+    topMerchants: current.topMerchants,
+    topTransactions: current.topTransactions,
+    outlierTransactions: current.outlierTransactions,
+    smartAlerts: uniqueNonEmpty(smartAlerts)
+  };
+
+  const fallbackActions = buildFallbackActions(report);
+  report.criticalActions = fallbackActions.criticalActions;
+  report.dispensableCuts = fallbackActions.dispensableCuts;
+  return report;
+}
+
+function buildDefaultDeltaInsight(item) {
+  const deltaValue = formatCurrencyBRL(Math.abs(item.delta));
+  if (item.delta > 0) {
+    return `Subiu ${deltaValue} no período e merece acompanhamento mais próximo.`;
+  }
+
+  if (item.delta < 0) {
+    return `Reduziu ${deltaValue} no período, mantendo tendência positiva.`;
+  }
+
+  return 'Manteve padrão estável em relação ao período anterior.';
+}
+
+function buildDefaultCategoryInsight(item) {
+  if (item.delta > 0) {
+    return `Participação relevante no período atual, com aumento de ${formatCurrencyBRL(item.delta)}.`;
+  }
+  if (item.delta < 0) {
+    return `Categoria segue relevante e apresentou queda de ${formatCurrencyBRL(Math.abs(item.delta))}.`;
+  }
+
+  return 'Categoria relevante e estável entre os períodos comparados.';
+}
+
+function mergeArrayInsightsByCategory(items, insightItems, fallbackBuilder = buildDefaultDeltaInsight) {
+  const insightMap = new Map();
+  (insightItems || []).forEach((item) => {
+    const key = normalizeCategoryKey(item?.category);
+    const text = String(item?.insight || '').trim();
+    if (!key || !text) {
+      return;
+    }
+    insightMap.set(key, text);
+  });
+
+  return (items || []).map((item) => {
+    const key = normalizeCategoryKey(item.category);
+    const insight = insightMap.get(key) || item.insight || fallbackBuilder(item);
+    return {
+      ...item,
+      insight
+    };
+  });
+}
+
+function mergeNarrativeWithDeterministic(baseReport, aiNarrative) {
+  const narrative = aiNarrative && typeof aiNarrative === 'object' ? aiNarrative : {};
+  const criticalActions = uniqueNonEmpty([
+    ...(Array.isArray(narrative.criticalActions) ? narrative.criticalActions : []),
+    ...(Array.isArray(baseReport.criticalActions) ? baseReport.criticalActions : [])
+  ]).slice(0, 6);
+
+  const dispensableCuts = uniqueNonEmpty([
+    ...(Array.isArray(narrative.dispensableCuts) ? narrative.dispensableCuts : []),
+    ...(Array.isArray(baseReport.dispensableCuts) ? baseReport.dispensableCuts : [])
+  ]).slice(0, 6);
+
+  const smartAlerts = uniqueNonEmpty([
+    ...(Array.isArray(baseReport.smartAlerts) ? baseReport.smartAlerts : []),
+    ...(Array.isArray(narrative.smartAlerts) ? narrative.smartAlerts : [])
+  ]).slice(0, 8);
+
+  const merged = {
+    ...baseReport,
+    overview: String(narrative.overview || '').trim() || baseReport.overview,
+    projectionSummary: String(narrative.projectionSummary || '').trim() || baseReport.projectionSummary,
+    increased: mergeArrayInsightsByCategory(baseReport.increased, narrative.increasedInsights, buildDefaultDeltaInsight),
+    reduced: mergeArrayInsightsByCategory(baseReport.reduced, narrative.reducedInsights, buildDefaultDeltaInsight),
+    categoryHighlights: mergeArrayInsightsByCategory(
+      baseReport.categoryHighlights,
+      narrative.categoryInsights,
+      buildDefaultCategoryInsight
+    ),
+    criticalActions,
+    dispensableCuts,
+    smartAlerts
+  };
+
+  return merged;
+}
+
 async function reserveConsultantUsage(userId, appId) {
   const dateKey = getDateKeyInTimezone();
   const usageRef = db.collection('ai_consultant_usage').doc(`${userId}_${dateKey}`);
@@ -432,6 +982,29 @@ exports.analyzeSpendingInsights = onRequest(
         dateKey: getDateKeyInTimezone()
       };
 
+      if (appId && insightKey) {
+        const existingInsightDoc = await db
+          .collection(`artifacts/${appId}/users/${decodedToken.uid}/consultor_insights`)
+          .doc(insightKey)
+          .get();
+
+        if (existingInsightDoc.exists) {
+          const existingInsight = existingInsightDoc.data();
+          if (existingInsight?.insights && typeof existingInsight.insights === 'object') {
+            response.status(200).json({
+              insights: existingInsight.insights,
+              usage,
+              storedInsight: {
+                ...existingInsight,
+                key: existingInsight.key || insightKey
+              },
+              fromCache: true
+            });
+            return;
+          }
+        }
+      }
+
       const geminiApiKey = process.env.GEMINI_API_KEY;
       const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
       if (!geminiApiKey) {
@@ -439,33 +1012,44 @@ exports.analyzeSpendingInsights = onRequest(
         return;
       }
 
+      const baseReport = buildDeterministicConsultantReport(currentPeriod, previousPeriod);
       const promptPayload = {
         filters,
-        currentPeriod,
-        previousPeriod
+        deterministicBase: {
+          indicators: baseReport.indicators,
+          projections: baseReport.projections,
+          increased: baseReport.increased,
+          reduced: baseReport.reduced,
+          categoryHighlights: baseReport.categoryHighlights,
+          topMerchants: baseReport.topMerchants,
+          topTransactions: baseReport.topTransactions,
+          outlierTransactions: baseReport.outlierTransactions,
+          smartAlerts: baseReport.smartAlerts
+        }
       };
 
       const result = await askGeminiForJson({
         geminiApiKey,
         geminiModel,
         systemInstruction:
-          'You are a personal finance consultant. Always return valid JSON and only JSON. Answer in Brazilian Portuguese. Compare current period versus previous period and provide practical, realistic suggestions.',
+          'Você é um consultor financeiro pessoal. Sempre retorne JSON válido e somente JSON. Responda em português do Brasil. Não invente números, use apenas os dados recebidos. Gere recomendações práticas, claras e realistas para o consumidor final.',
         promptText:
-          'Analyze this spending data and return strictly this JSON structure: ' +
-          '{"overview":"...","increased":[{"category":"...","current":0,"previous":0,"delta":0,"insight":"..."}],"reduced":[{"category":"...","current":0,"previous":0,"delta":0,"insight":"..."}],"criticalActions":["..."],"dispensableCuts":["..."]}. ' +
-          'Rules: bring useful insights, avoid generic advice, focus on what increased, what reduced, and practical next actions. Data: ' +
+          'Analise os dados e retorne estritamente este JSON: ' +
+          '{"overview":"...","projectionSummary":"...","increasedInsights":[{"category":"...","insight":"..."}],"reducedInsights":[{"category":"...","insight":"..."}],"categoryInsights":[{"category":"...","insight":"..."}],"criticalActions":["..."],"dispensableCuts":["..."],"smartAlerts":["..."]}. ' +
+          'Regras: textos objetivos, práticos, úteis para reduzir gastos; sem jargão técnico; destaque aumento/redução por categoria, risco de parcelas e oportunidades de corte. Dados: ' +
           JSON.stringify(promptPayload),
-        temperature: 0.2
+        temperature: 0.25
       });
 
-      if (!result.ok) {
-        response.status(result.status || 500).json({
-          error: 'Gemini request failed',
-          details: result.payload,
-          model: result.model
-        });
-        return;
-      }
+      const insights = result.ok ? mergeNarrativeWithDeterministic(baseReport, result.data) : baseReport;
+      const warning =
+        result.ok
+          ? null
+          : {
+              error: 'Gemini request failed, deterministic fallback used',
+              details: result.payload,
+              model: result.model
+            };
 
       const generatedAt = new Date().toISOString();
       const storedInsight = {
@@ -484,10 +1068,11 @@ exports.analyzeSpendingInsights = onRequest(
           startDate: previousPeriod.startDate || '',
           endDate: previousPeriod.endDate || ''
         },
-        insights: result.data,
+        insights,
         model: result.model || geminiModel,
         generatedAt,
-        updatedAt: generatedAt
+        updatedAt: generatedAt,
+        warning
       };
 
       if (appId) {
@@ -498,9 +1083,10 @@ exports.analyzeSpendingInsights = onRequest(
       }
 
       response.status(200).json({
-        insights: result.data,
+        insights,
         usage,
-        storedInsight
+        storedInsight,
+        warning
       });
     } catch (error) {
       response.status(500).json({

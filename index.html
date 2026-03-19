@@ -25,24 +25,24 @@
       <div class="auth-shell w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6">
         <aside class="auth-hero neo-brutalism p-8 lg:p-10">
           <p class="auth-chip">Smart Finance IA</p>
-          <h1 class="auth-title mt-6">Controle financeiro simples, sem planilhas complicadas.</h1>
+          <h1 class="auth-title mt-6">Organize sua vida financeira em minutos, sem complicação.</h1>
           <p class="auth-subtitle mt-4">
-            Importe seu extrato em CSV ou OFX, clique para categorizar e veja para onde seu dinheiro está indo.
-            Sem termos técnicos, sem trabalho manual.
+            Importe extrato em CSV, OFX ou PDF, escolha a conta bancária, clique para categorizar com IA
+            e tenha visão clara de gastos, excessos e oportunidades de economia.
           </p>
 
           <div class="auth-points mt-8 space-y-3">
             <div class="auth-point neo-brutalism">
-              <span>1. Envie seu extrato</span>
-              <small>Funciona com CSV e OFX de banco e cartão</small>
+              <span>1. Importe seu extrato</span>
+              <small>Compatível com CSV, OFX e PDF dos principais bancos</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>2. Clique para organizar</span>
-              <small>A IA classifica os gastos e aprende com suas escolhas</small>
+              <span>2. Organize em poucos cliques</span>
+              <small>A IA categoriza e aprende com suas decisões anteriores</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>3. Tome decisões com confiança</span>
-              <small>Entenda excessos, compare períodos e economize com clareza</small>
+              <span>3. Decida com segurança</span>
+              <small>Compare períodos, use o Consultor IA e reduza gastos desnecessários</small>
             </div>
           </div>
         </aside>
@@ -50,7 +50,7 @@
         <div class="auth-card neo-brutalism p-8 lg:p-10">
           <div class="text-center">
             <h2 class="auth-form-title">Acesse sua conta</h2>
-            <p class="auth-form-subtitle mt-2">Entre para acompanhar seus gastos em poucos cliques.</p>
+            <p class="auth-form-subtitle mt-2">Seu financeiro centralizado com rapidez, clareza e controle.</p>
           </div>
 
           <form id="auth-form" class="space-y-5 mt-8">
@@ -219,7 +219,7 @@
                   <button
                     type="button"
                     class="help-tooltip"
-                    data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados e já tenta reaproveitar categorias anteriores automaticamente."
+                    data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados, descarta receitas (valores positivos) e já reaproveita categorias anteriores automaticamente."
                     aria-label="Ajuda sobre importação"
                   >
                     ?
@@ -390,7 +390,16 @@
                   ?
                 </button>
               </div>
-              <span id="contador-itens" class="text-[9px] font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
+              <div class="flex items-center gap-2">
+                <button
+                  id="btn-add-transaction"
+                  class="w-8 h-8 border-2 border-black bg-yellow-300 font-black text-lg leading-none neo-brutalism"
+                  title="Adicionar transação"
+                >
+                  +
+                </button>
+                <span id="contador-itens" class="text-[9px] font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
+              </div>
             </div>
 
             <div class="mb-1 border-2 border-black bg-zinc-50 p-4 space-y-3">
@@ -489,6 +498,63 @@
         <input id="bank-account-picker-input" type="text" placeholder="Buscar ou criar conta bancária" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" />
         <button id="bank-account-picker-create" class="hidden w-full px-3 py-2 border-2 border-black font-black text-[11px] uppercase bg-yellow-200"></button>
         <div id="bank-account-picker-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <div id="transaction-create-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-xl bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-black text-sm uppercase">Nova Transação</h3>
+          <button id="transaction-create-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <form id="transaction-create-form" class="space-y-4">
+          <div>
+            <label for="transaction-create-title" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Descrição</label>
+            <input id="transaction-create-title" type="text" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" required />
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="transaction-create-category" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Categoria</label>
+              <select id="transaction-create-category" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"></select>
+            </div>
+            <div>
+              <label for="transaction-create-bank-account" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Conta Bancária</label>
+              <select id="transaction-create-bank-account" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"></select>
+            </div>
+            <div>
+              <label for="transaction-create-value" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Valor</label>
+              <input id="transaction-create-value" type="number" min="0.01" step="0.01" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" required />
+            </div>
+            <div>
+              <label for="transaction-create-account-type" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Crédito/Débito</label>
+              <select id="transaction-create-account-type" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm">
+                <option value="Crédito">Crédito</option>
+                <option value="Conta">Débito</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="w-full px-4 py-3 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300">
+            Salvar transação
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div id="title-editor-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-lg bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-black text-sm uppercase">Editar Descrição</h3>
+          <button id="title-editor-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <form id="title-editor-form" class="space-y-4">
+          <div>
+            <label for="title-editor-input" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Descrição da Transação</label>
+            <input id="title-editor-input" type="text" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" required />
+          </div>
+          <button type="submit" class="w-full px-4 py-3 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300">
+            Salvar descrição
+          </button>
+        </form>
       </div>
     </div>
 

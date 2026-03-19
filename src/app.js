@@ -30,7 +30,9 @@ import {
   createAndAssignCategory,
   updateBankAccount,
   createBankAccount,
-  createAndAssignBankAccount
+  createAndAssignBankAccount,
+  createManualTransaction,
+  updateTransactionDescription
 } from './application/flows/transaction-flow.js';
 import {
   syncCategoriesWithAi,
@@ -107,7 +109,9 @@ class SmartFinanceApplication {
       onBankAccountUpdate: ({ docId, bankAccount }) => this.updateBankAccount(docId, bankAccount),
       onCreateBankAccount: ({ bankAccountName }) => this.createBankAccount(bankAccountName),
       onCreateAndAssignBankAccount: ({ docId, bankAccountName }) =>
-        this.createAndAssignBankAccount(docId, bankAccountName)
+        this.createAndAssignBankAccount(docId, bankAccountName),
+      onCreateTransaction: (payload) => this.createManualTransaction(payload),
+      onTitleUpdate: ({ docId, title }) => this.updateTransactionDescription(docId, title)
     });
 
     this.installButton.addEventListener('click', async () => {
@@ -189,6 +193,14 @@ class SmartFinanceApplication {
 
   async createAndAssignBankAccount(docId, bankAccountName) {
     return createAndAssignBankAccount(this, docId, bankAccountName);
+  }
+
+  async createManualTransaction(payload) {
+    return createManualTransaction(this, payload);
+  }
+
+  async updateTransactionDescription(docId, title) {
+    return updateTransactionDescription(this, docId, title);
   }
 
   async syncCategoriesWithAi() {

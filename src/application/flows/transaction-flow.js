@@ -1,10 +1,48 @@
-import { getInstallmentGroupKey, getInstallmentInfo, getTransactionTitleMatchKey } from '../../utils/transaction-utils.js';
+import {
+  generateTransactionHash,
+  getInstallmentGroupKey,
+  getInstallmentInfo,
+  getTransactionTitleMatchKey
+} from '../../utils/transaction-utils.js';
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
 
 function normalizeBankAccountName(value) {
   const name = String(value || '').trim();
   return name || DEFAULT_BANK_ACCOUNT;
+}
+
+function parseManualAmount(value) {
+  const sanitized = String(value || '')
+    .replace(/[^\d,.-]/g, '')
+    .trim();
+  if (!sanitized) {
+    return Number.NaN;
+  }
+
+  let normalized = sanitized;
+  const hasComma = normalized.includes(',');
+  const hasDot = normalized.includes('.');
+
+  if (hasComma && hasDot) {
+    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      normalized = normalized.replace(/,/g, '');
+    }
+  } else if (hasComma) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  } else {
+    normalized = normalized.replace(/,/g, '');
+  }
+
+  return Number.parseFloat(normalized);
+}
+
+function resolveManualTransactionDate(app) {
+  const fallbackDate = new Date().toISOString().slice(0, 10);
+  const filteredEndDate = String(app.state?.filters?.endDate || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(filteredEndDate) ? filteredEndDate : fallbackDate;
 }
 
 export async function importCsv(app, file, accountType, bankAccountName = DEFAULT_BANK_ACCOUNT) {
@@ -247,4 +285,79 @@ export async function createAndAssignBankAccount(app, docId, bankAccountName) {
   }
 
   await updateBankAccount(app, docId, createdName);
+}
+
+export async function createManualTransaction(app, payload = {}) {
+  if (!app.state.user) {
+    return false;
+  }
+
+  const title = String(payload.title || '').trim();
+  const category = String(payload.category || '').trim() || 'Outros';
+  const bankAccount = normalizeBankAccountName(payload.bankAccount);
+  const accountType = payload.accountType === 'Crédito' ? 'Crédito' : 'Conta';
+  const parsedAmount = parseManualAmount(payload.value);
+  const value = Math.abs(parsedAmount);
+
+  if (!title) {
+    app.authView.showMessage('Informe a descrição da transação.', 'error');
+    return false;
+  }
+
+  if (!Number.isFinite(value) || value <= 0) {
+    app.authView.showMessage('Informe um valor válido maior que zero.', 'error');
+    return false;
+  }
+
+  const date = resolveManualTransactionDate(app);
+  const transaction = {
+    date,
+    title,
+    value,
+    category,
+    accountType,
+    bankAccount,
+    active: true
+  };
+  const hash = generateTransactionHash(transaction);
+  const alreadyExists = app.state.transactions.some((existing) => existing.hash === hash);
+  if (alreadyExists) {
+    app.authView.showMessage('Essa transação já existe na base (mesmo título, data, valor e tipo).', 'error');
+    return false;
+  }
+
+  try {
+    const inserted = await app.repository.createTransaction(app.state.user.uid, { ...transaction, hash });
+    app.setTransactionsAndRefresh([...app.state.transactions, inserted]);
+    app.authView.showMessage('Transação criada com sucesso.', 'success');
+    return true;
+  } catch (error) {
+    app.authView.showMessage(app.normalizeError(error), 'error');
+    return false;
+  }
+}
+
+export async function updateTransactionDescription(app, docId, title) {
+  if (!app.state.user) {
+    return false;
+  }
+
+  const normalizedTitle = String(title || '').trim();
+  if (!normalizedTitle) {
+    app.authView.showMessage('Descrição inválida.', 'error');
+    return false;
+  }
+
+  try {
+    await app.repository.updateTitle(app.state.user.uid, docId, normalizedTitle);
+    app.setTransactionsAndRefresh(
+      app.state.transactions.map((transaction) =>
+        transaction.docId === docId ? { ...transaction, title: normalizedTitle } : transaction
+      )
+    );
+    return true;
+  } catch (error) {
+    app.authView.showMessage(app.normalizeError(error), 'error');
+    return false;
+  }
 }

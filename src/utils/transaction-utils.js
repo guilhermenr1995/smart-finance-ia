@@ -87,7 +87,7 @@ export function isIncomeOrIgnoredStatement(value, title) {
 
 export function isIgnoredCreditEntry(value, title) {
   const normalizedTitle = normalizeTitleForMatching(title);
-  return value <= 0 || /\b(PAGAMENTO|ESTORNO)\b/.test(normalizedTitle);
+  return value >= 0 || /\b(PAGAMENTO|ESTORNO|RECEBIDO|DEPOSITO|CREDITO)\b/.test(normalizedTitle);
 }
 
 export function detectBaseCategory(title) {

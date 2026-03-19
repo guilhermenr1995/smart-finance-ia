@@ -20,37 +20,48 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 - Logout.
 - Isolamento de dados por usuário autenticado.
 
-### 2) Importação de transações (CSV e OFX)
+### 2) Importação de transações (CSV, OFX e PDF)
 
 - Importa CSV de cartão de crédito.
 - Importa CSV de conta corrente.
 - Importa OFX de conta/cartão (ex.: Nu, Itaú e outros bancos compatíveis).
+- Importa PDF de extrato (incluindo formatos comuns de Itaú e tabelas genéricas de bancos).
 - Ignora entradas inválidas (pagamentos, estornos e receitas quando aplicável).
 - Evita duplicidade por hash (`date + title + value + accountType`).
 - Após importar, já tenta reaproveitar categoria com base no histórico do usuário.
 
-### 3) Categorização inteligente (camadas)
+### 3) Gestão de contas bancárias (novo CRUD)
+
+- Conta bancária default: `Padrão`.
+- Cadastro de conta bancária customizada por usuário logado.
+- Seleção de conta bancária no momento da importação:
+  - todas as transações do arquivo entram na conta escolhida.
+- Edição de conta bancária por transação individual na listagem.
+- Busca e criação inline (mesmo padrão UX de categorias).
+- Persistência em coleção dedicada no Firestore (`contas_bancarias`).
+
+### 4) Categorização inteligente (camadas)
 
 - Camada 1: memória interna (sem IA), usando histórico do próprio usuário.
 - Camada 2: IA (Gemini via proxy seguro), apenas para itens ainda pendentes.
 - Re-tentativa automática com backoff para falhas temporárias de IA (ex.: 503).
 - Processamento em lotes com controle de progresso.
 
-### 4) Regras de categoria e parcelas
+### 5) Regras de categoria e parcelas
 
 - Transações cujo título começa com `Transferência` **nunca** são tratadas como parcela.
 - Regra visual de `Parcelas` no mix respeita detecção robusta de `N/X`.
 - Ao editar a categoria de uma transação parcelada, a aplicação propaga a categoria para as demais parcelas relacionadas da mesma compra.
 - Quando existe transação igual/similar já categorizada na base, a categoria é reaproveitada automaticamente.
 
-### 5) Categorias personalizadas por usuário
+### 6) Categorias personalizadas por usuário
 
 - Lista padrão + categorias criadas pelo usuário.
 - Ao editar categoria na tabela, campo com busca.
 - Se não existir categoria, aparece ação `+ Criar "..."`.
 - Nova categoria é criada e aplicada imediatamente à transação.
 
-### 6) Dashboard e análise
+### 7) Dashboard e análise
 
 - Filtros por período, tipo de conta e categoria.
 - Busca global na base do usuário (por descrição ou valor).
@@ -61,7 +72,7 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 - Lista de transações com edição de categoria e ação de ignorar/reativar item.
 - Indicadores de total gasto e total ignorado.
 
-### 7) Consultor IA (insights comparativos)
+### 8) Consultor IA (insights comparativos)
 
 - Botão dedicado de Consultor IA na dashboard.
 - Analisa período filtrado atual vs mesmo range anterior.
@@ -69,13 +80,13 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 - Salva automaticamente os insights por período/filtro no Firestore para reaproveitar sem nova consulta.
 - Limite diário por usuário já está preparado no backend e pode ser ativado quando necessário.
 
-### 8) Cache e performance
+### 9) Cache e performance
 
 - Cache local por usuário para reduzir leituras recorrentes no Firestore.
 - Sincronização inteligente com nuvem (evita fetch desnecessário quando cache está fresco).
 - Objetivo: reduzir custo operacional e melhorar tempo de resposta.
 
-### 9) PWA e acesso mobile
+### 10) PWA e acesso mobile
 
 - Instalável no Android/iOS (Add to Home Screen).
 - `manifest.webmanifest` + `service-worker.js`.
@@ -84,15 +95,16 @@ Aplicação web/PWA para controle financeiro pessoal com foco em simplicidade: i
 ## Jornada do cliente (fim a fim)
 
 1. Usuário cria conta (ou entra com Google).
-2. Abre o painel e importa o CSV de cartão e/ou conta.
-3. O sistema deduplica e reaproveita categorias já conhecidas.
-4. Usuário clica em `Categorizar ciclo com IA` para pendências.
-5. Revisa a tabela e ajusta manualmente apenas o necessário.
-6. Se faltar categoria, cria na hora pelo seletor.
-7. Usa a busca global para localizar rapidamente lançamentos por descrição/valor.
-8. Aciona o Consultor IA para receber insights comparativos e recomendações práticas.
-9. Observa o mix atual x período anterior e toma decisões de gasto.
-10. Nas próximas importações, a memória interna melhora automaticamente e reduz dependência da IA.
+2. Abre o painel e seleciona a conta bancária de destino da importação.
+3. Importa extratos de cartão e/ou conta em CSV, OFX ou PDF.
+4. O sistema deduplica e reaproveita categorias já conhecidas.
+5. Usuário clica em `Categorizar ciclo com IA` para pendências.
+6. Revisa a tabela e ajusta manualmente apenas o necessário.
+7. Se faltar categoria ou conta bancária, cria na hora pelo seletor.
+8. Usa a busca global para localizar rapidamente lançamentos por descrição, valor ou categoria.
+9. Aciona o Consultor IA para receber insights comparativos e recomendações práticas.
+10. Observa o mix atual x período anterior e toma decisões de gasto.
+11. Nas próximas importações, a memória interna melhora automaticamente e reduz dependência da IA.
 
 ## Stack técnica
 
@@ -140,6 +152,7 @@ Campos principais:
 - `value: number`
 - `category: string`
 - `accountType: "Crédito" | "Conta"`
+- `bankAccount: string` (default: `Padrão`)
 - `active: boolean`
 
 Coleção de categorias do usuário:
@@ -152,11 +165,21 @@ Campos principais:
 - `normalizedName: string`
 - `createdAt: string (ISO)`
 
+Coleção de contas bancárias do usuário:
+
+`artifacts/{appId}/users/{userId}/contas_bancarias/{bankAccountId}`
+
+Campos principais:
+
+- `name: string`
+- `normalizedName: string`
+- `createdAt: string (ISO)`
+
 ## Segurança
 
 - Regras do Firestore em `firestore.rules`.
 - Isolamento obrigatório por `request.auth.uid == userId`.
-- Validação de shape/tipos para transações e categorias.
+- Validação de shape/tipos para transações, categorias e contas bancárias.
 - `.gitignore` preparado para bloquear arquivos locais sensíveis (`.env`, `runtime-config.js`, caches).
 - Versionar apenas arquivos de exemplo (`runtime-config.example.js` e `backend/cloud-functions/.env.example`).
 
