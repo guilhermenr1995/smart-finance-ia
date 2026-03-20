@@ -12,7 +12,7 @@ function normalizeForSearch(value) {
 }
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
-const DEFAULT_PAGE_SIZE = 30;
+const DEFAULT_PAGE_SIZE = 10;
 const BANK_GUIDE_STORAGE_KEY = 'smart-finance-bank-guide';
 const BANK_EXPORT_GUIDES = {
   nubank: {

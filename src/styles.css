@@ -227,6 +227,23 @@ select.edit-mode {
   color: #3f3f46;
 }
 
+.mix-chart-panel .dashboard-section-head {
+  margin-bottom: 8px;
+}
+
+.mix-chart-legend {
+  margin-top: 4px;
+  margin-bottom: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.mix-chart-canvas {
+  border: 1px solid #d4d4d8;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding: 10px 12px 8px;
+}
+
 .search-panel {
   margin-top: 2px;
   border-color: #111827;
@@ -1666,6 +1683,20 @@ select.edit-mode {
   .dashboard-legend-row {
     gap: 8px;
     font-size: 0.78rem;
+  }
+
+  .mix-chart-panel .dashboard-section-head {
+    margin-bottom: 6px;
+  }
+
+  .mix-chart-legend {
+    margin-top: 2px;
+    margin-bottom: 12px;
+    padding-top: 8px;
+  }
+
+  .mix-chart-canvas {
+    padding: 10px 10px 6px;
   }
 
   .search-panel {
