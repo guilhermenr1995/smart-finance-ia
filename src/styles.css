@@ -1329,6 +1329,14 @@ select.edit-mode {
   gap: 8px;
 }
 
+.admin-user-maintenance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .admin-user-maintenance-btn {
   min-height: 36px;
   border: 2px solid #111827;
@@ -1340,6 +1348,12 @@ select.edit-mode {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   transition: opacity 0.2s ease;
+}
+
+.admin-user-maintenance-btn-danger {
+  border-color: #991b1b;
+  background: #991b1b;
+  color: #fee2e2;
 }
 
 .admin-user-maintenance-btn.is-loading,

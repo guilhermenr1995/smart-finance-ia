@@ -272,6 +272,35 @@ function resolveMaintenanceDedupUrl(config) {
   return '';
 }
 
+function resolveMaintenanceResetUrl(config) {
+  const explicit = String(config?.admin?.maintenanceResetProxyUrl || '').trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const maintenanceUrl = String(config?.admin?.maintenanceProxyUrl || '').trim();
+  if (maintenanceUrl) {
+    return maintenanceUrl.replace(/maintenancededuplicatetransactions/gi, 'maintenanceresetuserjourney');
+  }
+
+  const dashboardUrl = resolveAdminDashboardUrl(config);
+  if (dashboardUrl) {
+    return dashboardUrl.replace(/getadmindashboard/gi, 'maintenanceresetuserjourney');
+  }
+
+  const consultantUrl = String(config?.ai?.consultantProxyUrl || '').trim();
+  if (consultantUrl) {
+    return consultantUrl.replace(/analyzespendinginsights/gi, 'maintenanceresetuserjourney');
+  }
+
+  const categorizationUrl = String(config?.ai?.proxyUrl || '').trim();
+  if (categorizationUrl) {
+    return categorizationUrl.replace(/categorizetransactions/gi, 'maintenanceresetuserjourney');
+  }
+
+  return '';
+}
+
 class AdminDashboardApp {
   constructor(config) {
     this.config = config;
@@ -433,17 +462,20 @@ class AdminDashboardApp {
         return;
       }
 
-      const action = String(actionButton.getAttribute('data-admin-action') || '').trim();
-      if (action !== 'dedup-user') {
-        return;
-      }
-
       const userId = String(actionButton.getAttribute('data-user-id') || '').trim();
       if (!userId) {
         return;
       }
 
-      void this.onDeduplicateUser(userId);
+      const action = String(actionButton.getAttribute('data-admin-action') || '').trim();
+      if (action === 'dedup-user') {
+        void this.onDeduplicateUser(userId);
+        return;
+      }
+
+      if (action === 'reset-user') {
+        void this.onResetUserJourney(userId);
+      }
     });
   }
 
@@ -553,6 +585,102 @@ class AdminDashboardApp {
       this.usersMaintenanceStatusByUserId.set(userId, {
         type: 'error',
         message: error?.message || 'Erro ao executar deduplicação.'
+      });
+    } finally {
+      this.usersMaintenanceRunning.delete(userId);
+      this.renderUsersSection();
+    }
+  }
+
+  async onResetUserJourney(userId) {
+    if (!userId || this.usersMaintenanceRunning.has(userId)) {
+      return;
+    }
+
+    const user = this.getUserById(userId);
+    if (!user) {
+      return;
+    }
+
+    const displayName = String(user.displayName || '').trim() || String(user.email || '').trim() || userId;
+    const confirmation = window.confirm(
+      `Resetar toda a jornada do usuário ${displayName}? Essa ação remove transações, categorias, contas bancárias, insights e métricas desse usuário.`
+    );
+    if (!confirmation) {
+      return;
+    }
+
+    const currentUser = this.auth?.currentUser;
+    if (!currentUser) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Sessão expirada. Faça login novamente para executar manutenção.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    const endpoint = resolveMaintenanceResetUrl(this.config);
+    if (!endpoint) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Endpoint de reset não configurado. Defina admin.maintenanceResetProxyUrl.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    this.usersMaintenanceRunning.add(userId);
+    this.usersMaintenanceStatusByUserId.set(userId, {
+      type: 'info',
+      message: 'Processando reset completo da jornada...'
+    });
+    this.renderUsersSection();
+
+    try {
+      const token = await currentUser.getIdToken(true);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          appId: this.config.appId,
+          userId,
+          dryRun: false
+        })
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = {};
+      }
+      if (!response.ok) {
+        throw new Error(payload?.message || payload?.error || 'Falha ao resetar jornada do usuário.');
+      }
+
+      const summary = payload?.summary || {};
+      const deletedDocs = toNumber(summary.totalDocsDeleted);
+      const matchedDocs = toNumber(summary.totalDocsMatched);
+      const message =
+        deletedDocs > 0
+          ? `Jornada resetada com sucesso. ${formatInteger(deletedDocs)} registro(s) removido(s).`
+          : `Jornada resetada com sucesso. Nenhum registro para remover (${formatInteger(matchedDocs)} item(ns) analisados).`;
+
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'success',
+        message
+      });
+      this.usersMaintenanceRunning.delete(userId);
+      await this.loadAdminDashboard(currentUser);
+      return;
+    } catch (error) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: error?.message || 'Erro ao resetar jornada do usuário.'
       });
     } finally {
       this.usersMaintenanceRunning.delete(userId);
@@ -1168,16 +1296,29 @@ class AdminDashboardApp {
 
             <div class="admin-user-maintenance">
               <div class="admin-user-maintenance-header">
-                <p class="admin-user-label">Deduplicação da base</p>
-                <button
-                  type="button"
-                  class="admin-user-maintenance-btn ${isMaintenanceRunning ? 'is-loading' : ''}"
-                  data-admin-action="dedup-user"
-                  data-user-id="${user.uid}"
-                  ${isMaintenanceRunning ? 'disabled' : ''}
-                >
-                  ${isMaintenanceRunning ? 'Processando...' : 'Remover duplicados'}
-                </button>
+                <p class="admin-user-label">Manutenção da base</p>
+                <div class="admin-user-maintenance-actions">
+                  <button
+                    type="button"
+                    class="admin-user-maintenance-btn ${isMaintenanceRunning ? 'is-loading' : ''}"
+                    data-admin-action="dedup-user"
+                    data-user-id="${user.uid}"
+                    ${isMaintenanceRunning ? 'disabled' : ''}
+                  >
+                    ${isMaintenanceRunning ? 'Processando...' : 'Remover duplicados'}
+                  </button>
+                  <button
+                    type="button"
+                    class="admin-user-maintenance-btn admin-user-maintenance-btn-danger ${
+                      isMaintenanceRunning ? 'is-loading' : ''
+                    }"
+                    data-admin-action="reset-user"
+                    data-user-id="${user.uid}"
+                    ${isMaintenanceRunning ? 'disabled' : ''}
+                  >
+                    ${isMaintenanceRunning ? 'Processando...' : 'Resetar jornada'}
+                  </button>
+                </div>
               </div>
               <p class="admin-user-maintenance-status ${maintenanceStatusClass}">
                 ${maintenanceStatus?.message || ''}

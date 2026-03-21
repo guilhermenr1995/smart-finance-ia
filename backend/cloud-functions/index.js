@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = new Set([
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const DEFAULT_FALLBACK_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 const DEFAULT_ADMIN_EMAILS = ['guilhermenr1995@gmail.com'];
+const USER_JOURNEY_RESET_COLLECTIONS = ['transacoes', 'categorias', 'contas_bancarias', 'consultor_insights', 'metrics_daily'];
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -514,6 +515,84 @@ async function deduplicateUserTransactions(appId, userId, options = {}) {
     keeperUpdates,
     dryRun,
     sampleGroups
+  };
+}
+
+async function deleteCollectionDocuments(collectionRef, options = {}) {
+  const batchSize = Math.max(1, Math.min(Number(options.batchSize || 380), 420));
+  let deletedCount = 0;
+
+  while (true) {
+    const snapshot = await collectionRef.limit(batchSize).get();
+    if (snapshot.empty) {
+      break;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    deletedCount += snapshot.size;
+    if (snapshot.size < batchSize) {
+      break;
+    }
+  }
+
+  return deletedCount;
+}
+
+async function resetUserJourneyData(appId, userId, options = {}) {
+  const dryRun = Boolean(options.dryRun);
+  const resetBy = String(options.resetBy || '').trim();
+  const userRef = db.doc(`artifacts/${appId}/users/${userId}`);
+  const deletedByCollection = {};
+  let totalDocsMatched = 0;
+  let totalDocsDeleted = 0;
+
+  for (const collectionName of USER_JOURNEY_RESET_COLLECTIONS) {
+    const collectionRef = userRef.collection(collectionName);
+    const snapshot = await collectionRef.get();
+    const matched = snapshot.size;
+    totalDocsMatched += matched;
+
+    let deleted = 0;
+    if (!dryRun && matched > 0) {
+      deleted = await deleteCollectionDocuments(collectionRef);
+    } else if (dryRun) {
+      deleted = matched;
+    }
+
+    totalDocsDeleted += deleted;
+    deletedByCollection[collectionName] = {
+      matched,
+      deleted
+    };
+  }
+
+  if (!dryRun) {
+    const nowIso = new Date().toISOString();
+    await userRef.set(
+      {
+        importOperationsTotal: 0,
+        importedTransactionsTotal: 0,
+        manualTransactionsTotal: 0,
+        aiCategorizationRunsTotal: 0,
+        aiConsultantRunsTotal: 0,
+        lastDataResetAt: nowIso,
+        lastDataResetBy: resetBy
+      },
+      { merge: true }
+    );
+  }
+
+  return {
+    userId,
+    dryRun,
+    deletedByCollection,
+    totalDocsMatched,
+    totalDocsDeleted
   };
 }
 
@@ -1982,6 +2061,75 @@ exports.maintenanceDeduplicateTransactions = onRequest(
     } catch (error) {
       response.status(500).json({
         error: 'Unexpected error while deduplicating transactions',
+        details: error?.message || 'unknown error'
+      });
+    }
+  }
+);
+
+exports.maintenanceResetUserJourney = onRequest(
+  {
+    invoker: 'public',
+    timeoutSeconds: 540,
+    memory: '1GiB'
+  },
+  async (request, response) => {
+    setCorsHeaders(request, response);
+
+    if (handlePreflightAndMethod(request, response)) {
+      return;
+    }
+
+    const decodedToken = await authenticateRequest(request, response);
+    if (!decodedToken) {
+      return;
+    }
+
+    if (!isAdminRequest(decodedToken)) {
+      response.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admin accounts can run maintenance.'
+      });
+      return;
+    }
+
+    try {
+      const appId = String(request.body?.appId || '').trim();
+      if (!appId) {
+        response.status(400).json({
+          error: 'appId is required'
+        });
+        return;
+      }
+
+      const userId = String(request.body?.userId || '').trim();
+      if (!userId) {
+        response.status(400).json({
+          error: 'userId is required'
+        });
+        return;
+      }
+
+      const dryRun = Boolean(request.body?.dryRun);
+      const startedAt = Date.now();
+      const summary = await resetUserJourneyData(appId, userId, {
+        dryRun,
+        resetBy: decodedToken.email || ''
+      });
+
+      response.status(200).json({
+        appId,
+        userId,
+        dryRun,
+        triggeredBy: decodedToken.email || '',
+        startedAt: new Date(startedAt).toISOString(),
+        finishedAt: new Date().toISOString(),
+        durationMs: Date.now() - startedAt,
+        summary
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: 'Unexpected error while resetting user journey',
         details: error?.message || 'unknown error'
       });
     }
