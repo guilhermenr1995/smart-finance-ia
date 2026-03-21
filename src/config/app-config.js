@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
   },
   admin: {
     dashboardProxyUrl: '',
+    maintenanceProxyUrl: '',
     allowedEmails: ['guilhermenr1995@gmail.com']
   },
   cache: {

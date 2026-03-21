@@ -1,3 +1,5 @@
+import { generateTransactionDedupKey, generateTransactionHash } from '../utils/transaction-utils.js';
+
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
 const APP_TIMEZONE = 'America/Sao_Paulo';
 
@@ -27,6 +29,27 @@ function normalizeTransactionMetadata(data = {}) {
     createdAt,
     lastCategoryUpdateAt
   };
+}
+
+function normalizeStoredTransaction(transaction = {}) {
+  const normalized = {
+    ...transaction,
+    ...normalizeTransactionMetadata(transaction),
+    bankAccount: normalizeBankAccountName(transaction.bankAccount)
+  };
+
+  const hash = String(normalized.hash || '').trim();
+  const dedupKey = String(normalized.dedupKey || '').trim();
+
+  if (!hash) {
+    normalized.hash = generateTransactionHash(normalized);
+  }
+
+  if (!dedupKey) {
+    normalized.dedupKey = generateTransactionDedupKey(normalized);
+  }
+
+  return normalized;
 }
 
 function normalizeCustomCollectionName(value, prefix = 'item') {
@@ -77,10 +100,9 @@ export class TransactionRepository {
     const transactions = [];
     snapshot.forEach((doc) => {
       const data = doc.data() || {};
+      const normalizedTransaction = normalizeStoredTransaction(data);
       transactions.push({
-        ...data,
-        bankAccount: normalizeBankAccountName(data.bankAccount),
-        ...normalizeTransactionMetadata(data),
+        ...normalizedTransaction,
         docId: doc.id
       });
     });
@@ -191,11 +213,7 @@ export class TransactionRepository {
 
     for (const transaction of transactions) {
       const docRef = collection.doc();
-      const normalizedTransaction = {
-        ...transaction,
-        ...normalizeTransactionMetadata(transaction),
-        bankAccount: normalizeBankAccountName(transaction.bankAccount)
-      };
+      const normalizedTransaction = normalizeStoredTransaction(transaction);
       currentBatch.set(docRef, normalizedTransaction);
       insertedTransactions.push({
         ...normalizedTransaction,
@@ -214,11 +232,7 @@ export class TransactionRepository {
 
   async createTransaction(userId, transaction) {
     const docRef = this.getCollection(userId).doc();
-    const normalizedTransaction = {
-      ...transaction,
-      ...normalizeTransactionMetadata(transaction),
-      bankAccount: normalizeBankAccountName(transaction.bankAccount)
-    };
+    const normalizedTransaction = normalizeStoredTransaction(transaction);
     await docRef.set(normalizedTransaction);
     return {
       ...normalizedTransaction,
@@ -239,8 +253,14 @@ export class TransactionRepository {
     return this.getCollection(userId).doc(docId).update({ bankAccount: normalizeBankAccountName(bankAccount) });
   }
 
-  async updateTitle(userId, docId, title) {
-    return this.getCollection(userId).doc(docId).update({ title: String(title || '').trim() });
+  async updateTitle(userId, docId, payload = {}) {
+    return this.getCollection(userId)
+      .doc(docId)
+      .update({
+        title: String(payload.title || '').trim(),
+        hash: String(payload.hash || '').trim(),
+        dedupKey: String(payload.dedupKey || '').trim()
+      });
   }
 
   async toggleActive(userId, docId, currentState) {

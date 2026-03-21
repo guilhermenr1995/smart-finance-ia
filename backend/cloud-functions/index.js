@@ -9,6 +9,7 @@ const db = getFirestore();
 const DEFAULT_ALLOWED_ORIGIN = 'https://smart-finance-ia.web.app';
 const CONSULTANT_DAILY_LIMIT = 3;
 const APP_TIMEZONE = 'America/Sao_Paulo';
+const DEFAULT_BANK_ACCOUNT = 'Padrão';
 
 const ALLOWED_ORIGINS = new Set([
   'https://smart-finance-ia.web.app',
@@ -249,6 +250,271 @@ function normalizeTransactionTitleKey(value) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeTransactionDateKey(value) {
+  const raw = String(value || '').trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const brMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+
+  const year = String(parsed.getFullYear()).padStart(4, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildTransactionDedupKey(transaction = {}) {
+  const dateKey = normalizeTransactionDateKey(transaction.date);
+  const titleKey = normalizeTransactionTitleKey(transaction.title);
+  const numericValue = Math.abs(toFiniteNumber(transaction.value));
+  const valueKey = numericValue.toFixed(2);
+  return `${dateKey}|${titleKey}|${valueKey}`;
+}
+
+function buildTransactionHash(transaction = {}) {
+  const payload = `${String(transaction.date || '').trim()}_${String(transaction.title || '').trim()}_${Math.abs(
+    toFiniteNumber(transaction.value)
+  ).toFixed(2)}_${String(transaction.accountType || '').trim()}`;
+  return Buffer.from(payload, 'utf8').toString('base64');
+}
+
+function isCategoryDefined(category) {
+  const normalized = String(category || '').trim().toLowerCase();
+  return normalized.length > 0 && normalized !== 'outros';
+}
+
+function getTransactionQualityScore(transaction = {}) {
+  let score = 0;
+
+  if (isCategoryDefined(transaction.category)) {
+    score += 100;
+  }
+
+  if (Boolean(transaction.categoryManuallyEdited)) {
+    score += 40;
+  }
+
+  if (Boolean(transaction.categoryAutoAssigned)) {
+    score += 20;
+  }
+
+  if (transaction.active !== false) {
+    score += 10;
+  }
+
+  if (String(transaction.createdBy || '').trim().toLowerCase() === 'manual') {
+    score += 6;
+  }
+
+  const normalizedBankAccount = String(transaction.bankAccount || '').trim().toLowerCase();
+  if (normalizedBankAccount && normalizedBankAccount !== DEFAULT_BANK_ACCOUNT.toLowerCase()) {
+    score += 3;
+  }
+
+  return score;
+}
+
+function sortByPriorityWithTimestamp(docs = []) {
+  return [...docs].sort((left, right) => {
+    const rightScore = getTransactionQualityScore(right.data);
+    const leftScore = getTransactionQualityScore(left.data);
+    if (rightScore !== leftScore) {
+      return rightScore - leftScore;
+    }
+
+    const leftUpdated = String(left.data.lastCategoryUpdateAt || left.data.createdAt || '');
+    const rightUpdated = String(right.data.lastCategoryUpdateAt || right.data.createdAt || '');
+    return rightUpdated.localeCompare(leftUpdated);
+  });
+}
+
+function selectPreferredBankAccount(docs = []) {
+  const preferred = docs.find((doc) => {
+    const normalized = String(doc.data.bankAccount || '').trim();
+    return normalized && normalized.toLowerCase() !== DEFAULT_BANK_ACCOUNT.toLowerCase();
+  });
+
+  if (preferred) {
+    return String(preferred.data.bankAccount || '').trim();
+  }
+
+  const fallback = String(docs[0]?.data?.bankAccount || '').trim();
+  return fallback || DEFAULT_BANK_ACCOUNT;
+}
+
+function mergeDuplicateTransactionGroup(keeperDoc, groupDocs = []) {
+  const ordered = sortByPriorityWithTimestamp(groupDocs);
+  const bestCategoryDoc =
+    ordered.find((doc) => isCategoryDefined(doc.data.category)) ||
+    ordered.find((doc) => String(doc.data.category || '').trim().length > 0) ||
+    ordered[0];
+
+  const allCategorySources = ordered
+    .map((doc) => String(doc.data.categorySource || '').trim())
+    .filter(Boolean);
+  const mergedCategorySource =
+    String(bestCategoryDoc?.data?.categorySource || '').trim() || allCategorySources[0] || 'manual';
+
+  const mergedCategory = String(bestCategoryDoc?.data?.category || '').trim() || 'Outros';
+  const hasAnyAutoAssigned = ordered.some((doc) => Boolean(doc.data.categoryAutoAssigned));
+  const hasAnyManuallyEdited = ordered.some((doc) => Boolean(doc.data.categoryManuallyEdited));
+  const hasAnyActive = ordered.some((doc) => doc.data.active !== false);
+  const latestCategoryUpdateAt = ordered
+    .map((doc) => String(doc.data.lastCategoryUpdateAt || '').trim())
+    .filter(Boolean)
+    .sort((left, right) => right.localeCompare(left))[0];
+  const earliestCreatedAt = ordered
+    .map((doc) => String(doc.data.createdAt || '').trim())
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right))[0];
+
+  const merged = {
+    ...keeperDoc.data,
+    category: mergedCategory,
+    categorySource: mergedCategorySource,
+    categoryAutoAssigned: hasAnyAutoAssigned,
+    categoryManuallyEdited: hasAnyManuallyEdited,
+    active: hasAnyActive,
+    bankAccount: selectPreferredBankAccount(ordered)
+  };
+
+  if (latestCategoryUpdateAt) {
+    merged.lastCategoryUpdateAt = latestCategoryUpdateAt;
+  }
+
+  if (earliestCreatedAt) {
+    merged.createdAt = earliestCreatedAt;
+  }
+
+  merged.hash = buildTransactionHash(merged);
+  merged.dedupKey = buildTransactionDedupKey(merged);
+
+  return merged;
+}
+
+function shouldUpdateKeeper(currentData = {}, mergedData = {}) {
+  const fieldsToCompare = [
+    'category',
+    'categorySource',
+    'categoryAutoAssigned',
+    'categoryManuallyEdited',
+    'active',
+    'bankAccount',
+    'createdAt',
+    'lastCategoryUpdateAt',
+    'hash',
+    'dedupKey'
+  ];
+
+  return fieldsToCompare.some((field) => {
+    const currentValue = currentData[field];
+    const mergedValue = mergedData[field];
+    return JSON.stringify(currentValue) !== JSON.stringify(mergedValue);
+  });
+}
+
+async function deduplicateUserTransactions(appId, userId, options = {}) {
+  const dryRun = Boolean(options.dryRun);
+  const collectionRef = db.collection(`artifacts/${appId}/users/${userId}/transacoes`);
+  const snapshot = await collectionRef.get();
+  const groups = new Map();
+
+  snapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    const key = String(data.dedupKey || '').trim() || buildTransactionDedupKey(data);
+    if (!key) {
+      return;
+    }
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+
+    groups.get(key).push({
+      id: doc.id,
+      ref: doc.ref,
+      data
+    });
+  });
+
+  const duplicateGroups = [...groups.entries()].filter(([, docs]) => docs.length > 1);
+  const operations = [];
+  let keeperUpdates = 0;
+  let duplicateDocs = 0;
+  const sampleGroups = [];
+
+  duplicateGroups.forEach(([groupKey, docs]) => {
+    const ordered = sortByPriorityWithTimestamp(docs);
+    const keeperDoc = ordered[0];
+    const mergedKeeper = mergeDuplicateTransactionGroup(keeperDoc, ordered);
+    const docsToDelete = ordered.slice(1);
+
+    duplicateDocs += docsToDelete.length;
+    if (sampleGroups.length < 8) {
+      sampleGroups.push({
+        dedupKey: groupKey,
+        keeperDocId: keeperDoc.id,
+        duplicateDocIds: docsToDelete.map((doc) => doc.id)
+      });
+    }
+
+    if (shouldUpdateKeeper(keeperDoc.data, mergedKeeper)) {
+      keeperUpdates += 1;
+      operations.push({
+        type: 'set',
+        ref: keeperDoc.ref,
+        data: mergedKeeper
+      });
+    }
+
+    docsToDelete.forEach((doc) => {
+      operations.push({
+        type: 'delete',
+        ref: doc.ref
+      });
+    });
+  });
+
+  if (!dryRun && operations.length > 0) {
+    const batchSize = 420;
+    for (let index = 0; index < operations.length; index += batchSize) {
+      const chunk = operations.slice(index, index + batchSize);
+      const batch = db.batch();
+
+      chunk.forEach((operation) => {
+        if (operation.type === 'set') {
+          batch.set(operation.ref, operation.data, { merge: true });
+          return;
+        }
+
+        batch.delete(operation.ref);
+      });
+
+      await batch.commit();
+    }
+  }
+
+  return {
+    userId,
+    scannedTransactions: snapshot.size,
+    duplicateGroups: duplicateGroups.length,
+    duplicateDocs,
+    keeperUpdates,
+    dryRun,
+    sampleGroups
+  };
 }
 
 function formatCurrencyBRL(value) {
@@ -1622,6 +1888,100 @@ exports.getAdminDashboard = onRequest(
     } catch (error) {
       response.status(500).json({
         error: 'Unexpected error while loading admin dashboard',
+        details: error?.message || 'unknown error'
+      });
+    }
+  }
+);
+
+exports.maintenanceDeduplicateTransactions = onRequest(
+  {
+    invoker: 'public',
+    timeoutSeconds: 540,
+    memory: '1GiB'
+  },
+  async (request, response) => {
+    setCorsHeaders(request, response);
+
+    if (handlePreflightAndMethod(request, response)) {
+      return;
+    }
+
+    const decodedToken = await authenticateRequest(request, response);
+    if (!decodedToken) {
+      return;
+    }
+
+    if (!isAdminRequest(decodedToken)) {
+      response.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admin accounts can run maintenance.'
+      });
+      return;
+    }
+
+    try {
+      const appId = String(request.body?.appId || '').trim();
+      if (!appId) {
+        response.status(400).json({
+          error: 'appId is required'
+        });
+        return;
+      }
+
+      const dryRun = Boolean(request.body?.dryRun);
+      const targetUserId = String(request.body?.userId || '').trim();
+
+      let userIds = [];
+      if (targetUserId) {
+        userIds = [targetUserId];
+      } else {
+        const usersSnapshot = await db.collection(`artifacts/${appId}/users`).get();
+        userIds = usersSnapshot.docs.map((doc) => doc.id);
+      }
+
+      const startedAt = Date.now();
+      const users = [];
+      for (const userId of userIds) {
+        const result = await deduplicateUserTransactions(appId, userId, { dryRun });
+        users.push(result);
+      }
+
+      const summary = users.reduce(
+        (accumulator, user) => {
+          accumulator.usersScanned += 1;
+          accumulator.transactionsScanned += Number(user.scannedTransactions || 0);
+          accumulator.duplicateGroups += Number(user.duplicateGroups || 0);
+          accumulator.duplicateDocs += Number(user.duplicateDocs || 0);
+          accumulator.keeperUpdates += Number(user.keeperUpdates || 0);
+          if (Number(user.duplicateGroups || 0) > 0) {
+            accumulator.usersWithDuplicates += 1;
+          }
+          return accumulator;
+        },
+        {
+          usersScanned: 0,
+          usersWithDuplicates: 0,
+          transactionsScanned: 0,
+          duplicateGroups: 0,
+          duplicateDocs: 0,
+          keeperUpdates: 0
+        }
+      );
+
+      response.status(200).json({
+        appId,
+        dryRun,
+        triggeredBy: decodedToken.email || '',
+        startedAt: new Date(startedAt).toISOString(),
+        finishedAt: new Date().toISOString(),
+        durationMs: Date.now() - startedAt,
+        summary,
+        users: users.filter((user) => user.duplicateGroups > 0 || user.keeperUpdates > 0)
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: 'Unexpected error while deduplicating transactions',
         details: error?.message || 'unknown error'
       });
     }

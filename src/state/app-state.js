@@ -1,4 +1,5 @@
 import { buildCycleBoundaries, getDefaultCycleRange } from '../utils/date-utils.js';
+import { generateTransactionDedupKey, generateTransactionHash } from '../utils/transaction-utils.js';
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
 
@@ -39,7 +40,38 @@ export class AppState {
   }
 
   setTransactions(transactions) {
-    this.transactions = transactions;
+    const byDocId = new Map();
+    const withoutDocId = [];
+
+    (transactions || []).forEach((transaction) => {
+      if (!transaction || typeof transaction !== 'object') {
+        return;
+      }
+
+      const docId = String(transaction.docId || '').trim();
+      const normalized = {
+        ...transaction,
+        hash: String(transaction.hash || '').trim() || generateTransactionHash(transaction),
+        dedupKey: String(transaction.dedupKey || '').trim() || generateTransactionDedupKey(transaction)
+      };
+
+      if (!docId) {
+        withoutDocId.push(normalized);
+        return;
+      }
+
+      if (!byDocId.has(docId)) {
+        byDocId.set(docId, normalized);
+        return;
+      }
+
+      const current = byDocId.get(docId);
+      const currentUpdatedAt = String(current?.lastCategoryUpdateAt || current?.createdAt || '');
+      const incomingUpdatedAt = String(normalized?.lastCategoryUpdateAt || normalized?.createdAt || '');
+      byDocId.set(docId, incomingUpdatedAt > currentUpdatedAt ? normalized : current);
+    });
+
+    this.transactions = [...byDocId.values(), ...withoutDocId];
   }
 
   setUserCategories(categories) {

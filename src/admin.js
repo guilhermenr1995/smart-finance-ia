@@ -248,6 +248,30 @@ function resolveAdminDashboardUrl(config) {
   return '';
 }
 
+function resolveMaintenanceDedupUrl(config) {
+  const explicit = String(config?.admin?.maintenanceProxyUrl || '').trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const dashboardUrl = resolveAdminDashboardUrl(config);
+  if (dashboardUrl) {
+    return dashboardUrl.replace(/getadmindashboard/gi, 'maintenancededuplicatetransactions');
+  }
+
+  const consultantUrl = String(config?.ai?.consultantProxyUrl || '').trim();
+  if (consultantUrl) {
+    return consultantUrl.replace(/analyzespendinginsights/gi, 'maintenancededuplicatetransactions');
+  }
+
+  const categorizationUrl = String(config?.ai?.proxyUrl || '').trim();
+  if (categorizationUrl) {
+    return categorizationUrl.replace(/categorizetransactions/gi, 'maintenancededuplicatetransactions');
+  }
+
+  return '';
+}
+
 class AdminDashboardApp {
   constructor(config) {
     this.config = config;
@@ -302,6 +326,8 @@ class AdminDashboardApp {
       pageSize: DEFAULT_USERS_PAGE_SIZE,
       totalPages: 1
     };
+    this.usersMaintenanceRunning = new Set();
+    this.usersMaintenanceStatusByUserId = new Map();
 
     if (this.usersPageSizeSelect) {
       this.usersPageSizeSelect.value = String(DEFAULT_USERS_PAGE_SIZE);
@@ -395,6 +421,143 @@ class AdminDashboardApp {
       this.usersState.page += 1;
       this.renderUsersSection();
     });
+
+    this.usersTable?.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target || typeof target.closest !== 'function') {
+        return;
+      }
+
+      const actionButton = target.closest('[data-admin-action]');
+      if (!actionButton) {
+        return;
+      }
+
+      const action = String(actionButton.getAttribute('data-admin-action') || '').trim();
+      if (action !== 'dedup-user') {
+        return;
+      }
+
+      const userId = String(actionButton.getAttribute('data-user-id') || '').trim();
+      if (!userId) {
+        return;
+      }
+
+      void this.onDeduplicateUser(userId);
+    });
+  }
+
+  getUserById(uid) {
+    return (Array.isArray(this.usersState.allUsers) ? this.usersState.allUsers : []).find((user) => user?.uid === uid) || null;
+  }
+
+  getMaintenanceStatus(userId) {
+    return (
+      this.usersMaintenanceStatusByUserId.get(userId) || {
+        type: 'idle',
+        message: 'Nenhuma manutenção executada neste usuário nesta sessão.'
+      }
+    );
+  }
+
+  async onDeduplicateUser(userId) {
+    if (!userId || this.usersMaintenanceRunning.has(userId)) {
+      return;
+    }
+
+    const user = this.getUserById(userId);
+    if (!user) {
+      return;
+    }
+
+    const displayName = String(user.displayName || '').trim() || String(user.email || '').trim() || userId;
+    const confirmation = window.confirm(
+      `Remover duplicados do usuário ${displayName}? Esta ação mantém 1 transação por combinação descrição + data + valor.`
+    );
+    if (!confirmation) {
+      return;
+    }
+
+    const currentUser = this.auth?.currentUser;
+    if (!currentUser) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Sessão expirada. Faça login novamente para executar manutenção.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    const endpoint = resolveMaintenanceDedupUrl(this.config);
+    if (!endpoint) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Endpoint de manutenção não configurado. Defina admin.maintenanceProxyUrl.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    this.usersMaintenanceRunning.add(userId);
+    this.usersMaintenanceStatusByUserId.set(userId, {
+      type: 'info',
+      message: 'Processando deduplicação...'
+    });
+    this.renderUsersSection();
+
+    try {
+      const token = await currentUser.getIdToken(true);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          appId: this.config.appId,
+          userId,
+          dryRun: false
+        })
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = {};
+      }
+      if (!response.ok) {
+        throw new Error(payload?.message || payload?.error || 'Falha ao remover duplicados.');
+      }
+
+      const summary = payload?.summary || {};
+      const duplicateDocs = toNumber(summary.duplicateDocs);
+      const duplicateGroups = toNumber(summary.duplicateGroups);
+      const keeperUpdates = toNumber(summary.keeperUpdates);
+
+      const baseMessage =
+        duplicateDocs > 0
+          ? `${formatInteger(duplicateDocs)} duplicata(s) removida(s) em ${formatInteger(duplicateGroups)} grupo(s).`
+          : 'Nenhuma duplicidade encontrada para este usuário.';
+      const mergedMessage =
+        keeperUpdates > 0 ? `${baseMessage} ${formatInteger(keeperUpdates)} registro(s) consolidados.` : baseMessage;
+
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'success',
+        message: mergedMessage
+      });
+      this.usersMaintenanceRunning.delete(userId);
+      await this.loadAdminDashboard(currentUser);
+      return;
+    } catch (error) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: error?.message || 'Erro ao executar deduplicação.'
+      });
+    } finally {
+      this.usersMaintenanceRunning.delete(userId);
+      this.renderUsersSection();
+    }
   }
 
   isAdminUser(user) {
@@ -935,6 +1098,17 @@ class AdminDashboardApp {
         const automation = user.automation || {};
         const pending = toNumber(transactions.pendingCategorization);
         const pendingClass = pending > 0 ? 'text-amber-700' : 'text-emerald-700';
+        const maintenanceStatus = this.getMaintenanceStatus(user.uid);
+        const maintenanceStatusType = String(maintenanceStatus?.type || 'idle').trim();
+        const maintenanceStatusClass =
+          maintenanceStatusType === 'success'
+            ? 'admin-user-maintenance-status-success'
+            : maintenanceStatusType === 'error'
+            ? 'admin-user-maintenance-status-error'
+            : maintenanceStatusType === 'info'
+            ? 'admin-user-maintenance-status-info'
+            : 'admin-user-maintenance-status-idle';
+        const isMaintenanceRunning = this.usersMaintenanceRunning.has(user.uid);
 
         return `
           <article class="admin-user-card">
@@ -990,6 +1164,24 @@ class AdminDashboardApp {
                 )}%"></div>
               </div>
               <p class="admin-user-value">${formatPercent(automation.acceptedRate || 0)}</p>
+            </div>
+
+            <div class="admin-user-maintenance">
+              <div class="admin-user-maintenance-header">
+                <p class="admin-user-label">Deduplicação da base</p>
+                <button
+                  type="button"
+                  class="admin-user-maintenance-btn ${isMaintenanceRunning ? 'is-loading' : ''}"
+                  data-admin-action="dedup-user"
+                  data-user-id="${user.uid}"
+                  ${isMaintenanceRunning ? 'disabled' : ''}
+                >
+                  ${isMaintenanceRunning ? 'Processando...' : 'Remover duplicados'}
+                </button>
+              </div>
+              <p class="admin-user-maintenance-status ${maintenanceStatusClass}">
+                ${maintenanceStatus?.message || ''}
+              </p>
             </div>
           </article>
         `;

@@ -22,6 +22,7 @@ window.SMART_FINANCE_CONFIG = {
   },
   admin: {
     dashboardProxyUrl: 'https://YOUR_ADMIN_DASHBOARD_PROXY_URL.a.run.app',
+    maintenanceProxyUrl: 'https://YOUR_MAINTENANCE_PROXY_URL.a.run.app',
     allowedEmails: ['guilhermenr1995@gmail.com']
   },
   cache: {

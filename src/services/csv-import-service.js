@@ -1,6 +1,7 @@
 import { parseCsvLine, parseLocaleNumber, splitCsvLines, normalizeCsvHeader } from '../utils/csv-utils.js';
 import {
   detectBaseCategory,
+  generateTransactionDedupKey,
   generateTransactionHash,
   isIgnoredCreditEntry,
   isIncomeOrIgnoredStatement
@@ -166,14 +167,17 @@ export class CsvImportService {
       }
 
       const hash = generateTransactionHash(parsed);
-      if (existingHashes.has(hash)) {
+      const dedupKey = generateTransactionDedupKey(parsed);
+      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
         continue;
       }
 
       existingHashes.add(hash);
+      existingHashes.add(dedupKey);
       transactions.push({
         ...parsed,
+        dedupKey,
         hash,
         active: true
       });
@@ -229,14 +233,17 @@ export class CsvImportService {
       };
 
       const hash = generateTransactionHash(parsed);
-      if (existingHashes.has(hash)) {
+      const dedupKey = generateTransactionDedupKey(parsed);
+      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
         return;
       }
 
       existingHashes.add(hash);
+      existingHashes.add(dedupKey);
       transactions.push({
         ...parsed,
+        dedupKey,
         hash,
         active: true
       });
@@ -321,14 +328,17 @@ export class CsvImportService {
       };
 
       const hash = generateTransactionHash(parsed);
-      if (existingHashes.has(hash)) {
+      const dedupKey = generateTransactionDedupKey(parsed);
+      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
         continue;
       }
 
       existingHashes.add(hash);
+      existingHashes.add(dedupKey);
       transactions.push({
         ...parsed,
+        dedupKey,
         hash,
         active: true
       });

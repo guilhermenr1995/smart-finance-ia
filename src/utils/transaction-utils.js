@@ -1,12 +1,38 @@
 import { parseDateFlexible } from './date-utils.js';
 
-function normalizeTitleForMatching(value) {
+export function normalizeTitleForMatching(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeTransactionDateKey(value) {
+  const raw = String(value || '').trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const parsed = parseDateFlexible(raw);
+  if (parsed instanceof Date && !Number.isNaN(parsed.getTime())) {
+    const year = String(parsed.getFullYear()).padStart(4, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return raw;
+}
+
+export function generateTransactionDedupKey({ date, title, value }) {
+  const dateKey = normalizeTransactionDateKey(date);
+  const titleKey = getTransactionTitleMatchKey(title);
+  const numericValue = Math.abs(Number(value || 0));
+  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
+  return `${dateKey}|${titleKey}|${valueKey}`;
 }
 
 function parseSearchAmount(rawValue) {

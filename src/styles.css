@@ -35,7 +35,7 @@ select.edit-mode {
 
 .row-inactive {
   opacity: 0.45;
-  filter: grayscale(1);
+  background: #eef2f7;
 }
 
 .dashboard-shell {
@@ -396,6 +396,9 @@ select.edit-mode {
   box-shadow: 3px 3px 0 #111827;
   background: #f8fafc;
   padding: 14px;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 164px;
 }
 
 .transaction-head {
@@ -1311,6 +1314,63 @@ select.edit-mode {
   padding: 8px;
 }
 
+.admin-user-maintenance {
+  margin-top: 10px;
+  border: 1px solid #111827;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.admin-user-maintenance-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-user-maintenance-btn {
+  min-height: 36px;
+  border: 2px solid #111827;
+  background: #111827;
+  color: #fef3c7;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: opacity 0.2s ease;
+}
+
+.admin-user-maintenance-btn.is-loading,
+.admin-user-maintenance-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-user-maintenance-status {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.admin-user-maintenance-status-idle {
+  color: #475569;
+}
+
+.admin-user-maintenance-status-info {
+  color: #0369a1;
+}
+
+.admin-user-maintenance-status-success {
+  color: #047857;
+}
+
+.admin-user-maintenance-status-error {
+  color: #b91c1c;
+}
+
 .admin-user-progress-track {
   margin-top: 6px;
   height: 10px;
@@ -1562,6 +1622,10 @@ select.edit-mode {
 
   .admin-user-value {
     font-size: 0.88rem;
+  }
+
+  .admin-user-maintenance-btn {
+    width: 100%;
   }
 
   .admin-users-toolbar {
@@ -1834,6 +1898,7 @@ select.edit-mode {
 
   .transaction-card {
     padding: 14px 12px;
+    box-shadow: 1px 1px 0 #111827;
   }
 
   .transaction-head {

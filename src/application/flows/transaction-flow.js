@@ -1,4 +1,5 @@
 import {
+  generateTransactionDedupKey,
   generateTransactionHash,
   getInstallmentGroupKey,
   getInstallmentInfo,
@@ -77,12 +78,25 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
   app.overlayView.show(`Importando ${accountType}...`);
 
   try {
-    await app.syncDataFromCloud({ force: false, showOverlay: false });
+    await app.syncDataFromCloud({ force: true, showOverlay: false });
     const importBankAccount = normalizeBankAccountName(bankAccountName);
 
     const isPdfFile = /\.pdf$/i.test(file.name || '');
     const fileContent = isPdfFile ? await file.arrayBuffer() : await file.text();
-    const existingHashes = new Set(app.state.transactions.map((transaction) => transaction.hash));
+    const existingHashes = new Set();
+    app.state.transactions.forEach((transaction) => {
+      const transactionHash = String(transaction?.hash || '').trim();
+      const transactionDedupKey =
+        String(transaction?.dedupKey || '').trim() || generateTransactionDedupKey(transaction || {});
+
+      if (transactionHash) {
+        existingHashes.add(transactionHash);
+      }
+
+      if (transactionDedupKey) {
+        existingHashes.add(transactionDedupKey);
+      }
+    });
     const parseResult = await app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
     const importedAt = new Date().toISOString();
 
@@ -110,12 +124,18 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     const autoAssignedByIndex = new Map(memoryApplied.updates.map((update) => [update.index, update]));
     const transactionsToInsert = memoryApplied.transactions.map((transaction, index) => {
       const autoSuggestion = autoAssignedByIndex.get(index);
+      const normalizedTransaction = {
+        ...transaction,
+        hash: String(transaction.hash || '').trim() || generateTransactionHash(transaction),
+        dedupKey: String(transaction.dedupKey || '').trim() || generateTransactionDedupKey(transaction)
+      };
+
       if (!autoSuggestion) {
-        return transaction;
+        return normalizedTransaction;
       }
 
       return {
-        ...transaction,
+        ...normalizedTransaction,
         categorySource: buildPlatformCategorySource(autoSuggestion.source),
         categoryAutoAssigned: true,
         categoryManuallyEdited: false,
@@ -389,14 +409,19 @@ export async function createManualTransaction(app, payload = {}) {
     lastCategoryUpdateAt: new Date().toISOString()
   };
   const hash = generateTransactionHash(transaction);
-  const alreadyExists = app.state.transactions.some((existing) => existing.hash === hash);
+  const dedupKey = generateTransactionDedupKey(transaction);
+  const alreadyExists = app.state.transactions.some((existing) => {
+    const existingHash = String(existing?.hash || '').trim();
+    const existingDedupKey = String(existing?.dedupKey || '').trim() || generateTransactionDedupKey(existing || {});
+    return existingHash === hash || existingDedupKey === dedupKey;
+  });
   if (alreadyExists) {
-    app.authView.showMessage('Essa transação já existe na base (mesmo título, data, valor e tipo).', 'error');
+    app.authView.showMessage('Essa transação já existe na base (mesma descrição, data e valor).', 'error');
     return false;
   }
 
   try {
-    const inserted = await app.repository.createTransaction(app.state.user.uid, { ...transaction, hash });
+    const inserted = await app.repository.createTransaction(app.state.user.uid, { ...transaction, hash, dedupKey });
     app.setTransactionsAndRefresh([...app.state.transactions, inserted]);
     try {
       await app.repository.recordUsageMetrics(app.state.user.uid, {
@@ -425,10 +450,46 @@ export async function updateTransactionDescription(app, docId, title) {
   }
 
   try {
-    await app.repository.updateTitle(app.state.user.uid, docId, normalizedTitle);
+    const currentTransaction = app.state.transactions.find((transaction) => transaction.docId === docId);
+    if (!currentTransaction) {
+      app.authView.showMessage('Transação não encontrada para edição.', 'error');
+      return false;
+    }
+
+    const nextSnapshot = {
+      ...currentTransaction,
+      title: normalizedTitle
+    };
+    const nextHash = generateTransactionHash(nextSnapshot);
+    const nextDedupKey = generateTransactionDedupKey(nextSnapshot);
+    const hasDuplicate = app.state.transactions.some((transaction) => {
+      if (transaction.docId === docId) {
+        return false;
+      }
+
+      const transactionDedupKey =
+        String(transaction?.dedupKey || '').trim() || generateTransactionDedupKey(transaction || {});
+      return transactionDedupKey === nextDedupKey;
+    });
+
+    if (hasDuplicate) {
+      app.authView.showMessage(
+        'Já existe outra transação com a mesma descrição, data e valor. Ajuste a descrição para evitar duplicidade.',
+        'error'
+      );
+      return false;
+    }
+
+    await app.repository.updateTitle(app.state.user.uid, docId, {
+      title: normalizedTitle,
+      hash: nextHash,
+      dedupKey: nextDedupKey
+    });
     app.setTransactionsAndRefresh(
       app.state.transactions.map((transaction) =>
-        transaction.docId === docId ? { ...transaction, title: normalizedTitle } : transaction
+        transaction.docId === docId
+          ? { ...transaction, title: normalizedTitle, hash: nextHash, dedupKey: nextDedupKey }
+          : transaction
       )
     );
     return true;

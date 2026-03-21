@@ -666,7 +666,10 @@ export class DashboardView {
       () => {
         this.closeTooltip();
       },
-      true
+      {
+        capture: true,
+        passive: true
+      }
     );
   }
 
@@ -1373,8 +1376,6 @@ export class DashboardView {
 
   renderCategoryChart(summary, previousSummary) {
     const categories = [...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories])];
-    this.chartBars.innerHTML = '';
-
     if (categories.length === 0) {
       this.chartBars.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dados no período selecionado.</p>';
       return;
@@ -1385,13 +1386,13 @@ export class DashboardView {
       1
     );
 
-    categories.forEach((category) => {
+    const chartRows = categories.map((category) => {
       const currentValue = summary.categoryTotals[category] || 0;
       const previousValue = previousSummary.categoryTotals[category] || 0;
       const currentHeight = (currentValue / maxValue) * 100;
       const previousHeight = (previousValue / maxValue) * 100;
 
-      this.chartBars.innerHTML += `
+      return `
         <div class="flex flex-col items-center min-w-[70px] h-full">
           <div class="flex items-end gap-1 h-full mb-2">
             <div title="Período atual: ${formatCurrencyBRL(currentValue)}" class="w-5 bg-yellow-400 border-2 border-black" style="height: ${currentHeight}%"></div>
@@ -1400,12 +1401,12 @@ export class DashboardView {
           <span class="text-[8px] font-bold uppercase truncate w-16 text-center">${escapeHtml(category)}</span>
         </div>`;
     });
+
+    this.chartBars.innerHTML = chartRows.join('');
   }
 
   renderCategoryStats(summary, previousSummary) {
     const categories = [...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories])];
-    this.statsList.innerHTML = '';
-
     if (categories.length === 0) {
       this.statsList.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem mix para exibir.</p>';
       return;
@@ -1416,14 +1417,14 @@ export class DashboardView {
       1
     );
 
-    categories.forEach((category) => {
+    const statsRows = categories.map((category) => {
       const currentValue = summary.categoryTotals[category] || 0;
       const previousValue = previousSummary.categoryTotals[category] || 0;
 
       const currentWidth = (currentValue / maxValue) * 100;
       const previousWidth = (previousValue / maxValue) * 100;
 
-      this.statsList.innerHTML += `
+      return `
         <div>
           <div class="flex justify-between text-[10px] font-black uppercase mb-1">
             <span class="truncate">${escapeHtml(category)}</span>
@@ -1440,6 +1441,8 @@ export class DashboardView {
           <p class="text-[9px] font-black uppercase text-zinc-500 mt-1">Anterior: ${formatCompactCurrency(previousValue)}</p>
         </div>`;
     });
+
+    this.statsList.innerHTML = statsRows.join('');
   }
 
   renderTransactions(transactions) {
