@@ -543,6 +543,64 @@ async function deleteCollectionDocuments(collectionRef, options = {}) {
   return deletedCount;
 }
 
+async function deleteQueryDocuments(queryRef, options = {}) {
+  const batchSize = Math.max(1, Math.min(Number(options.batchSize || 380), 420));
+  let deletedCount = 0;
+
+  while (true) {
+    const snapshot = await queryRef.limit(batchSize).get();
+    if (snapshot.empty) {
+      break;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    deletedCount += snapshot.size;
+    if (snapshot.size < batchSize) {
+      break;
+    }
+  }
+
+  return deletedCount;
+}
+
+function compareResetCollectionRefs(left, right) {
+  const leftName = String(left?.id || '');
+  const rightName = String(right?.id || '');
+  const leftPriority = USER_JOURNEY_RESET_COLLECTIONS.indexOf(leftName);
+  const rightPriority = USER_JOURNEY_RESET_COLLECTIONS.indexOf(rightName);
+
+  const normalizedLeftPriority = leftPriority === -1 ? Number.MAX_SAFE_INTEGER : leftPriority;
+  const normalizedRightPriority = rightPriority === -1 ? Number.MAX_SAFE_INTEGER : rightPriority;
+
+  if (normalizedLeftPriority !== normalizedRightPriority) {
+    return normalizedLeftPriority - normalizedRightPriority;
+  }
+
+  return leftName.localeCompare(rightName);
+}
+
+async function resolveUserCollectionsForReset(userRef) {
+  const collectionMap = new Map();
+
+  const listedCollections = await userRef.listCollections();
+  listedCollections.forEach((collectionRef) => {
+    collectionMap.set(collectionRef.id, collectionRef);
+  });
+
+  USER_JOURNEY_RESET_COLLECTIONS.forEach((collectionName) => {
+    if (!collectionMap.has(collectionName)) {
+      collectionMap.set(collectionName, userRef.collection(collectionName));
+    }
+  });
+
+  return [...collectionMap.values()].sort(compareResetCollectionRefs);
+}
+
 async function resetUserJourneyData(appId, userId, options = {}) {
   const dryRun = Boolean(options.dryRun);
   const resetBy = String(options.resetBy || '').trim();
@@ -551,8 +609,9 @@ async function resetUserJourneyData(appId, userId, options = {}) {
   let totalDocsMatched = 0;
   let totalDocsDeleted = 0;
 
-  for (const collectionName of USER_JOURNEY_RESET_COLLECTIONS) {
-    const collectionRef = userRef.collection(collectionName);
+  const collectionsForReset = await resolveUserCollectionsForReset(userRef);
+  for (const collectionRef of collectionsForReset) {
+    const collectionName = collectionRef.id;
     const snapshot = await collectionRef.get();
     const matched = snapshot.size;
     totalDocsMatched += matched;
@@ -570,6 +629,22 @@ async function resetUserJourneyData(appId, userId, options = {}) {
       deleted
     };
   }
+
+  const consultantUsageQuery = db.collection('ai_consultant_usage').where('userId', '==', userId);
+  const consultantUsageSnapshot = await consultantUsageQuery.get();
+  const consultantUsageMatched = consultantUsageSnapshot.size;
+  const consultantUsageDeleted = dryRun
+    ? consultantUsageMatched
+    : consultantUsageMatched > 0
+    ? await deleteQueryDocuments(consultantUsageQuery)
+    : 0;
+
+  totalDocsMatched += consultantUsageMatched;
+  totalDocsDeleted += consultantUsageDeleted;
+  deletedByCollection.ai_consultant_usage = {
+    matched: consultantUsageMatched,
+    deleted: consultantUsageDeleted
+  };
 
   if (!dryRun) {
     const nowIso = new Date().toISOString();
