@@ -232,6 +232,43 @@ function toPercent(value) {
   return Number(toFiniteNumber(value).toFixed(2));
 }
 
+function sanitizeString(value, maxLength = 200) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function sanitizeProviderIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => sanitizeString(item, 120))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function buildResetUserProfilePayload(userId, existingData = {}) {
+  const nowIso = new Date().toISOString();
+  const dateKey = getDateKeyInTimezone();
+
+  return {
+    uid: sanitizeString(existingData.uid || userId, 150),
+    email: sanitizeString(existingData.email, 200),
+    displayName: sanitizeString(existingData.displayName, 140),
+    photoURL: sanitizeString(existingData.photoURL, 500),
+    providerIds: sanitizeProviderIds(existingData.providerIds),
+    createdAt: sanitizeString(existingData.createdAt, 50) || nowIso,
+    lastAccessAt: sanitizeString(existingData.lastAccessAt, 50) || nowIso,
+    createdDateKey: sanitizeString(existingData.createdDateKey, 10) || dateKey,
+    lastAccessDateKey: sanitizeString(existingData.lastAccessDateKey, 10) || dateKey,
+    importOperationsTotal: 0,
+    importedTransactionsTotal: 0,
+    manualTransactionsTotal: 0,
+    aiCategorizationRunsTotal: 0,
+    aiConsultantRunsTotal: 0
+  };
+}
+
 function normalizeCategoryKey(value) {
   return String(value || '')
     .trim()
@@ -601,13 +638,42 @@ async function resolveUserCollectionsForReset(userRef) {
   return [...collectionMap.values()].sort(compareResetCollectionRefs);
 }
 
-async function resetUserJourneyData(appId, userId, options = {}) {
+async function resolveArtifactAppIdsForReset(primaryAppId, options = {}) {
+  const includeAllApps = options.includeAllApps !== false;
+  const appIds = new Set();
+  const normalizedPrimary = String(primaryAppId || '').trim();
+
+  if (normalizedPrimary) {
+    appIds.add(normalizedPrimary);
+  }
+
+  if (!includeAllApps) {
+    return [...appIds];
+  }
+
+  try {
+    const artifactRefs = await db.collection('artifacts').listDocuments();
+    artifactRefs.forEach((ref) => {
+      const appId = String(ref?.id || '').trim();
+      if (appId) {
+        appIds.add(appId);
+      }
+    });
+  } catch (error) {
+    console.warn('Unable to list app namespaces for journey reset:', error?.message || error);
+  }
+
+  return [...appIds];
+}
+
+async function resetUserJourneyDataForApp(appId, userId, options = {}) {
   const dryRun = Boolean(options.dryRun);
-  const resetBy = String(options.resetBy || '').trim();
   const userRef = db.doc(`artifacts/${appId}/users/${userId}`);
   const deletedByCollection = {};
   let totalDocsMatched = 0;
   let totalDocsDeleted = 0;
+  let resetMode = 'dry-run';
+  let postResetCollectionsWithDocs = 0;
 
   const collectionsForReset = await resolveUserCollectionsForReset(userRef);
   for (const collectionRef of collectionsForReset) {
@@ -616,56 +682,97 @@ async function resetUserJourneyData(appId, userId, options = {}) {
     const matched = snapshot.size;
     totalDocsMatched += matched;
 
-    let deleted = 0;
-    if (!dryRun && matched > 0) {
-      deleted = await deleteCollectionDocuments(collectionRef);
-    } else if (dryRun) {
-      deleted = matched;
-    }
+    let deleted = dryRun ? matched : 0;
 
-    totalDocsDeleted += deleted;
     deletedByCollection[collectionName] = {
       matched,
       deleted
     };
   }
 
+  if (!dryRun) {
+    const userSnapshot = await userRef.get();
+    const existingData = userSnapshot.exists ? userSnapshot.data() || {} : {};
+    const restoredProfile = buildResetUserProfilePayload(userId, existingData);
+
+    if (typeof db.recursiveDelete === 'function') {
+      resetMode = 'recursive-delete';
+      await db.recursiveDelete(userRef);
+    } else {
+      resetMode = 'manual-delete';
+      for (const collectionRef of collectionsForReset) {
+        await deleteCollectionDocuments(collectionRef);
+      }
+      await userRef.delete().catch(() => {});
+    }
+
+    // Defensive cleanup: if anything remains, remove it explicitly.
+    const remainingCollections = await userRef.listCollections();
+    for (const collectionRef of remainingCollections) {
+      const probe = await collectionRef.limit(1).get();
+      if (!probe.empty) {
+        postResetCollectionsWithDocs += 1;
+      }
+      await deleteCollectionDocuments(collectionRef);
+    }
+
+    await userRef.set(restoredProfile, { merge: false });
+    totalDocsDeleted = totalDocsMatched;
+    Object.keys(deletedByCollection).forEach((collectionName) => {
+      deletedByCollection[collectionName].deleted = deletedByCollection[collectionName].matched;
+    });
+  } else {
+    totalDocsDeleted = totalDocsMatched;
+  }
+
+  return {
+    appId,
+    userId,
+    userPath: userRef.path,
+    dryRun,
+    resetMode,
+    postResetCollectionsWithDocs,
+    deletedByCollection,
+    totalDocsMatched,
+    totalDocsDeleted
+  };
+}
+
+async function resetUserJourneyData(appId, userId, options = {}) {
+  const targetAppIds = await resolveArtifactAppIdsForReset(appId, {
+    includeAllApps: options.includeAllApps
+  });
+  const perApp = {};
+  let totalDocsMatched = 0;
+  let totalDocsDeleted = 0;
+
+  for (const targetAppId of targetAppIds) {
+    const appSummary = await resetUserJourneyDataForApp(targetAppId, userId, options);
+    perApp[targetAppId] = appSummary;
+    totalDocsMatched += Number(appSummary.totalDocsMatched || 0);
+    totalDocsDeleted += Number(appSummary.totalDocsDeleted || 0);
+  }
+
   const consultantUsageQuery = db.collection('ai_consultant_usage').where('userId', '==', userId);
   const consultantUsageSnapshot = await consultantUsageQuery.get();
   const consultantUsageMatched = consultantUsageSnapshot.size;
-  const consultantUsageDeleted = dryRun
+  const consultantUsageDeleted = Boolean(options.dryRun)
     ? consultantUsageMatched
     : consultantUsageMatched > 0
     ? await deleteQueryDocuments(consultantUsageQuery)
     : 0;
-
   totalDocsMatched += consultantUsageMatched;
   totalDocsDeleted += consultantUsageDeleted;
-  deletedByCollection.ai_consultant_usage = {
-    matched: consultantUsageMatched,
-    deleted: consultantUsageDeleted
-  };
-
-  if (!dryRun) {
-    const nowIso = new Date().toISOString();
-    await userRef.set(
-      {
-        importOperationsTotal: 0,
-        importedTransactionsTotal: 0,
-        manualTransactionsTotal: 0,
-        aiCategorizationRunsTotal: 0,
-        aiConsultantRunsTotal: 0,
-        lastDataResetAt: nowIso,
-        lastDataResetBy: resetBy
-      },
-      { merge: true }
-    );
-  }
 
   return {
     userId,
-    dryRun,
-    deletedByCollection,
+    dryRun: Boolean(options.dryRun),
+    targetAppIds,
+    perApp,
+    consultantUsage: {
+      matched: consultantUsageMatched,
+      deleted: consultantUsageDeleted
+    },
     totalDocsMatched,
     totalDocsDeleted
   };

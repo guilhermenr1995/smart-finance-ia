@@ -78,8 +78,13 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
   app.overlayView.show(`Importando ${accountType}...`);
 
   try {
-    await app.syncDataFromCloud({ force: true, showOverlay: false });
+    const synced = await app.syncDataFromCloud({ force: true, showOverlay: false });
+    if (!synced) {
+      throw new Error('Não foi possível sincronizar sua base antes da importação. Tente novamente em instantes.');
+    }
+
     const importBankAccount = normalizeBankAccountName(bankAccountName);
+    app.overlayView.log(`Base sincronizada com sucesso (${app.state.transactions.length} lançamento(s) atuais).`);
 
     const isPdfFile = /\.pdf$/i.test(file.name || '');
     const fileContent = isPdfFile ? await file.arrayBuffer() : await file.text();

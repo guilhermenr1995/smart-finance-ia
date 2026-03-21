@@ -113,7 +113,13 @@ export function isIncomeOrIgnoredStatement(value, title) {
 
 export function isIgnoredCreditEntry(value, title) {
   const normalizedTitle = normalizeTitleForMatching(title);
-  return value >= 0 || /\b(PAGAMENTO|ESTORNO|RECEBIDO|DEPOSITO|CREDITO)\b/.test(normalizedTitle);
+  const numericValue = Number(value);
+  const hasNeutralValue = !Number.isFinite(numericValue) || Math.abs(numericValue) < 0.00001;
+  if (hasNeutralValue) {
+    return true;
+  }
+
+  return /\b(PAGAMENTO|ESTORNO|RECEBIDO|DEPOSITO|CREDITO|CASHBACK|AJUSTE)\b/.test(normalizedTitle);
 }
 
 export function detectBaseCategory(title) {
