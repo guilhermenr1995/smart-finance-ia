@@ -1,7 +1,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { FieldValue, getFirestore } = require('firebase-admin/firestore');
+const { FieldPath, FieldValue, getFirestore } = require('firebase-admin/firestore');
 
 initializeApp();
 
@@ -666,6 +666,133 @@ async function resolveArtifactAppIdsForReset(primaryAppId, options = {}) {
   return [...appIds];
 }
 
+async function resetLegacyUserJourneyData(userId, options = {}) {
+  const dryRun = Boolean(options.dryRun);
+  const userRef = db.doc(`users/${userId}`);
+  const deletedByCollection = {};
+  let totalDocsMatched = 0;
+  let totalDocsDeleted = 0;
+
+  try {
+    const collections = await resolveUserCollectionsForReset(userRef);
+    for (const collectionRef of collections) {
+      const collectionName = collectionRef.id;
+      const snapshot = await collectionRef.get();
+      const matched = snapshot.size;
+      totalDocsMatched += matched;
+
+      deletedByCollection[collectionName] = {
+        matched,
+        deleted: dryRun ? matched : 0
+      };
+
+      if (!dryRun && matched > 0) {
+        const deleted = await deleteCollectionDocuments(collectionRef);
+        deletedByCollection[collectionName].deleted = deleted;
+        totalDocsDeleted += deleted;
+      }
+    }
+
+    if (!dryRun) {
+      await userRef.delete().catch(() => {});
+    } else {
+      totalDocsDeleted = totalDocsMatched;
+    }
+  } catch (error) {
+    console.warn(`Legacy journey reset failed for user ${userId}:`, error?.message || error);
+  }
+
+  return {
+    userPath: userRef.path,
+    deletedByCollection,
+    totalDocsMatched,
+    totalDocsDeleted
+  };
+}
+
+async function resolveUserIdsForJourneyReset(appId, rawUserId, rawEmail, options = {}) {
+  const resolvedUserIds = new Set();
+  const candidateUserId = sanitizeString(rawUserId, 180);
+  if (candidateUserId) {
+    resolvedUserIds.add(candidateUserId);
+  }
+
+  const targetAppIds = Array.isArray(options.targetAppIds) && options.targetAppIds.length > 0
+    ? [...new Set(options.targetAppIds.map((item) => String(item || '').trim()).filter(Boolean))]
+    : await resolveArtifactAppIdsForReset(appId, {
+        includeAllApps: options.includeAllApps
+      });
+
+  const rawEmailCandidate = sanitizeString(rawEmail, 220);
+  const normalizedEmailCandidate = toNormalizedEmail(rawEmailCandidate);
+  const candidateEmails = uniqueNonEmpty([rawEmailCandidate, normalizedEmailCandidate]);
+
+  if (normalizedEmailCandidate) {
+    try {
+      const authUser = await getAuth().getUserByEmail(normalizedEmailCandidate);
+      const authUid = sanitizeString(authUser?.uid, 180);
+      if (authUid) {
+        resolvedUserIds.add(authUid);
+      }
+    } catch (error) {
+      if (error?.code !== 'auth/user-not-found') {
+        console.warn('Unable to resolve auth uid for journey reset by email:', error?.message || error);
+      }
+    }
+  }
+
+  if (candidateEmails.length > 0 && targetAppIds.length > 0) {
+    for (const targetAppId of targetAppIds) {
+      const usersCollection = db.collection(`artifacts/${targetAppId}/users`);
+      for (const candidateEmail of candidateEmails) {
+        try {
+          const snapshot = await usersCollection.where('email', '==', candidateEmail).get();
+          snapshot.forEach((doc) => {
+            const uid = sanitizeString(doc?.id, 180);
+            if (uid) {
+              resolvedUserIds.add(uid);
+            }
+          });
+        } catch (error) {
+          console.warn(
+            `Unable to resolve user docs by email for journey reset in app ${targetAppId}:`,
+            error?.message || error
+          );
+        }
+      }
+    }
+  }
+
+  // Fallback for legacy docs where e-mail case differs from current auth profile.
+  // This avoids false negatives when only exact `where('email', '==', ...)` is used.
+  if (normalizedEmailCandidate && targetAppIds.length > 0) {
+    for (const targetAppId of targetAppIds) {
+      try {
+        const usersSnapshot = await db.collection(`artifacts/${targetAppId}/users`).select('email').get();
+        usersSnapshot.forEach((doc) => {
+          const docEmail = toNormalizedEmail(doc.data()?.email);
+          if (docEmail && docEmail === normalizedEmailCandidate) {
+            const uid = sanitizeString(doc.id, 180);
+            if (uid) {
+              resolvedUserIds.add(uid);
+            }
+          }
+        });
+      } catch (error) {
+        console.warn(
+          `Unable to resolve user docs by normalized email scan for journey reset in app ${targetAppId}:`,
+          error?.message || error
+        );
+      }
+    }
+  }
+
+  return {
+    targetAppIds,
+    userIds: [...resolvedUserIds]
+  };
+}
+
 async function resetUserJourneyDataForApp(appId, userId, options = {}) {
   const dryRun = Boolean(options.dryRun);
   const userRef = db.doc(`artifacts/${appId}/users/${userId}`);
@@ -739,9 +866,12 @@ async function resetUserJourneyDataForApp(appId, userId, options = {}) {
 }
 
 async function resetUserJourneyData(appId, userId, options = {}) {
-  const targetAppIds = await resolveArtifactAppIdsForReset(appId, {
-    includeAllApps: options.includeAllApps
-  });
+  const targetAppIds =
+    Array.isArray(options.targetAppIds) && options.targetAppIds.length > 0
+      ? [...new Set(options.targetAppIds.map((item) => String(item || '').trim()).filter(Boolean))]
+      : await resolveArtifactAppIdsForReset(appId, {
+          includeAllApps: options.includeAllApps
+        });
   const perApp = {};
   let totalDocsMatched = 0;
   let totalDocsDeleted = 0;
@@ -753,16 +883,56 @@ async function resetUserJourneyData(appId, userId, options = {}) {
     totalDocsDeleted += Number(appSummary.totalDocsDeleted || 0);
   }
 
-  const consultantUsageQuery = db.collection('ai_consultant_usage').where('userId', '==', userId);
-  const consultantUsageSnapshot = await consultantUsageQuery.get();
-  const consultantUsageMatched = consultantUsageSnapshot.size;
-  const consultantUsageDeleted = Boolean(options.dryRun)
-    ? consultantUsageMatched
-    : consultantUsageMatched > 0
-    ? await deleteQueryDocuments(consultantUsageQuery)
+  const consultantUsageByFieldQuery = db.collection('ai_consultant_usage').where('userId', '==', userId);
+  const consultantUsageByFieldSnapshot = await consultantUsageByFieldQuery.get();
+  const consultantUsageByFieldMatched = consultantUsageByFieldSnapshot.size;
+  const consultantUsageByFieldDeleted = Boolean(options.dryRun)
+    ? consultantUsageByFieldMatched
+    : consultantUsageByFieldMatched > 0
+    ? await deleteQueryDocuments(consultantUsageByFieldQuery)
     : 0;
-  totalDocsMatched += consultantUsageMatched;
-  totalDocsDeleted += consultantUsageDeleted;
+
+  let consultantUsageByDocIdMatched = 0;
+  let consultantUsageByDocIdDeleted = 0;
+  try {
+    const docIdPrefix = `${sanitizeString(userId, 200)}_`;
+    const consultantUsageByDocIdQuery = db
+      .collection('ai_consultant_usage')
+      .where(FieldPath.documentId(), '>=', docIdPrefix)
+      .where(FieldPath.documentId(), '<', `${docIdPrefix}\uf8ff`);
+    const consultantUsageByDocIdSnapshot = await consultantUsageByDocIdQuery.get();
+    consultantUsageByDocIdMatched = consultantUsageByDocIdSnapshot.docs.filter(
+      (doc) => !consultantUsageByFieldSnapshot.docs.some((existingDoc) => existingDoc.id === doc.id)
+    ).length;
+
+    if (!Boolean(options.dryRun) && consultantUsageByDocIdMatched > 0) {
+      const docIdsAlreadyHandled = new Set(consultantUsageByFieldSnapshot.docs.map((doc) => doc.id));
+      const extraDocRefs = consultantUsageByDocIdSnapshot.docs
+        .filter((doc) => !docIdsAlreadyHandled.has(doc.id))
+        .map((doc) => doc.ref);
+
+      const chunkSize = 400;
+      for (let index = 0; index < extraDocRefs.length; index += chunkSize) {
+        const chunk = extraDocRefs.slice(index, index + chunkSize);
+        const batch = db.batch();
+        chunk.forEach((ref) => batch.delete(ref));
+        await batch.commit();
+      }
+
+      consultantUsageByDocIdDeleted = extraDocRefs.length;
+    } else if (Boolean(options.dryRun)) {
+      consultantUsageByDocIdDeleted = consultantUsageByDocIdMatched;
+    }
+  } catch (error) {
+    console.warn('Unable to cleanup ai_consultant_usage by document id prefix:', error?.message || error);
+  }
+
+  const legacySummary = await resetLegacyUserJourneyData(userId, options);
+
+  const consultantUsageMatched = consultantUsageByFieldMatched + consultantUsageByDocIdMatched;
+  const consultantUsageDeleted = consultantUsageByFieldDeleted + consultantUsageByDocIdDeleted;
+  totalDocsMatched += consultantUsageMatched + Number(legacySummary.totalDocsMatched || 0);
+  totalDocsDeleted += consultantUsageDeleted + Number(legacySummary.totalDocsDeleted || 0);
 
   return {
     userId,
@@ -771,8 +941,17 @@ async function resetUserJourneyData(appId, userId, options = {}) {
     perApp,
     consultantUsage: {
       matched: consultantUsageMatched,
-      deleted: consultantUsageDeleted
+      deleted: consultantUsageDeleted,
+      byField: {
+        matched: consultantUsageByFieldMatched,
+        deleted: consultantUsageByFieldDeleted
+      },
+      byDocIdPrefix: {
+        matched: consultantUsageByDocIdMatched,
+        deleted: consultantUsageByDocIdDeleted
+      }
     },
+    legacy: legacySummary,
     totalDocsMatched,
     totalDocsDeleted
   };
@@ -2285,23 +2464,56 @@ exports.maintenanceResetUserJourney = onRequest(
       }
 
       const userId = String(request.body?.userId || '').trim();
-      if (!userId) {
+      const userEmail = String(request.body?.userEmail || '').trim();
+      if (!userId && !userEmail) {
         response.status(400).json({
-          error: 'userId is required'
+          error: 'userId or userEmail is required'
         });
         return;
       }
 
       const dryRun = Boolean(request.body?.dryRun);
       const startedAt = Date.now();
-      const summary = await resetUserJourneyData(appId, userId, {
-        dryRun,
-        resetBy: decodedToken.email || ''
+      const resolved = await resolveUserIdsForJourneyReset(appId, userId, userEmail, {
+        includeAllApps: true
       });
+      if (resolved.userIds.length === 0) {
+        response.status(404).json({
+          error: 'User not found',
+          message: 'No user matched the provided userId/userEmail.'
+        });
+        return;
+      }
+
+      const perUser = {};
+      let totalDocsMatched = 0;
+      let totalDocsDeleted = 0;
+      for (const resolvedUserId of resolved.userIds) {
+        const userSummary = await resetUserJourneyData(appId, resolvedUserId, {
+          dryRun,
+          resetBy: decodedToken.email || '',
+          includeAllApps: true,
+          targetAppIds: resolved.targetAppIds
+        });
+        perUser[resolvedUserId] = userSummary;
+        totalDocsMatched += Number(userSummary.totalDocsMatched || 0);
+        totalDocsDeleted += Number(userSummary.totalDocsDeleted || 0);
+      }
+
+      const summary = {
+        inputUserId: userId,
+        inputUserEmail: userEmail,
+        resolvedUserIds: resolved.userIds,
+        targetAppIds: resolved.targetAppIds,
+        perUser,
+        totalDocsMatched,
+        totalDocsDeleted
+      };
 
       response.status(200).json({
         appId,
-        userId,
+        userId: userId || resolved.userIds[0] || '',
+        userEmail,
         dryRun,
         triggeredBy: decodedToken.email || '',
         startedAt: new Date(startedAt).toISOString(),

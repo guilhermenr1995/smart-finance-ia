@@ -103,7 +103,15 @@ export function getTransactionTitleMatchKey(title) {
 
 export function generateTransactionHash({ date, title, value, accountType }) {
   const payload = `${date}_${title}_${Number(value).toFixed(2)}_${accountType}`;
-  return btoa(unescape(encodeURIComponent(payload)));
+  if (typeof globalThis.btoa === 'function') {
+    return globalThis.btoa(unescape(encodeURIComponent(payload)));
+  }
+
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(payload, 'utf8').toString('base64');
+  }
+
+  throw new Error('Unable to generate transaction hash in this environment.');
 }
 
 export function isIncomeOrIgnoredStatement(value, title) {

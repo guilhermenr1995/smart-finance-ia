@@ -7,7 +7,7 @@ function normalizeBankAccountName(value) {
 
 export class LocalCacheService {
   constructor(config = {}) {
-    this.keyPrefix = config.keyPrefix || 'smart-finance-cache-v1';
+    this.keyPrefix = config.keyPrefix || 'smart-finance-cache-v2';
     this.maxAgeMs = config.maxAgeMs || 1000 * 60 * 15;
   }
 

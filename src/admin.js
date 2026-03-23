@@ -357,6 +357,8 @@ class AdminDashboardApp {
     };
     this.usersMaintenanceRunning = new Set();
     this.usersMaintenanceStatusByUserId = new Map();
+    this.defaultGoogleLoginLabel = this.googleLoginButton?.innerText || 'Entrar com Google';
+    this.pendingGoogleLogin = false;
 
     if (this.usersPageSizeSelect) {
       this.usersPageSizeSelect.value = String(DEFAULT_USERS_PAGE_SIZE);
@@ -375,6 +377,13 @@ class AdminDashboardApp {
     }
 
     this.auth = this.firebase.auth();
+    try {
+      await this.auth.setPersistence(this.firebase.auth.Auth.Persistence.LOCAL);
+    } catch (error) {
+      console.warn('Unable to enforce local auth persistence on admin:', error);
+    }
+
+    await this.auth.getRedirectResult().catch(() => null);
     this.bindEvents();
     this.auth.onAuthStateChanged((user) => {
       this.handleAuthState(user);
@@ -383,20 +392,33 @@ class AdminDashboardApp {
 
   bindEvents() {
     this.googleLoginButton.addEventListener('click', async () => {
-      this.googleLoginButton.disabled = true;
-      this.showAuthMessage('Abrindo login Google...', 'info');
+      this.pendingGoogleLogin = true;
+      this.setGoogleLoginBusy(true, 'Abrindo login Google...');
       try {
         const provider = new this.firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         await this.auth.signInWithPopup(provider);
       } catch (error) {
-        this.showAuthMessage(error?.message || 'Falha ao autenticar com Google.', 'error');
-      } finally {
-        this.googleLoginButton.disabled = false;
+        if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/operation-not-supported-in-this-environment') {
+          try {
+            await this.auth.signInWithRedirect(new this.firebase.auth.GoogleAuthProvider());
+            return;
+          } catch (redirectError) {
+            this.showAuthMessage(redirectError?.message || 'Falha ao autenticar com Google.', 'error');
+          }
+        } else {
+          this.showAuthMessage(error?.message || 'Falha ao autenticar com Google.', 'error');
+        }
+
+        this.pendingGoogleLogin = false;
+        this.setGoogleLoginBusy(false);
       }
     });
 
     this.logoutButton.addEventListener('click', async () => {
       await this.auth.signOut();
+      this.pendingGoogleLogin = false;
+      this.setGoogleLoginBusy(false);
     });
 
     this.refreshButton.addEventListener('click', async () => {
@@ -548,6 +570,7 @@ class AdminDashboardApp {
         body: JSON.stringify({
           appId: this.config.appId,
           userId,
+          userEmail: String(user?.email || '').trim(),
           dryRun: false
         })
       });
@@ -648,6 +671,7 @@ class AdminDashboardApp {
         body: JSON.stringify({
           appId: this.config.appId,
           userId,
+          userEmail: String(user?.email || '').trim(),
           dryRun: false
         })
       });
@@ -665,10 +689,15 @@ class AdminDashboardApp {
       const summary = payload?.summary || {};
       const deletedDocs = toNumber(summary.totalDocsDeleted);
       const matchedDocs = toNumber(summary.totalDocsMatched);
+      const resolvedUserIds = Array.isArray(summary.resolvedUserIds) ? summary.resolvedUserIds : [];
+      const resolvedLabel =
+        resolvedUserIds.length > 1 ? ` (${formatInteger(resolvedUserIds.length)} IDs relacionados limpos)` : '';
       const message =
         deletedDocs > 0
-          ? `Jornada resetada com sucesso. ${formatInteger(deletedDocs)} registro(s) removido(s).`
-          : `Jornada resetada com sucesso. Nenhum registro para remover (${formatInteger(matchedDocs)} item(ns) analisados).`;
+          ? `Jornada resetada com sucesso. ${formatInteger(deletedDocs)} registro(s) removido(s)${resolvedLabel}.`
+          : `Jornada resetada com sucesso. Nenhum registro para remover (${formatInteger(
+              matchedDocs
+            )} item(ns) analisados)${resolvedLabel}.`;
 
       this.usersMaintenanceStatusByUserId.set(userId, {
         type: 'success',
@@ -698,6 +727,20 @@ class AdminDashboardApp {
     this.authMessage.innerText = message;
   }
 
+  setGoogleLoginBusy(isBusy, message = '') {
+    if (!this.googleLoginButton) {
+      return;
+    }
+
+    this.googleLoginButton.disabled = isBusy;
+    this.googleLoginButton.classList.toggle('admin-google-loading', isBusy);
+    this.googleLoginButton.innerText = isBusy ? 'Conectando...' : this.defaultGoogleLoginLabel;
+
+    if (isBusy) {
+      this.showAuthMessage(message || 'Conectando com Google...', 'info');
+    }
+  }
+
   clearAuthMessage() {
     this.authMessage.innerText = '';
     this.authMessage.dataset.type = '';
@@ -709,6 +752,8 @@ class AdminDashboardApp {
       this.authScreen.classList.remove('hidden');
       this.appScreen.classList.add('hidden');
       this.clearAuthMessage();
+      this.pendingGoogleLogin = false;
+      this.setGoogleLoginBusy(false);
       return;
     }
 
@@ -720,11 +765,15 @@ class AdminDashboardApp {
       this.accessDeniedPanel.classList.remove('hidden');
       this.loadingPanel.classList.add('hidden');
       this.dashboardContent.classList.add('hidden');
+      this.pendingGoogleLogin = false;
+      this.setGoogleLoginBusy(false);
       return;
     }
 
     this.accessDeniedPanel.classList.add('hidden');
     await this.loadAdminDashboard(user);
+    this.pendingGoogleLogin = false;
+    this.setGoogleLoginBusy(false);
   }
 
   async loadAdminDashboard(user) {

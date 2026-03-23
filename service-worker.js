@@ -1,4 +1,5 @@
-const CACHE_NAME = 'smart-finance-shell-v10';
+const CACHE_NAME = 'smart-finance-shell-v11';
+const NETWORK_FIRST_DESTINATIONS = new Set(['document', 'script', 'style', 'manifest']);
 
 const APP_SHELL_FILES = [
   './',
@@ -43,6 +44,12 @@ self.addEventListener('install', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -68,7 +75,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (event.request.mode === 'navigate') {
+  if (shouldUseNetworkFirst(event.request)) {
     event.respondWith(networkFirst(event.request));
     return;
   }
@@ -76,11 +83,29 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(cacheFirst(event.request));
 });
 
+function shouldUseNetworkFirst(request) {
+  if (request.mode === 'navigate') {
+    return true;
+  }
+
+  const destination = String(request.destination || '').toLowerCase();
+  if (NETWORK_FIRST_DESTINATIONS.has(destination)) {
+    return true;
+  }
+
+  const requestPath = new URL(request.url).pathname;
+  return (
+    requestPath.endsWith('.js') ||
+    requestPath.endsWith('.css') ||
+    requestPath.endsWith('.html') ||
+    requestPath.endsWith('.webmanifest')
+  );
+}
+
 async function networkFirst(request) {
   try {
     const networkResponse = await fetch(request);
-    const cache = await caches.open(CACHE_NAME);
-    cache.put(request, networkResponse.clone());
+    await cacheIfValid(request, networkResponse);
     return networkResponse;
   } catch (error) {
     const cachedResponse = await caches.match(request);
@@ -95,7 +120,15 @@ async function cacheFirst(request) {
   }
 
   const networkResponse = await fetch(request);
-  const cache = await caches.open(CACHE_NAME);
-  cache.put(request, networkResponse.clone());
+  await cacheIfValid(request, networkResponse);
   return networkResponse;
+}
+
+async function cacheIfValid(request, response) {
+  if (!response || response.status !== 200) {
+    return;
+  }
+
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, response.clone());
 }

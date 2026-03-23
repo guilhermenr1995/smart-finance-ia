@@ -18,6 +18,14 @@ export class AuthView {
     this.authStatus = document.getElementById('auth-status');
     this.userEmail = document.getElementById('user-email');
     this.message = document.getElementById('auth-message');
+    this.loadingIndicator = document.getElementById('auth-loading-indicator');
+    this.loadingText = document.getElementById('auth-loading-text');
+    this.defaultButtonLabels = {
+      login: this.loginButton?.innerText || 'Entrar',
+      register: this.registerButton?.innerText || 'Criar conta',
+      google: this.googleButton?.innerText || 'Google',
+      resetPassword: this.resetPasswordButton?.innerText || 'Esqueci senha'
+    };
   }
 
   bindEvents(handlers) {
@@ -77,7 +85,7 @@ export class AuthView {
     this.userEmail.innerText = 'Faça login para acessar seus dados';
   }
 
-  setBusy(isBusy) {
+  setBusy(isBusy, options = {}) {
     const controls = [
       this.loginButton,
       this.registerButton,
@@ -91,6 +99,37 @@ export class AuthView {
     controls.forEach((element) => {
       element.disabled = isBusy;
     });
+
+    const action = String(options?.action || '').trim().toLowerCase();
+    if (isBusy) {
+      this.loginButton.innerText = action === 'login' ? 'Entrando...' : this.defaultButtonLabels.login;
+      this.registerButton.innerText = action === 'register' ? 'Criando...' : this.defaultButtonLabels.register;
+      this.googleButton.innerText = action === 'google' ? 'Conectando...' : this.defaultButtonLabels.google;
+      this.resetPasswordButton.innerText =
+        action === 'reset-password' ? 'Enviando...' : this.defaultButtonLabels.resetPassword;
+      this.authForm.classList.add('auth-form-busy');
+
+      const loadingMessage = String(options?.message || 'Processando autenticação...').trim();
+      if (this.loadingIndicator) {
+        this.loadingIndicator.classList.remove('hidden');
+      }
+      if (this.loadingText) {
+        this.loadingText.innerText = loadingMessage || 'Processando autenticação...';
+      }
+      if (loadingMessage) {
+        this.showMessage(loadingMessage, 'info');
+      }
+      return;
+    }
+
+    this.loginButton.innerText = this.defaultButtonLabels.login;
+    this.registerButton.innerText = this.defaultButtonLabels.register;
+    this.googleButton.innerText = this.defaultButtonLabels.google;
+    this.resetPasswordButton.innerText = this.defaultButtonLabels.resetPassword;
+    this.authForm.classList.remove('auth-form-busy');
+    if (this.loadingIndicator) {
+      this.loadingIndicator.classList.add('hidden');
+    }
   }
 
   showMessage(text, type = 'info') {

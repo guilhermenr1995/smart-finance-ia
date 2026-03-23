@@ -16,6 +16,7 @@ service cloud.firestore {
     function hasValidTransactionShape(data) {
       return data.keys().hasOnly([
           'hash',
+          'dedupKey',
           'date',
           'title',
           'value',
@@ -31,6 +32,7 @@ service cloud.firestore {
           'lastCategoryUpdateAt'
         ])
         && data.hash is string
+        && (!('dedupKey' in data) || (data.dedupKey is string && data.dedupKey.size() > 0 && data.dedupKey.size() <= 320))
         && data.date is string
         && data.title is string
         && data.title.size() > 0
@@ -145,12 +147,11 @@ service cloud.firestore {
 
       allow update: if isOwner(userId)
         && hasValidTransactionShape(request.resource.data)
-        && request.resource.data.hash == resource.data.hash
         && request.resource.data.date == resource.data.date
         && request.resource.data.value == resource.data.value
         && request.resource.data.accountType == resource.data.accountType
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy)
+        && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
 
       allow delete: if isOwner(userId);
     }

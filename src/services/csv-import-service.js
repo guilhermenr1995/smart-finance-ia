@@ -1,4 +1,4 @@
-import { parseCsvLine, parseLocaleNumber, splitCsvLines, normalizeCsvHeader } from '../utils/csv-utils.js';
+import { detectCsvDelimiter, parseCsvLine, parseLocaleNumber, splitCsvLines, normalizeCsvHeader } from '../utils/csv-utils.js';
 import {
   detectBaseCategory,
   generateTransactionDedupKey,
@@ -56,6 +56,83 @@ function parseOfxAmount(rawValue) {
   }
 
   return Number.parseFloat(normalized);
+}
+
+function normalizeHeaderCell(value) {
+  return normalizeCsvHeader(String(value || ''))
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findHeaderIndex(normalizedHeaders, aliases = []) {
+  const normalizedAliases = aliases.map((item) => normalizeHeaderCell(item)).filter(Boolean);
+  if (!Array.isArray(normalizedHeaders) || normalizedAliases.length === 0) {
+    return -1;
+  }
+
+  for (const alias of normalizedAliases) {
+    const exactMatchIndex = normalizedHeaders.findIndex((header) => header === alias);
+    if (exactMatchIndex !== -1) {
+      return exactMatchIndex;
+    }
+  }
+
+  for (const alias of normalizedAliases) {
+    const partialMatchIndex = normalizedHeaders.findIndex((header) => header.includes(alias) || alias.includes(header));
+    if (partialMatchIndex !== -1) {
+      return partialMatchIndex;
+    }
+  }
+
+  return -1;
+}
+
+function uniqueIndexes(indexes = [], columnsLength = 0) {
+  return [...new Set(indexes)]
+    .filter((index) => Number.isInteger(index))
+    .filter((index) => index >= 0 && index < columnsLength);
+}
+
+function normalizeImportedDate(rawDate) {
+  const value = String(rawDate || '').trim();
+  if (!value) {
+    return '';
+  }
+
+  const isoLike = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoLike) {
+    const year = Number.parseInt(isoLike[1], 10);
+    const month = Number.parseInt(isoLike[2], 10);
+    const day = Number.parseInt(isoLike[3], 10);
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  const brLike = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+.*)?$/);
+  if (brLike) {
+    const day = Number.parseInt(brLike[1], 10);
+    const month = Number.parseInt(brLike[2], 10);
+    const rawYear = Number.parseInt(brLike[3], 10);
+    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const year = String(parsed.getFullYear()).padStart(4, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeSignalText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
 }
 
 function normalizeForPdfMatching(value) {
@@ -141,28 +218,64 @@ export class CsvImportService {
     if (lines.length <= 1) {
       return {
         transactions: [],
-        skipped: 0
+        skipped: 0,
+        diagnostics: {
+          sourceType: 'csv',
+          delimiter: ',',
+          totalRows: 0,
+          importedRows: 0,
+          skippedRows: 0,
+          skippedInvalidRows: 0,
+          skippedIgnoredRows: 0,
+          skippedDuplicateRows: 0
+        }
       };
     }
 
-    const header = normalizeCsvHeader(lines[0]);
-    const isCheckingAccountStatement = header.includes('identificador');
+    const delimiter = detectCsvDelimiter(lines);
+    const headerColumns = parseCsvLine(lines[0], delimiter).map((cell) => cell.replace(/^"|"$/g, '').trim());
+    const header = normalizeCsvHeader(headerColumns.join(' '));
+    const forceCheckingByAccountType = String(accountType || '').trim() !== 'Crédito';
+    const isCheckingAccountStatement =
+      forceCheckingByAccountType ||
+      header.includes('identificador') ||
+      /\b(saldo|debito|débito|credito|crédito|conta corrente|movimentacao|movimentação)\b/i.test(header);
+    const csvLayout = this.resolveCsvLayout(headerColumns, isCheckingAccountStatement);
     const transactions = [];
     let skipped = 0;
+    let skippedInvalidRows = 0;
+    let skippedIgnoredRows = 0;
+    let skippedDuplicateRows = 0;
 
     for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
-      const columns = parseCsvLine(lines[lineIndex]).map((cell) => cell.replace(/^"|"$/g, '').trim());
+      const columns = parseCsvLine(lines[lineIndex], delimiter).map((cell) => cell.replace(/^"|"$/g, '').trim());
       if (columns.length < this.minimumColumns) {
         skipped += 1;
+        skippedInvalidRows += 1;
         continue;
       }
 
       const parsed = isCheckingAccountStatement
-        ? this.parseCheckingAccountLine(columns, accountType)
-        : this.parseCreditCardLine(columns, accountType);
+        ? this.parseCheckingAccountLine(columns, accountType, csvLayout)
+        : this.parseCreditCardLine(columns, accountType, csvLayout);
 
       if (!parsed) {
         skipped += 1;
+        const candidateValue = isCheckingAccountStatement
+          ? this.resolveValueFromColumns(columns, [csvLayout.valueIndex, 1, 2, 3])
+          : this.resolveValueFromColumns(columns, [csvLayout.valueIndex, 2, 3, 1]);
+        const candidateTitle = isCheckingAccountStatement
+          ? this.resolveTextFromColumns(columns, [csvLayout.titleIndex, 3, 2, 1], '')
+          : this.resolveTextFromColumns(columns, [csvLayout.titleIndex, 1, 2], '');
+        const ignoredByBusinessRule = isCheckingAccountStatement
+          ? !Number.isNaN(candidateValue) && isIncomeOrIgnoredStatement(candidateValue, candidateTitle)
+          : !Number.isNaN(candidateValue) && isIgnoredCreditEntry(candidateValue, candidateTitle);
+
+        if (ignoredByBusinessRule) {
+          skippedIgnoredRows += 1;
+        } else {
+          skippedInvalidRows += 1;
+        }
         continue;
       }
 
@@ -170,6 +283,7 @@ export class CsvImportService {
       const dedupKey = generateTransactionDedupKey(parsed);
       if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
+        skippedDuplicateRows += 1;
         continue;
       }
 
@@ -185,7 +299,27 @@ export class CsvImportService {
 
     return {
       transactions,
-      skipped
+      skipped,
+      diagnostics: {
+        sourceType: 'csv',
+        delimiter,
+        fieldMapping: {
+          dateIndex: csvLayout.dateIndex,
+          titleIndex: csvLayout.titleIndex,
+          valueIndex: csvLayout.valueIndex,
+          identifierIndex: csvLayout.identifierIndex,
+          typeIndex: csvLayout.typeIndex,
+          debitIndex: csvLayout.debitIndex,
+          creditIndex: csvLayout.creditIndex,
+          parseMode: isCheckingAccountStatement ? 'checking' : 'credit'
+        },
+        totalRows: Math.max(0, lines.length - 1),
+        importedRows: transactions.length,
+        skippedRows: skipped,
+        skippedInvalidRows,
+        skippedIgnoredRows,
+        skippedDuplicateRows
+      }
     };
   }
 
@@ -194,12 +328,24 @@ export class CsvImportService {
     if (blocks.length === 0) {
       return {
         transactions: [],
-        skipped: 0
+        skipped: 0,
+        diagnostics: {
+          sourceType: 'ofx',
+          totalRows: 0,
+          importedRows: 0,
+          skippedRows: 0,
+          skippedInvalidRows: 0,
+          skippedIgnoredRows: 0,
+          skippedDuplicateRows: 0
+        }
       };
     }
 
     const transactions = [];
     let skipped = 0;
+    let skippedInvalidRows = 0;
+    let skippedIgnoredRows = 0;
+    let skippedDuplicateRows = 0;
 
     blocks.forEach((block) => {
       const date = parseOfxDate(extractOfxTagValue(block, 'DTPOSTED'));
@@ -212,6 +358,7 @@ export class CsvImportService {
 
       if (!date || Number.isNaN(value)) {
         skipped += 1;
+        skippedInvalidRows += 1;
         return;
       }
 
@@ -220,6 +367,7 @@ export class CsvImportService {
 
       if (shouldIgnore) {
         skipped += 1;
+        skippedIgnoredRows += 1;
         return;
       }
 
@@ -236,6 +384,7 @@ export class CsvImportService {
       const dedupKey = generateTransactionDedupKey(parsed);
       if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
+        skippedDuplicateRows += 1;
         return;
       }
 
@@ -251,7 +400,16 @@ export class CsvImportService {
 
     return {
       transactions,
-      skipped
+      skipped,
+      diagnostics: {
+        sourceType: 'ofx',
+        totalRows: blocks.length,
+        importedRows: transactions.length,
+        skippedRows: skipped,
+        skippedInvalidRows,
+        skippedIgnoredRows,
+        skippedDuplicateRows
+      }
     };
   }
 
@@ -290,6 +448,9 @@ export class CsvImportService {
     const inferredYear = this.resolvePdfYear(fileName, allLines);
     const transactions = [];
     let skipped = 0;
+    let skippedInvalidRows = 0;
+    let skippedIgnoredRows = 0;
+    let skippedDuplicateRows = 0;
 
     for (let lineIndex = 0; lineIndex < allLines.length; lineIndex += 1) {
       const currentLine = allLines[lineIndex];
@@ -305,6 +466,7 @@ export class CsvImportService {
 
       if (!candidate) {
         skipped += 1;
+        skippedInvalidRows += 1;
         continue;
       }
 
@@ -315,6 +477,7 @@ export class CsvImportService {
 
       if (shouldIgnore) {
         skipped += 1;
+        skippedIgnoredRows += 1;
         continue;
       }
 
@@ -331,6 +494,7 @@ export class CsvImportService {
       const dedupKey = generateTransactionDedupKey(parsed);
       if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
         skipped += 1;
+        skippedDuplicateRows += 1;
         continue;
       }
 
@@ -346,7 +510,16 @@ export class CsvImportService {
 
     return {
       transactions,
-      skipped
+      skipped,
+      diagnostics: {
+        sourceType: 'pdf',
+        totalRows: allLines.length,
+        importedRows: transactions.length,
+        skippedRows: skipped,
+        skippedInvalidRows,
+        skippedIgnoredRows,
+        skippedDuplicateRows
+      }
     };
   }
 
@@ -476,31 +649,195 @@ export class CsvImportService {
     };
   }
 
-  parseCheckingAccountLine(columns, accountType) {
-    const date = columns[0];
-    const value = parseLocaleNumber(columns[1]);
-    const title = columns[3] || columns[2] || 'Sem título';
+  resolveCsvLayout(headerColumns, isCheckingAccountStatement) {
+    const normalizedHeaders = (Array.isArray(headerColumns) ? headerColumns : []).map((cell) => normalizeHeaderCell(cell));
+    const dateIndex = findHeaderIndex(normalizedHeaders, [
+      'data',
+      'date',
+      'dt',
+      'posted date',
+      'transaction date',
+      'data da transacao',
+      'data da transação',
+      'data de compra'
+    ]);
+    const titleIndex = findHeaderIndex(normalizedHeaders, [
+      'descricao',
+      'descrição',
+      'historico',
+      'histórico',
+      'detalhes',
+      'title',
+      'titulo',
+      'título',
+      'merchant',
+      'estabelecimento',
+      'nome'
+    ]);
+    const valueIndex = findHeaderIndex(normalizedHeaders, [
+      'valor',
+      'amount',
+      'price',
+      'preco',
+      'preço',
+      'total',
+      'valor r$',
+      'valor da transacao',
+      'valor da transação'
+    ]);
+    const identifierIndex = findHeaderIndex(normalizedHeaders, [
+      'identificador',
+      'id',
+      'id transacao',
+      'id transação',
+      'transaction id',
+      'fitid'
+    ]);
+    const typeIndex = findHeaderIndex(normalizedHeaders, [
+      'tipo',
+      'natureza',
+      'tipo lancamento',
+      'tipo lançamento',
+      'tipo movimentacao',
+      'tipo movimentação',
+      'debito credito',
+      'd c',
+      'dc'
+    ]);
+    const debitIndex = findHeaderIndex(normalizedHeaders, [
+      'debito',
+      'débito',
+      'valor debito',
+      'valor débito',
+      'saida',
+      'saída'
+    ]);
+    const creditIndex = findHeaderIndex(normalizedHeaders, [
+      'credito',
+      'crédito',
+      'valor credito',
+      'valor crédito',
+      'entrada'
+    ]);
 
-    if (Number.isNaN(value) || isIncomeOrIgnoredStatement(value, title)) {
+    return {
+      dateIndex: dateIndex >= 0 ? dateIndex : 0,
+      titleIndex: titleIndex >= 0 ? titleIndex : isCheckingAccountStatement ? 3 : 1,
+      valueIndex: valueIndex >= 0 ? valueIndex : isCheckingAccountStatement ? 1 : 2,
+      identifierIndex,
+      typeIndex,
+      debitIndex,
+      creditIndex
+    };
+  }
+
+  resolveTextFromColumns(columns, preferredIndexes = [], fallback = '') {
+    const indexes = uniqueIndexes(preferredIndexes, columns.length);
+    for (const index of indexes) {
+      const value = String(columns[index] || '').trim();
+      if (value) {
+        return value;
+      }
+    }
+
+    return String(fallback || '').trim();
+  }
+
+  resolveValueFromColumns(columns, preferredIndexes = [], options = {}) {
+    const fallbackToAnyColumn = options.fallbackToAnyColumn !== false;
+    const indexes = uniqueIndexes(
+      fallbackToAnyColumn ? [...preferredIndexes, ...columns.map((_, index) => index)] : preferredIndexes,
+      columns.length
+    );
+    const dateLikePattern = /^\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?$/;
+    for (const index of indexes) {
+      const raw = String(columns[index] || '').trim();
+      if (!raw || dateLikePattern.test(raw)) {
+        continue;
+      }
+
+      const parsed = parseLocaleNumber(raw);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return Number.NaN;
+  }
+
+  resolveSignedCheckingValue(columns, csvLayout, value, title) {
+    const debitColumnValue = this.resolveValueFromColumns(columns, [csvLayout.debitIndex], {
+      fallbackToAnyColumn: false
+    });
+    if (Number.isFinite(debitColumnValue) && Math.abs(debitColumnValue) > 0.00001) {
+      return -Math.abs(debitColumnValue);
+    }
+
+    const creditColumnValue = this.resolveValueFromColumns(columns, [csvLayout.creditIndex], {
+      fallbackToAnyColumn: false
+    });
+    if (Number.isFinite(creditColumnValue) && Math.abs(creditColumnValue) > 0.00001) {
+      return Math.abs(creditColumnValue);
+    }
+
+    let signedValue = Number(value);
+    if (!Number.isFinite(signedValue)) {
+      return Number.NaN;
+    }
+
+    const typeToken = normalizeSignalText(this.resolveTextFromColumns(columns, [csvLayout.typeIndex], ''));
+    const rowToken = normalizeSignalText(columns.join(' '));
+    const titleToken = normalizeSignalText(title);
+    const signalToken = `${typeToken} ${titleToken} ${rowToken}`;
+
+    if (/\b(D|DEBITO|DEBIT|SAIDA|SAQUE)\b/.test(typeToken)) {
+      signedValue = -Math.abs(signedValue);
+      return signedValue;
+    }
+
+    if (/\b(C|CREDITO|CREDIT|ENTRADA)\b/.test(typeToken)) {
+      signedValue = Math.abs(signedValue);
+      return signedValue;
+    }
+
+    if (
+      /\b(PIX ENVIAD|TRANSFERENCIA ENVIAD|TRANSFERENCIA|COMPRA|PAGAMENTO|DEBITO|TED ENVIAD|DOC ENVIAD|SAQUE|TARIFA|IOF|JUROS|ENCARGO|BOLETO)\b/.test(
+        signalToken
+      )
+    ) {
+      signedValue = -Math.abs(signedValue);
+      return signedValue;
+    }
+
+    return signedValue;
+  }
+
+  parseCheckingAccountLine(columns, accountType, csvLayout = {}) {
+    const date = normalizeImportedDate(this.resolveTextFromColumns(columns, [csvLayout.dateIndex, 0], ''));
+    const value = this.resolveValueFromColumns(columns, [csvLayout.valueIndex, 1, 2, 3]);
+    const title = this.resolveTextFromColumns(columns, [csvLayout.titleIndex, 3, 2, 1], 'Sem título');
+    const signedValue = this.resolveSignedCheckingValue(columns, csvLayout, value, title);
+
+    if (!date || Number.isNaN(signedValue) || isIncomeOrIgnoredStatement(signedValue, title)) {
       return null;
     }
 
     return {
       date,
       title,
-      value: Math.abs(value),
+      value: Math.abs(signedValue),
       category: detectBaseCategory(title),
       accountType,
       bankAccount: DEFAULT_BANK_ACCOUNT
     };
   }
 
-  parseCreditCardLine(columns, accountType) {
-    const date = columns[0];
-    const title = columns[1] || 'Sem título';
-    const value = parseLocaleNumber(columns[2]);
+  parseCreditCardLine(columns, accountType, csvLayout = {}) {
+    const date = normalizeImportedDate(this.resolveTextFromColumns(columns, [csvLayout.dateIndex, 0], ''));
+    const title = this.resolveTextFromColumns(columns, [csvLayout.titleIndex, 1, 2, 3], 'Sem título');
+    const value = this.resolveValueFromColumns(columns, [csvLayout.valueIndex, 2, 3, 1]);
 
-    if (Number.isNaN(value) || isIgnoredCreditEntry(value, title)) {
+    if (!date || Number.isNaN(value) || isIgnoredCreditEntry(value, title)) {
       return null;
     }
 

@@ -29,13 +29,20 @@ export function parseDateFlexible(rawValue) {
     return new Date();
   }
 
-  if (value.includes('-')) {
-    const [year, month, day] = value.split('-').map(Number);
+  const isoLike = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoLike) {
+    const year = Number.parseInt(isoLike[1], 10);
+    const month = Number.parseInt(isoLike[2], 10);
+    const day = Number.parseInt(isoLike[3], 10);
     return new Date(year, month - 1, day, 12, 0, 0, 0);
   }
 
-  if (value.includes('/')) {
-    const [day, month, year] = value.split('/').map(Number);
+  const brLike = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+.*)?$/);
+  if (brLike) {
+    const day = Number.parseInt(brLike[1], 10);
+    const month = Number.parseInt(brLike[2], 10);
+    const rawYear = Number.parseInt(brLike[3], 10);
+    const year = rawYear < 100 ? 2000 + rawYear : rawYear;
     return new Date(year, month - 1, day, 12, 0, 0, 0);
   }
 

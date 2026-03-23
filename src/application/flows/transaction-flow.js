@@ -103,11 +103,47 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
       }
     });
     const parseResult = await app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
+    const diagnostics = parseResult?.diagnostics || {};
     const importedAt = new Date().toISOString();
 
     if (parseResult.transactions.length === 0) {
       app.overlayView.log('Nenhuma transação nova foi identificada.');
       app.overlayView.log(`Itens ignorados: ${parseResult.skipped}`);
+      if (diagnostics && typeof diagnostics === 'object') {
+        const delimiter = diagnostics.delimiter === '\t' ? 'TAB' : diagnostics.delimiter || '-';
+        const totalRows = Number(diagnostics.totalRows || 0);
+        const skippedInvalidRows = Number(diagnostics.skippedInvalidRows || 0);
+        const skippedIgnoredRows = Number(diagnostics.skippedIgnoredRows || 0);
+        const skippedDuplicateRows = Number(diagnostics.skippedDuplicateRows || 0);
+        const fieldMapping = diagnostics.fieldMapping || {};
+        app.overlayView.log(
+          `Diagnóstico: origem=${diagnostics.sourceType || '-'} | delimitador=${delimiter} | válidas=${Number(
+            diagnostics.importedRows || 0
+          )}`
+        );
+        if (diagnostics.sourceType === 'csv') {
+          const parseMode = String(fieldMapping.parseMode || '-').trim();
+          const toColumnLabel = (value) => {
+            const index = Number(value);
+            return Number.isInteger(index) && index >= 0 ? String(index + 1) : '-';
+          };
+          app.overlayView.log(
+            `Mapeamento CSV: data=${toColumnLabel(fieldMapping.dateIndex)} | descrição=${toColumnLabel(
+              fieldMapping.titleIndex
+            )} | valor=${toColumnLabel(fieldMapping.valueIndex)} | modo=${parseMode}`
+          );
+        }
+        app.overlayView.log(
+          `Descartes: inválidas=${skippedInvalidRows} | regra negócio=${skippedIgnoredRows} | duplicadas=${skippedDuplicateRows}`
+        );
+        if (totalRows > 0 && skippedInvalidRows === totalRows) {
+          app.overlayView.log('Dica: o formato do CSV não foi reconhecido. Tente exportar novamente ou usar OFX/PDF.');
+        } else if (totalRows > 0 && skippedIgnoredRows === totalRows) {
+          app.overlayView.log('Dica: os lançamentos foram lidos como receitas/estornos e foram descartados pelas regras.');
+        } else if (totalRows > 0 && skippedDuplicateRows === totalRows) {
+          app.overlayView.log('Dica: todos os itens já existem na base (mesma descrição, data e valor).');
+        }
+      }
       setTimeout(() => app.overlayView.hide(), 1000);
       return;
     }
@@ -174,6 +210,13 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     app.overlayView.log(
       `Importação concluída: ${transactionsToInsert.length} novos lançamentos na conta "${importBankAccount}", ${parseResult.skipped} ignorados.`
     );
+    if (diagnostics && typeof diagnostics === 'object') {
+      app.overlayView.log(
+        `Detalhe ignorados: inválidas=${Number(diagnostics.skippedInvalidRows || 0)} | regra negócio=${Number(
+          diagnostics.skippedIgnoredRows || 0
+        )} | duplicadas=${Number(diagnostics.skippedDuplicateRows || 0)}`
+      );
+    }
     setTimeout(() => app.overlayView.hide(), 900);
   } catch (error) {
     app.overlayView.showError(app.normalizeError(error));

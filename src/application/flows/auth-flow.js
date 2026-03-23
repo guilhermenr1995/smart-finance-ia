@@ -23,6 +23,7 @@ export async function handleAuthState(app, user) {
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
     app.state.setAiConsultantHistory([]);
     app.refreshDashboard();
+    app.authView.setBusy(false);
     return;
   }
 
@@ -49,56 +50,98 @@ export async function handleAuthState(app, user) {
 
   const shouldSyncCloud = !app.localCacheService.isFresh(cached.lastSyncedAt);
   await app.syncDataFromCloud({ force: shouldSyncCloud, showOverlay: shouldSyncCloud });
+  app.authView.setBusy(false);
 }
 
-export async function runAuthOperation(app, action) {
-  app.authView.setBusy(true);
+export async function runAuthOperation(app, action, options = {}) {
+  app.authView.setBusy(true, options);
+  let succeeded = false;
   try {
     await action();
+    succeeded = true;
     app.authView.clearMessage();
   } catch (error) {
     app.authView.showMessage(normalizeAuthError(app, error), 'error');
   } finally {
-    app.authView.setBusy(false);
+    const holdBusyUntilAuthState = Boolean(options?.holdBusyUntilAuthState);
+    if (!holdBusyUntilAuthState || !succeeded) {
+      app.authView.setBusy(false);
+    }
   }
 }
 
 export async function handleEmailLogin(app, { email, password }) {
-  await runAuthOperation(app, async () => {
-    assertEmailAndPassword(email, password);
-    await app.authService.signInWithEmail(email, password);
-  });
+  await runAuthOperation(
+    app,
+    async () => {
+      assertEmailAndPassword(email, password);
+      await app.authService.signInWithEmail(email, password);
+    },
+    {
+      action: 'login',
+      message: 'Entrando na sua conta...'
+    }
+  );
 }
 
 export async function handleEmailRegister(app, { email, password }) {
-  await runAuthOperation(app, async () => {
-    assertEmailAndPassword(email, password);
-    await app.authService.registerWithEmail(email, password);
-    app.authView.showMessage('Conta criada com sucesso.', 'success');
-  });
+  await runAuthOperation(
+    app,
+    async () => {
+      assertEmailAndPassword(email, password);
+      await app.authService.registerWithEmail(email, password);
+      app.authView.showMessage('Conta criada com sucesso.', 'success');
+    },
+    {
+      action: 'register',
+      message: 'Criando sua conta...'
+    }
+  );
 }
 
 export async function handleGoogleLogin(app) {
-  await runAuthOperation(app, async () => {
-    await app.authService.signInWithGoogle();
-  });
+  await runAuthOperation(
+    app,
+    async () => {
+      await app.authService.signInWithGoogle();
+    },
+    {
+      action: 'google',
+      message: 'Abrindo login do Google...',
+      holdBusyUntilAuthState: true
+    }
+  );
 }
 
 export async function handlePasswordReset(app, email) {
-  await runAuthOperation(app, async () => {
-    if (!email) {
-      throw new Error('Informe seu e-mail para redefinir a senha.');
-    }
+  await runAuthOperation(
+    app,
+    async () => {
+      if (!email) {
+        throw new Error('Informe seu e-mail para redefinir a senha.');
+      }
 
-    await app.authService.sendPasswordReset(email);
-    app.authView.showMessage('E-mail de redefinição enviado.', 'success');
-  });
+      await app.authService.sendPasswordReset(email);
+      app.authView.showMessage('E-mail de redefinição enviado.', 'success');
+    },
+    {
+      action: 'reset-password',
+      message: 'Enviando e-mail de redefinição...'
+    }
+  );
 }
 
 export async function handleLogout(app) {
-  await runAuthOperation(app, async () => {
-    await app.authService.signOut();
-  });
+  await runAuthOperation(
+    app,
+    async () => {
+      await app.authService.signOut();
+    },
+    {
+      action: 'logout',
+      message: 'Encerrando sua sessão...'
+    }
+  );
 }
 
 export function assertEmailAndPassword(email, password) {

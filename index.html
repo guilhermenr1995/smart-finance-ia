@@ -47,7 +47,7 @@
           </div>
         </aside>
 
-        <div class="auth-card neo-brutalism p-8 lg:p-10">
+        <div class="auth-card relative neo-brutalism p-8 lg:p-10">
           <div class="text-center">
             <h2 class="auth-form-title">Acesse sua conta</h2>
             <p class="auth-form-subtitle mt-2">Seu financeiro centralizado com rapidez, clareza e controle.</p>
@@ -72,6 +72,11 @@
           </form>
 
           <p id="auth-message" class="hidden auth-message text-[11px] font-black uppercase text-center mt-5"></p>
+
+          <div id="auth-loading-indicator" class="auth-loading-indicator hidden" aria-live="polite" aria-busy="true">
+            <div class="auth-loading-spinner"></div>
+            <p id="auth-loading-text" class="auth-loading-text">Processando autenticação...</p>
+          </div>
         </div>
       </div>
     </section>

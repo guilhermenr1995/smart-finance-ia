@@ -9,6 +9,12 @@ export class AuthService {
   }
 
   async bootstrapSession() {
+    try {
+      await this.auth.setPersistence(this.firebase.auth.Auth.Persistence.LOCAL);
+    } catch (error) {
+      console.warn('Unable to enforce local auth persistence:', error);
+    }
+
     await this.auth.getRedirectResult().catch(() => null);
 
     if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
