@@ -1302,22 +1302,17 @@ export class DashboardView {
               <div class="goal-progress-fill ${progressClass}" style="width: ${cappedProgress}%"></div>
             </div>
             <p class="goal-progress-label">${progressPercent.toFixed(1)}% da meta do período</p>
-            ${
-              isPastReferenceMonth
-                ? '<p class="goal-progress-label">Meta histórica (mês encerrado).</p>'
-                : `
-                  <div class="goal-item-actions goal-item-actions-compact">
-                    <button
-                      type="button"
-                      data-action="delete-goal"
-                      data-doc-id="${escapeHtml(goal.docId || '')}"
-                      class="goal-inline-action goal-inline-action-danger"
-                    >
-                      Excluir meta
-                    </button>
-                  </div>
-                `
-            }
+            ${isPastReferenceMonth ? '<p class="goal-progress-label">Meta histórica (mês encerrado).</p>' : ''}
+            <div class="goal-item-actions goal-item-actions-compact">
+              <button
+                type="button"
+                data-action="delete-goal"
+                data-doc-id="${escapeHtml(goal.docId || '')}"
+                class="goal-inline-action goal-inline-action-danger"
+              >
+                Excluir meta
+              </button>
+            </div>
           </article>
         `;
       })

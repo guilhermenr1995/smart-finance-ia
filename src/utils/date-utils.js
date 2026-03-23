@@ -1,6 +1,6 @@
 export function getDefaultCycleRange(referenceDate = new Date()) {
-  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 3, 0, 0, 0, 0);
-  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 2, 23, 59, 59, 999);
+  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
   return {
     startDate: toInputDateValue(start),
@@ -27,6 +27,13 @@ export function parseDateFlexible(rawValue) {
   const value = String(rawValue).trim();
   if (!value) {
     return new Date();
+  }
+
+  const yearMonthLike = value.match(/^(\d{4})-(\d{1,2})$/);
+  if (yearMonthLike) {
+    const year = Number.parseInt(yearMonthLike[1], 10);
+    const month = Number.parseInt(yearMonthLike[2], 10);
+    return new Date(year, month - 1, 1, 12, 0, 0, 0);
   }
 
   const isoLike = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
@@ -69,6 +76,25 @@ export function buildCycleBoundaries(startInput, endInput) {
 
 export function shiftInputDateByMonths(inputDate, deltaMonths) {
   const date = parseDateFlexible(inputDate);
-  const shifted = new Date(date.getFullYear(), date.getMonth() + deltaMonths, date.getDate(), 12, 0, 0, 0);
+  const targetMonthStart = new Date(date.getFullYear(), date.getMonth() + deltaMonths, 1, 12, 0, 0, 0);
+  const targetMonthLastDay = new Date(
+    targetMonthStart.getFullYear(),
+    targetMonthStart.getMonth() + 1,
+    0,
+    12,
+    0,
+    0,
+    0
+  ).getDate();
+  const safeDay = Math.min(Math.max(date.getDate(), 1), targetMonthLastDay);
+  const shifted = new Date(
+    targetMonthStart.getFullYear(),
+    targetMonthStart.getMonth(),
+    safeDay,
+    12,
+    0,
+    0,
+    0
+  );
   return toInputDateValue(shifted);
 }

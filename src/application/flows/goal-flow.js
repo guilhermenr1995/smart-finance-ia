@@ -5,7 +5,8 @@ import {
   normalizeGoalScope,
   normalizeMonthlyGoalRecord
 } from '../../utils/goal-utils.js';
-import { getTransactionTitleMatchKey } from '../../utils/transaction-utils.js';
+import { shiftInputDateByMonths } from '../../utils/date-utils.js';
+import { getDisplayCategory, getTransactionTitleMatchKey } from '../../utils/transaction-utils.js';
 
 const DISCRETIONARY_CATEGORIES = new Set(['alimentacao', 'lazer', 'compras', 'assinaturas', 'outros', 'pet']);
 const PROTECTED_CATEGORIES = new Set(['parcelas', 'transferencia']);
@@ -32,12 +33,6 @@ function normalizeCategoryKey(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
-}
-
-function shiftMonthKey(monthKey, deltaMonths) {
-  const bounds = getMonthBounds(monthKey);
-  const shifted = new Date(bounds.startDate.getFullYear(), bounds.startDate.getMonth() + deltaMonths, 1);
-  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function clamp(value, min, max) {
@@ -95,6 +90,7 @@ function summarizeHistoryForAutoGoals(transactions, monthKeys) {
   const totalsByCategoryMonth = new Map();
   const countsByCategoryMonth = new Map();
   const merchantTotalsByCategory = new Map();
+  const categoryLabelByKey = new Map();
 
   const validMonthKeys = new Set(monthKeys);
   (transactions || []).forEach((transaction) => {
@@ -112,8 +108,11 @@ function summarizeHistoryForAutoGoals(transactions, monthKeys) {
       return;
     }
 
-    const category = String(transaction.category || 'Outros').trim() || 'Outros';
+    const category = String(getDisplayCategory(transaction) || transaction.category || 'Outros').trim() || 'Outros';
     const categoryKey = normalizeCategoryKey(category);
+    if (!categoryLabelByKey.has(categoryKey) || categoryLabelByKey.get(categoryKey) === 'Outros') {
+      categoryLabelByKey.set(categoryKey, category);
+    }
 
     const totalsKey = `${monthKey}__${categoryKey}`;
     totalsByCategoryMonth.set(totalsKey, (totalsByCategoryMonth.get(totalsKey) || 0) + value);
@@ -135,17 +134,6 @@ function summarizeHistoryForAutoGoals(transactions, monthKeys) {
   });
 
   const categories = new Map();
-  totalsByCategoryMonth.forEach((_, key) => {
-    const [, categoryKey] = key.split('__');
-    if (!categories.has(categoryKey)) {
-      categories.set(categoryKey, {
-        category: '',
-        values: monthKeys.map(() => 0),
-        counts: monthKeys.map(() => 0)
-      });
-    }
-  });
-
   totalsByCategoryMonth.forEach((total, key) => {
     const [monthKey, categoryKey] = key.split('__');
     const monthIndex = monthKeys.indexOf(monthKey);
@@ -154,21 +142,13 @@ function summarizeHistoryForAutoGoals(transactions, monthKeys) {
     }
 
     const current = categories.get(categoryKey) || {
-      category: '',
+      category: categoryLabelByKey.get(categoryKey) || 'Outros',
       values: monthKeys.map(() => 0),
       counts: monthKeys.map(() => 0)
     };
 
     current.values[monthIndex] = Number(total.toFixed(2));
     current.counts[monthIndex] = Number(countsByCategoryMonth.get(key) || 0);
-    if (!current.category) {
-      const sampleCategory = (transactions || []).find(
-        (transaction) =>
-          getMonthKeyFromDate(transaction.date) === monthKey &&
-          normalizeCategoryKey(transaction.category || 'Outros') === categoryKey
-      );
-      current.category = String(sampleCategory?.category || 'Outros').trim() || 'Outros';
-    }
 
     categories.set(categoryKey, current);
   });
@@ -187,18 +167,93 @@ function calculateAverage(values) {
   return values.reduce((sum, value) => sum + Number(value || 0), 0) / values.length;
 }
 
-function calculateStandardDeviation(values, average) {
+function calculateMedian(values) {
   if (!Array.isArray(values) || values.length === 0) {
     return 0;
   }
 
-  const variance =
-    values.reduce((sum, value) => {
-      const numericValue = Number(value || 0);
-      return sum + (numericValue - average) ** 2;
-    }, 0) / values.length;
+  const sortedValues = [...values].map((value) => Number(value || 0)).sort((left, right) => left - right);
+  const middleIndex = Math.floor(sortedValues.length / 2);
+  if (sortedValues.length % 2 === 0) {
+    return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
+  }
 
-  return Math.sqrt(variance);
+  return sortedValues[middleIndex];
+}
+
+function selectHistoryMonthKeys(monthlyCoverage, targetMonthKey) {
+  const sortedCoverage = [...monthlyCoverage].filter(Boolean).sort((left, right) => left.localeCompare(right));
+  const priorMonths = sortedCoverage.filter((monthKey) => monthKey < targetMonthKey);
+  if (priorMonths.length >= 3) {
+    return priorMonths.slice(-3);
+  }
+
+  const fallbackMonths = [...priorMonths];
+  if (sortedCoverage.includes(targetMonthKey)) {
+    fallbackMonths.push(targetMonthKey);
+  }
+
+  return fallbackMonths.slice(-3);
+}
+
+function getConservativeReductionPercent(referenceValue) {
+  const safeValue = Math.max(0, Number(referenceValue || 0));
+  if (safeValue <= 1000) {
+    return 0.1;
+  }
+
+  if (safeValue >= 5000) {
+    return 0.15;
+  }
+
+  const progress = (safeValue - 1000) / 4000;
+  return Number((0.1 + progress * 0.05).toFixed(4));
+}
+
+function buildSummaryForDateRange(app, transactions, startDateInput, endDateInput) {
+  const startDate = String(startDateInput || '').trim();
+  const endDate = String(endDateInput || '').trim();
+  if (!startDate || !endDate) {
+    return {
+      categoryTotals: {},
+      sortedCategories: []
+    };
+  }
+
+  const bounds = {
+    accountType: 'all',
+    category: 'all',
+    cycleStart: new Date(`${startDate}T00:00:00`),
+    cycleEnd: new Date(`${endDate}T23:59:59`)
+  };
+  const visibleTransactions = app.queryService.getVisibleTransactions(transactions, bounds);
+  return app.queryService.buildSummary(visibleTransactions);
+}
+
+function resolveMonthProgress(targetMonthKey, totalDays, referenceDate) {
+  const safeTotalDays = Math.max(1, Number(totalDays || 1));
+  const safeReferenceDate = referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  const referenceMonthKey = getMonthKeyFromDate(safeReferenceDate);
+
+  if (targetMonthKey < referenceMonthKey) {
+    return {
+      elapsedDays: safeTotalDays,
+      remainingDays: 0
+    };
+  }
+
+  if (targetMonthKey > referenceMonthKey) {
+    return {
+      elapsedDays: 0,
+      remainingDays: safeTotalDays
+    };
+  }
+
+  const elapsedDays = clamp(safeReferenceDate.getDate(), 1, safeTotalDays);
+  return {
+    elapsedDays,
+    remainingDays: Math.max(0, safeTotalDays - elapsedDays)
+  };
 }
 
 function buildGoalRationale(category, metrics, topMerchantTitle, reductionPercent, profileType = 'regular') {
@@ -246,144 +301,84 @@ function buildAutomaticGoalSuggestions(app, targetMonthKey, goalScope) {
     };
   }
 
-  const historyMonthCandidates = [];
-  for (let offset = 3; offset >= 1; offset -= 1) {
-    historyMonthCandidates.push(shiftMonthKey(targetMonthKey, -offset));
-  }
-
-  let monthKeys = historyMonthCandidates;
   const monthlyCoverage = new Set(
     activeTransactions.map((transaction) => getMonthKeyFromDate(transaction.date)).filter(Boolean)
   );
-  const hasCoverageForAllHistoryMonths = monthKeys.every((key) => monthlyCoverage.has(key));
+  const monthKeys = selectHistoryMonthKeys(monthlyCoverage, targetMonthKey);
 
-  if (!hasCoverageForAllHistoryMonths) {
-    const sortedMonthsWithData = [...monthlyCoverage]
-      .filter((monthKey) => monthKey <= targetMonthKey)
-      .sort((left, right) => left.localeCompare(right))
-      .slice(-3);
-    monthKeys = sortedMonthsWithData;
-  }
-
-  if (monthKeys.length < 3) {
+  if (monthKeys.length < 2) {
     return {
       monthKeys,
       suggestions: []
     };
   }
 
-  const summary = summarizeHistoryForAutoGoals(activeTransactions, monthKeys);
+  const targetMonth = getMonthBounds(targetMonthKey);
+  const startDateInput = String(app?.state?.filters?.startDate || targetMonth.startDateInput).trim() || targetMonth.startDateInput;
+  const endDateInput = String(app?.state?.filters?.endDate || targetMonth.endDateInput).trim() || targetMonth.endDateInput;
+  const previousStartDate = shiftInputDateByMonths(startDateInput, -1);
+  const previousEndDate = shiftInputDateByMonths(endDateInput, -1);
 
-  const suggestions = summary.categories
-    .map((metrics) => {
-      const category = String(metrics.category || 'Outros').trim() || 'Outros';
-      const values = (metrics.values || []).map((value) => Number(value || 0));
-      const nonZeroValues = values.filter((value) => value > 0);
-      if (nonZeroValues.length < 2) {
+  const currentSummary = buildSummaryForDateRange(app, activeTransactions, startDateInput, endDateInput);
+  const previousSummary = buildSummaryForDateRange(app, activeTransactions, previousStartDate, previousEndDate);
+  const categories = [
+    ...new Set([...(currentSummary.sortedCategories || []), ...(previousSummary.sortedCategories || [])])
+  ];
+
+  const parsedFilterEnd = new Date(`${endDateInput}T12:00:00`);
+  const now = new Date();
+  const progressReferenceDate =
+    parsedFilterEnd instanceof Date && !Number.isNaN(parsedFilterEnd.getTime()) && parsedFilterEnd < now
+      ? parsedFilterEnd
+      : now;
+  const { elapsedDays, remainingDays } = resolveMonthProgress(targetMonthKey, targetMonth.totalDays, progressReferenceDate);
+
+  const suggestions = categories
+    .map((categoryName) => {
+      const category = String(categoryName || 'Outros').trim() || 'Outros';
+      const previousTotal = Math.max(0, Number(previousSummary.categoryTotals?.[category] || 0));
+      const currentTotal = Math.max(0, Number(currentSummary.categoryTotals?.[category] || 0));
+      if (previousTotal <= 0 && currentTotal <= 0) {
         return null;
       }
 
-      const average = calculateAverage(nonZeroValues);
-      if (!Number.isFinite(average) || average < 30) {
-        return null;
-      }
+      const reductionPercent = getConservativeReductionPercent(Math.max(previousTotal, currentTotal));
+      let targetValue = 0;
+      let rationale = '';
 
-      const standardDeviation = calculateStandardDeviation(nonZeroValues, average);
-      const volatility = average > 0 ? standardDeviation / average : 0;
-      const latest = Number(values[values.length - 1] || 0);
-      const latestReference = latest > 0 ? latest : Number(nonZeroValues[nonZeroValues.length - 1] || average);
-      const latestCount = Number(metrics.counts[metrics.counts.length - 1] || 0);
-      const countAverage = calculateAverage(metrics.counts);
-      const categoryKey = normalizeCategoryKey(category);
-      const profileType = resolveCategoryGoalProfile(categoryKey);
-      const recurrenceRatio = nonZeroValues.length / Math.max(values.length, 1);
-      const minObserved = Math.min(...nonZeroValues);
-
-      if (recurrenceRatio < 0.67 && profileType !== 'fixed' && profileType !== 'protected') {
-        return null;
-      }
-
-      let baseline = average * 0.65 + latestReference * 0.35;
-      if (profileType === 'fixed') {
-        baseline = Math.max(average, latestReference, minObserved * 0.98);
-      }
-      if (profileType === 'protected') {
-        baseline = Math.max(average, latestReference);
-      }
-
-      let reductionPercent = 0.04;
-      if (profileType === 'discretionary') {
-        reductionPercent = 0.08;
-      }
-      if (profileType === 'fixed') {
-        reductionPercent = 0.01;
-      }
-      if (profileType === 'protected') {
-        reductionPercent = 0;
-      }
-
-      if (latestReference > average * 1.12 && profileType !== 'protected') {
-        reductionPercent += profileType === 'discretionary' ? 0.02 : 0.01;
-      }
-      if (latestCount > countAverage + 1 && profileType !== 'protected') {
-        reductionPercent += profileType === 'discretionary' ? 0.015 : 0.005;
-      }
-      if (volatility > 0.35) {
-        reductionPercent -= 0.015;
-      }
-      if (profileType === 'fixed' && volatility <= 0.12) {
-        reductionPercent = Math.min(reductionPercent, 0.02);
-      }
-
-      const maxReductionByProfile = {
-        protected: 0,
-        fixed: 0.03,
-        regular: 0.08,
-        discretionary: 0.13
-      };
-      reductionPercent = clamp(reductionPercent, 0, maxReductionByProfile[profileType] || 0.08);
-
-      let targetValue = baseline * (1 - reductionPercent);
-
-      let floor = average * 0.82;
-      let ceiling = Math.max(average * 1.06, latestReference * 1.05);
-      if (profileType === 'protected') {
-        floor = Math.max(average * 0.96, latestReference * 0.96, minObserved * 0.95);
-        ceiling = Math.max(average * 1.05, latestReference * 1.03);
-      } else if (profileType === 'fixed') {
-        floor = Math.max(average * 0.9, latestReference * 0.9, minObserved * 0.9);
-        ceiling = Math.max(average * 1.04, latestReference * 1.03);
-      } else if (profileType === 'discretionary') {
-        floor = Math.max(average * 0.72, latestReference * 0.68, minObserved * 0.65);
-        ceiling = Math.max(average * 1.08, latestReference * 1.06);
+      if (previousTotal > currentTotal && previousTotal > 0) {
+        targetValue = previousTotal * (1 - reductionPercent);
+        rationale = `Meta definida ${(reductionPercent * 100).toFixed(1)}% abaixo do período anterior para consolidar uma redução sustentável.`;
       } else {
-        floor = Math.max(average * 0.82, latestReference * 0.8, minObserved * 0.78);
+        const safeElapsedDays = Math.max(1, elapsedDays);
+        const behaviorDailyAverage = currentTotal / safeElapsedDays;
+        const reducedDailyAverage = behaviorDailyAverage * (1 - reductionPercent);
+        const projectedRemainingSpend = reducedDailyAverage * remainingDays;
+        targetValue = currentTotal + projectedRemainingSpend;
+
+        if (remainingDays <= 0) {
+          targetValue = currentTotal;
+        }
+
+        rationale = `Meta projetada com base no gasto atual e redução de ${(reductionPercent * 100).toFixed(1)}% na média diária para os ${remainingDays} dia(s) restantes.`;
       }
 
-      targetValue = clamp(targetValue, floor, ceiling);
-      targetValue = Number(targetValue.toFixed(2));
+      if (!Number.isFinite(targetValue) || targetValue <= 0) {
+        return null;
+      }
 
-      const topMerchant = [...(summary.merchantTotalsByCategory.get(categoryKey)?.values() || [])]
-        .sort((left, right) => Number(right.total || 0) - Number(left.total || 0))
-        .slice(0, 1)[0];
+      targetValue = Number(targetValue.toFixed(2));
 
       return {
         monthKey: targetMonthKey,
         category,
         targetValue,
         source: 'auto',
-        rationale: buildGoalRationale(
-          category,
-          { ...metrics, average, countAverage, values },
-          topMerchant?.title,
-          reductionPercent,
-          profileType
-        )
+        rationale
       };
     })
     .filter(Boolean)
-    .sort((left, right) => right.targetValue - left.targetValue)
-    .slice(0, 10);
+    .sort((left, right) => right.targetValue - left.targetValue);
 
   return {
     monthKeys,
@@ -494,8 +489,8 @@ export async function generateAutomaticMonthlyGoals(app) {
   }
 
   const generation = buildAutomaticGoalSuggestions(app, targetMonthKey, goalScope);
-  if (generation.monthKeys.length < 3) {
-    app.authView.showMessage('Você precisa de pelo menos 3 meses de histórico para gerar metas automáticas.', 'error');
+  if (generation.monthKeys.length < 2) {
+    app.authView.showMessage('Você precisa de pelo menos 1 período anterior para gerar metas automáticas.', 'error');
     return false;
   }
 
@@ -508,31 +503,28 @@ export async function generateAutomaticMonthlyGoals(app) {
     (goal) =>
       goal.active !== false &&
       goal.monthKey === targetMonthKey &&
-      resolveGoalScope(app, goal.accountScope) === goalScope
+      normalizeGoalScope(goal.accountScope) === goalScope
   );
-  const lockedManualCategories = new Set(
-    existingGoalsInMonth
-      .filter((goal) => goal.source === 'manual')
-      .map((goal) => normalizeCategoryKey(goal.category))
-  );
-
-  const suggestionsToPersist = generation.suggestions
-    .filter((suggestion) => !lockedManualCategories.has(normalizeCategoryKey(suggestion.category)))
-    .map((suggestion) => ({
-      ...suggestion,
-      monthKey: targetMonthKey,
-      accountScope: goalScope
-    }));
-
-  if (suggestionsToPersist.length === 0) {
-    app.authView.showMessage('As categorias deste mês já possuem metas manuais. Nada para atualizar automaticamente.', 'info');
-    return true;
-  }
+  const suggestionsToPersist = generation.suggestions.map((suggestion) => ({
+    ...suggestion,
+    monthKey: targetMonthKey,
+    accountScope: goalScope
+  }));
 
   app.dashboardView.setBusy(true);
   app.overlayView.show('Gerando metas automáticas...');
 
   try {
+    const existingDocIds = existingGoalsInMonth.map((goal) => String(goal.docId || '').trim()).filter(Boolean);
+    if (existingDocIds.length > 0) {
+      await app.repository.batchDeleteMonthlyGoals(app.state.user.uid, existingDocIds, {
+        batchSize: 100,
+        onProgress: (done, total) => {
+          app.overlayView.log(`Limpando metas anteriores ${done}/${total}.`);
+        }
+      });
+    }
+
     const upsertedGoals = await app.repository.batchUpsertMonthlyGoals(app.state.user.uid, suggestionsToPersist, {
       batchSize: 60,
       onProgress: (done, total) => {
@@ -540,7 +532,11 @@ export async function generateAutomaticMonthlyGoals(app) {
       }
     });
 
-    const mergedGoals = mergeMonthlyGoals(app.state.monthlyGoals, upsertedGoals);
+    const goalsOutsideTargetScope = (app.state.monthlyGoals || []).filter(
+      (goal) =>
+        !(goal?.active !== false && goal.monthKey === targetMonthKey && normalizeGoalScope(goal.accountScope) === goalScope)
+    );
+    const mergedGoals = mergeMonthlyGoals(goalsOutsideTargetScope, upsertedGoals);
     app.state.setMonthlyGoals(mergedGoals);
     app.persistTransactionsCache();
     app.refreshDashboard();
@@ -571,7 +567,7 @@ export async function deleteMonthlyGoalsForReferenceMonth(app) {
     (goal) =>
       goal?.active !== false &&
       String(goal?.monthKey || '').trim() === monthKey &&
-      resolveGoalScope(app, goal.accountScope) === goalScope
+      normalizeGoalScope(goal.accountScope) === goalScope
   );
   const goalDocIds = goalsInReferenceMonth.map((goal) => String(goal.docId || '').trim()).filter(Boolean);
 

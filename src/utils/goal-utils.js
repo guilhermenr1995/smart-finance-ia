@@ -24,6 +24,17 @@ function toSafeDate(value) {
 }
 
 export function getMonthKeyFromDate(value) {
+  const raw = String(value || '').trim();
+  const yearMonthMatch = raw.match(/^(\d{4})-(\d{2})$/);
+  if (yearMonthMatch) {
+    return `${yearMonthMatch[1]}-${yearMonthMatch[2]}`;
+  }
+
+  const yearMonthDayMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (yearMonthDayMatch) {
+    return `${yearMonthDayMatch[1]}-${yearMonthDayMatch[2]}`;
+  }
+
   const date = toSafeDate(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
@@ -106,7 +117,9 @@ export function buildGoalDocId(monthKey, category, accountScope = GOAL_SCOPE_ALL
 }
 
 export function normalizeMonthlyGoalRecord(goal = {}) {
-  const monthKey = getMonthKeyFromDate(goal.monthKey || goal.periodStart || goal.startDate);
+  const incomingDocId = String(goal.docId || '').trim();
+  const monthKeyFromDocId = incomingDocId.match(/^(\d{4}-\d{2})(?:__|$)/)?.[1] || '';
+  const monthKey = getMonthKeyFromDate(monthKeyFromDocId || goal.monthKey || goal.periodStart || goal.startDate);
   const monthBounds = getMonthBounds(monthKey);
   const category = String(goal.category || '').trim();
   const targetValue = Math.max(0, Number(goal.targetValue || goal.value || 0));
@@ -114,7 +127,7 @@ export function normalizeMonthlyGoalRecord(goal = {}) {
   const accountScope = normalizeGoalScope(goal.accountScope || goal.scope || goal.accountType);
 
   return {
-    docId: String(goal.docId || buildGoalDocId(monthKey, category, accountScope)).trim(),
+    docId: String(incomingDocId || buildGoalDocId(monthKey, category, accountScope)).trim(),
     monthKey,
     periodStart: String(goal.periodStart || monthBounds.startDateInput),
     periodEnd: String(goal.periodEnd || monthBounds.endDateInput),
