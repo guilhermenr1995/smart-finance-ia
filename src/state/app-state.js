@@ -1,4 +1,5 @@
 import { buildCycleBoundaries, getDefaultCycleRange } from '../utils/date-utils.js';
+import { normalizeMonthlyGoalRecord } from '../utils/goal-utils.js';
 import { generateTransactionDedupKey, generateTransactionHash } from '../utils/transaction-utils.js';
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
@@ -11,6 +12,7 @@ export class AppState {
     this.transactions = [];
     this.userCategories = [];
     this.userBankAccounts = [DEFAULT_BANK_ACCOUNT];
+    this.monthlyGoals = [];
     this.search = {
       mode: 'description',
       term: '',
@@ -98,6 +100,56 @@ export class AppState {
 
       return left.localeCompare(right, 'pt-BR');
     });
+  }
+
+  setMonthlyGoals(goals) {
+    const normalized = (goals || [])
+      .map((goal) => normalizeMonthlyGoalRecord(goal))
+      .filter((goal) => goal.category && goal.targetValue > 0);
+
+    const dedupedByDocId = new Map();
+    normalized.forEach((goal) => {
+      dedupedByDocId.set(goal.docId, goal);
+    });
+
+    this.monthlyGoals = [...dedupedByDocId.values()].sort((left, right) => {
+      const monthDiff = String(right.monthKey).localeCompare(String(left.monthKey));
+      if (monthDiff !== 0) {
+        return monthDiff;
+      }
+
+      return String(left.category || '').localeCompare(String(right.category || ''), 'pt-BR');
+    });
+  }
+
+  upsertMonthlyGoal(goal) {
+    if (!goal) {
+      return;
+    }
+
+    const normalized = normalizeMonthlyGoalRecord(goal);
+    if (!normalized.category || normalized.targetValue <= 0) {
+      return;
+    }
+
+    const nextGoals = [...this.monthlyGoals];
+    const currentIndex = nextGoals.findIndex((item) => item.docId === normalized.docId);
+    if (currentIndex >= 0) {
+      nextGoals[currentIndex] = normalized;
+    } else {
+      nextGoals.push(normalized);
+    }
+
+    this.setMonthlyGoals(nextGoals);
+  }
+
+  removeMonthlyGoal(docId) {
+    const safeDocId = String(docId || '').trim();
+    if (!safeDocId) {
+      return;
+    }
+
+    this.monthlyGoals = this.monthlyGoals.filter((goal) => goal.docId !== safeDocId);
   }
 
   updateSearch(partialSearch) {

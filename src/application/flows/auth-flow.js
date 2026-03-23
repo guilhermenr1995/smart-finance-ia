@@ -18,6 +18,7 @@ export async function handleAuthState(app, user) {
     app.state.setTransactions([]);
     app.state.setUserCategories([]);
     app.state.setUserBankAccounts(['Padrão']);
+    app.state.setMonthlyGoals([]);
     app.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false });
     app.state.setAiConsultantReport(null);
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
@@ -38,13 +39,15 @@ export async function handleAuthState(app, user) {
     cached.transactions.length > 0 ||
     (cached.categories || []).length > 0 ||
     (cached.bankAccounts || []).length > 0 ||
-    (cached.consultantInsights || []).length > 0;
+    (cached.consultantInsights || []).length > 0 ||
+    (cached.monthlyGoals || []).length > 0;
 
   if (hasCachedSnapshot) {
     app.state.setTransactions(cached.transactions);
     app.state.setUserCategories(cached.categories || []);
     app.state.setUserBankAccounts(cached.bankAccounts || ['Padrão']);
     app.state.setAiConsultantHistory(cached.consultantInsights || []);
+    app.state.setMonthlyGoals(cached.monthlyGoals || []);
     app.refreshDashboard();
   }
 

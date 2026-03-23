@@ -1,5 +1,14 @@
 import { CATEGORIES } from '../../constants/categories.js';
 import { shiftInputDateByMonths } from '../../utils/date-utils.js';
+import {
+  buildGoalTargetsByCategory,
+  computeGoalTargetForDateRange,
+  getGoalScopeLabel,
+  getGoalsForReferenceMonth,
+  getMonthBounds,
+  getMonthKeyFromDate,
+  normalizeGoalScope
+} from '../../utils/goal-utils.js';
 import { matchesTransactionSearch } from '../../utils/transaction-utils.js';
 
 export function getVisibleTransactions(app) {
@@ -47,6 +56,33 @@ export function refreshDashboard(app) {
   const previousVisibleTransactions = app.queryService.getVisibleTransactions(app.state.transactions, previousBounds);
   const previousSummary = app.queryService.buildSummary(previousVisibleTransactions);
 
+  const referenceMonthKey = getMonthKeyFromDate(app.state.filters.endDate || app.state.filters.startDate);
+  const referenceMonth = getMonthBounds(referenceMonthKey);
+  const activeGoalScope = normalizeGoalScope(app.state.filters.accountType);
+  const activeGoalScopeLabel = getGoalScopeLabel(activeGoalScope);
+  const monthlyGoals = Array.isArray(app.state.monthlyGoals) ? app.state.monthlyGoals : [];
+  const scopedMonthlyGoals = monthlyGoals.filter(
+    (goal) => normalizeGoalScope(goal?.accountScope) === activeGoalScope
+  );
+  const goalTargetsByCategory = buildGoalTargetsByCategory(
+    scopedMonthlyGoals,
+    app.state.filters.startDate,
+    app.state.filters.endDate
+  );
+  const goalsForReferenceMonth = getGoalsForReferenceMonth(scopedMonthlyGoals, referenceMonthKey, activeGoalScope).map(
+    (goal) => {
+      const targetForPeriod = computeGoalTargetForDateRange(goal, app.state.filters.startDate, app.state.filters.endDate);
+      const currentValue = Number(summary.categoryTotals[goal.category] || 0);
+      const progressPercent = targetForPeriod > 0 ? (currentValue / targetForPeriod) * 100 : 0;
+      return {
+        ...goal,
+        targetForPeriod,
+        currentValue,
+        progressPercent
+      };
+    }
+  );
+
   const availableCategories = [...new Set([...CATEGORIES, ...app.state.userCategories])];
   const availableBankAccounts = app.state.userBankAccounts || ['Padrão'];
 
@@ -72,6 +108,14 @@ export function refreshDashboard(app) {
     aiConsultant: {
       ...app.state.aiConsultant,
       report: activeInsight?.insights || null
+    },
+    goals: {
+      referenceMonthKey,
+      referenceMonthLabel: `${referenceMonth.label} · ${activeGoalScopeLabel}`,
+      scope: activeGoalScope,
+      scopeLabel: activeGoalScopeLabel,
+      items: goalsForReferenceMonth,
+      targetsByCategory: goalTargetsByCategory
     }
   });
 }

@@ -40,6 +40,12 @@ import {
   buildConsultantInsightKey,
   runAiConsultant
 } from './application/flows/ai-flow.js';
+import {
+  deleteMonthlyGoal,
+  deleteMonthlyGoalsForReferenceMonth,
+  generateAutomaticMonthlyGoals,
+  saveMonthlyGoal
+} from './application/flows/goal-flow.js';
 import { TransactionQueryService } from './utils/transaction-utils.js';
 
 class SmartFinanceApplication {
@@ -116,7 +122,11 @@ class SmartFinanceApplication {
       onCreateAndAssignBankAccount: ({ docId, bankAccountName }) =>
         this.createAndAssignBankAccount(docId, bankAccountName),
       onCreateTransaction: (payload) => this.createManualTransaction(payload),
-      onTitleUpdate: ({ docId, title }) => this.updateTransactionDescription(docId, title)
+      onTitleUpdate: ({ docId, title }) => this.updateTransactionDescription(docId, title),
+      onSaveGoal: (payload) => this.saveMonthlyGoal(payload),
+      onDeleteGoal: (goalDocId) => this.deleteMonthlyGoal(goalDocId),
+      onDeleteGoalsByMonth: () => this.deleteMonthlyGoalsForReferenceMonth(),
+      onGenerateAutomaticGoals: () => this.generateAutomaticMonthlyGoals()
     });
 
     this.installButton.addEventListener('click', async () => {
@@ -222,6 +232,22 @@ class SmartFinanceApplication {
 
   async runAiConsultant() {
     return runAiConsultant(this);
+  }
+
+  async saveMonthlyGoal(payload) {
+    return saveMonthlyGoal(this, payload);
+  }
+
+  async deleteMonthlyGoal(goalDocId) {
+    return deleteMonthlyGoal(this, goalDocId);
+  }
+
+  async deleteMonthlyGoalsForReferenceMonth() {
+    return deleteMonthlyGoalsForReferenceMonth(this);
+  }
+
+  async generateAutomaticMonthlyGoals() {
+    return generateAutomaticMonthlyGoals(this);
   }
 
   normalizeError(error) {

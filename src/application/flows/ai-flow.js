@@ -16,10 +16,6 @@ function getInclusivePeriodDays(startDate, endDate) {
   return Math.max(1, rawDays);
 }
 
-function getDaysInMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-}
-
 function calculateQuantile(sortedValues, percentile) {
   if (!Array.isArray(sortedValues) || sortedValues.length === 0) {
     return 0;
@@ -163,19 +159,6 @@ function buildDeterministicInsights(periodDates, summary) {
       Math.max(periodDays, 1)
   );
 
-  const periodEnd = parseDateFlexible(periodDates.endDate);
-  const currentMonthDays = getDaysInMonth(periodEnd);
-  const daysRemainingInMonth = Math.max(0, currentMonthDays - periodEnd.getDate());
-  const projectedAdditionalEndOfMonth = roundCurrency(behavioralAverage * daysRemainingInMonth);
-  const projectedEndOfMonth = roundCurrency(totalPeriod + projectedAdditionalEndOfMonth);
-
-  const nextMonthDate = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 1);
-  const nextMonthDays = getDaysInMonth(nextMonthDate);
-  const dailyInstallmentCommitment = roundCurrency(totalInstallments / Math.max(periodDays, 1));
-  const projectedNextMonthInstallments = roundCurrency(dailyInstallmentCommitment * nextMonthDays);
-  const projectedNextMonthConsumption = roundCurrency(behavioralAverage * nextMonthDays);
-  const projectedNextMonthTotal = roundCurrency(projectedNextMonthInstallments + projectedNextMonthConsumption);
-
   const categoryMetrics = buildCategoryMetrics(considered, Math.max(totalPeriod, 0.01));
   const topMerchants = buildTopMerchants(considered, Math.max(totalPeriod, 0.01));
 
@@ -212,16 +195,6 @@ function buildDeterministicInsights(periodDates, summary) {
         value: roundCurrency(transaction.value),
         category: transaction.category
       })),
-    projections: {
-      currentMonthDays,
-      daysRemainingInMonth,
-      projectedAdditionalEndOfMonth,
-      projectedEndOfMonth,
-      nextMonthDays,
-      projectedNextMonthInstallments,
-      projectedNextMonthConsumption,
-      projectedNextMonthTotal
-    },
     categoryMetrics,
     topMerchants,
     smartAlerts

@@ -1,5 +1,6 @@
 import { CATEGORIES } from '../constants/categories.js';
 import { toBrDate } from '../utils/date-utils.js';
+import { getMonthBounds, getMonthKeyFromDate } from '../utils/goal-utils.js';
 import { escapeHtml, formatCompactCurrency, formatCurrencyBRL } from '../utils/format-utils.js';
 import { getDisplayCategory, sortTransactionsByDateDesc } from '../utils/transaction-utils.js';
 
@@ -134,6 +135,11 @@ export class DashboardView {
 
     this.chartBars = document.getElementById('chart-bars');
     this.statsList = document.getElementById('stats-list');
+    this.goalsReferenceMonthLabel = document.getElementById('goals-reference-month');
+    this.goalsList = document.getElementById('goals-list');
+    this.addGoalButton = document.getElementById('btn-goals-add');
+    this.autoGoalsButton = document.getElementById('btn-goals-auto');
+    this.deleteGoalsByMonthButton = document.getElementById('btn-goals-delete-month');
     this.itemsCounter = document.getElementById('contador-itens');
     this.tableBody = document.getElementById('tabela-corpo');
     this.searchSummaryPanel = document.getElementById('search-summary-panel');
@@ -174,6 +180,14 @@ export class DashboardView {
     this.titleEditorForm = document.getElementById('title-editor-form');
     this.titleEditorCloseButton = document.getElementById('title-editor-close');
     this.titleEditorInput = document.getElementById('title-editor-input');
+    this.goalModal = document.getElementById('goal-modal');
+    this.goalModalTitle = document.getElementById('goal-modal-title');
+    this.goalModalMonthLabel = document.getElementById('goal-modal-month');
+    this.goalForm = document.getElementById('goal-form');
+    this.goalCloseButton = document.getElementById('goal-close');
+    this.goalCategorySelect = document.getElementById('goal-category');
+    this.goalTargetValueInput = document.getElementById('goal-target-value');
+    this.goalRationaleInput = document.getElementById('goal-rationale');
 
     this.handlers = null;
     this.availableCategories = [...CATEGORIES];
@@ -183,6 +197,9 @@ export class DashboardView {
     this.activeBankAccountPickerDocId = null;
     this.activeTitleEditorDocId = null;
     this.isImportBankAccountPickerMode = false;
+    this.activeGoalDocId = null;
+    this.activeGoalMonthKey = getMonthKeyFromDate(new Date());
+    this.isGoalCreationAllowed = true;
     this.activeTooltipTrigger = null;
     this.isBusy = false;
     this.consultantHasRemaining = true;
@@ -220,6 +237,7 @@ export class DashboardView {
     this.availableCategories = merged;
     this.initCategoryFilter();
     this.renderTransactionCreateCategoryOptions();
+    this.renderGoalCategoryOptions();
   }
 
   setAvailableBankAccounts(bankAccounts) {
@@ -258,6 +276,16 @@ export class DashboardView {
     }
 
     this.transactionCreateCategorySelect.innerHTML = this.availableCategories
+      .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+      .join('');
+  }
+
+  renderGoalCategoryOptions() {
+    if (!this.goalCategorySelect) {
+      return;
+    }
+
+    this.goalCategorySelect.innerHTML = this.availableCategories
       .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
       .join('');
   }
@@ -427,6 +455,24 @@ export class DashboardView {
       this.openTransactionCreateModal();
     });
 
+    this.addGoalButton?.addEventListener('click', () => {
+      this.openGoalModal();
+    });
+
+    this.autoGoalsButton?.addEventListener('click', () => {
+      handlers.onGenerateAutomaticGoals?.();
+    });
+
+    this.deleteGoalsByMonthButton?.addEventListener('click', async () => {
+      const monthLabel = this.goalsReferenceMonthLabel?.innerText || 'o mês selecionado';
+      const confirmed = window.confirm(`Deseja remover todas as metas de ${monthLabel}?`);
+      if (!confirmed) {
+        return;
+      }
+
+      await handlers.onDeleteGoalsByMonth?.();
+    });
+
     this.aiButton.addEventListener('click', () => {
       handlers.onAiCategorization();
     });
@@ -469,6 +515,33 @@ export class DashboardView {
         docId: openBankAccountPickerTarget.dataset.docId,
         currentBankAccount: openBankAccountPickerTarget.dataset.currentBankAccount
       });
+    });
+
+    this.goalsList?.addEventListener('click', async (event) => {
+      const editTarget = event.target.closest('[data-action="edit-goal"]');
+      if (editTarget) {
+        this.openGoalModal({
+          docId: editTarget.dataset.docId,
+          category: editTarget.dataset.category,
+          targetValue: editTarget.dataset.targetValue,
+          rationale: editTarget.dataset.rationale,
+          source: editTarget.dataset.source,
+          accountScope: editTarget.dataset.accountScope
+        });
+        return;
+      }
+
+      const deleteTarget = event.target.closest('[data-action="delete-goal"]');
+      if (!deleteTarget) {
+        return;
+      }
+
+      const confirmed = window.confirm('Deseja remover esta meta mensal?');
+      if (!confirmed) {
+        return;
+      }
+
+      await handlers.onDeleteGoal?.(deleteTarget.dataset.docId);
     });
 
     this.categoryPickerCloseButton.addEventListener('click', () => {
@@ -632,6 +705,34 @@ export class DashboardView {
         this.closeTitleEditor();
       }
     });
+
+    this.goalCloseButton?.addEventListener('click', () => {
+      this.closeGoalModal();
+    });
+
+    this.goalModal?.addEventListener('click', (event) => {
+      if (event.target === this.goalModal) {
+        this.closeGoalModal();
+      }
+    });
+
+    this.goalForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const saved = await handlers.onSaveGoal?.({
+        docId: this.activeGoalDocId,
+        monthKey: this.activeGoalMonthKey,
+        category: this.goalCategorySelect?.value,
+        targetValue: this.goalTargetValueInput?.value,
+        rationale: this.goalRationaleInput?.value,
+        accountScope: this.goalModal?.dataset?.scope || this.getActiveAccountScope(),
+        source: this.goalModal?.dataset?.source || 'manual'
+      });
+
+      if (saved) {
+        this.closeGoalModal();
+      }
+    });
   }
 
   bindTooltipInteractions() {
@@ -658,6 +759,7 @@ export class DashboardView {
       if (event.key === 'Escape') {
         this.closeTooltip();
         this.closeBankGuideModal();
+        this.closeGoalModal();
       }
     });
 
@@ -741,6 +843,15 @@ export class DashboardView {
     if (this.addTransactionButton) {
       this.addTransactionButton.disabled = isBusy;
     }
+    if (this.addGoalButton) {
+      this.addGoalButton.disabled = isBusy;
+    }
+    if (this.autoGoalsButton) {
+      this.autoGoalsButton.disabled = isBusy;
+    }
+    if (this.deleteGoalsByMonthButton) {
+      this.deleteGoalsByMonthButton.disabled = isBusy;
+    }
     if (this.paginationPageSizeSelect) {
       this.paginationPageSizeSelect.disabled = isBusy;
     }
@@ -760,6 +871,13 @@ export class DashboardView {
 
     const selectedButton = this.accountFilterButtons[accountType] || this.accountFilterButtons.all;
     selectedButton.classList.add('filter-active');
+  }
+
+  getActiveAccountScope() {
+    const activeEntry = Object.entries(this.accountFilterButtons).find(([, button]) =>
+      button.classList.contains('filter-active')
+    );
+    return activeEntry ? activeEntry[0] : 'all';
   }
 
   openCategoryPicker(docId, currentCategory) {
@@ -857,6 +975,64 @@ export class DashboardView {
     this.titleEditorModal.classList.add('hidden');
   }
 
+  openGoalModal(goal = null) {
+    if (!this.goalModal) {
+      return;
+    }
+
+    if (!this.isGoalCreationAllowed) {
+      window.alert('Metas novas só podem ser criadas/ajustadas para o mês atual ou meses futuros.');
+      return;
+    }
+
+    const monthKey = getMonthKeyFromDate(this.endDateInput?.value || this.startDateInput?.value || new Date());
+    const monthBounds = getMonthBounds(monthKey);
+    const normalizedGoal = goal || {};
+
+    this.activeGoalMonthKey = monthKey;
+    this.activeGoalDocId = normalizedGoal?.docId || null;
+    this.goalModal.dataset.source = normalizedGoal?.source || 'manual';
+    this.goalModal.dataset.scope = String(normalizedGoal?.accountScope || this.getActiveAccountScope() || 'all');
+
+    if (this.goalModalTitle) {
+      this.goalModalTitle.innerText = this.activeGoalDocId ? 'Editar Meta Mensal' : 'Nova Meta Mensal';
+    }
+    if (this.goalModalMonthLabel) {
+      this.goalModalMonthLabel.innerText = `${monthBounds.label} (${monthBounds.startDateInput} até ${monthBounds.endDateInput})`;
+    }
+
+    this.renderGoalCategoryOptions();
+    const preferredCategory =
+      String(normalizedGoal?.category || '').trim() ||
+      (this.availableCategories.includes('Outros') ? 'Outros' : this.availableCategories[0] || '');
+    if (this.goalCategorySelect) {
+      this.goalCategorySelect.value = preferredCategory;
+    }
+
+    if (this.goalTargetValueInput) {
+      const normalizedTarget = Number(normalizedGoal?.targetValue || 0);
+      this.goalTargetValueInput.value = normalizedTarget > 0 ? normalizedTarget.toFixed(2) : '';
+    }
+    if (this.goalRationaleInput) {
+      this.goalRationaleInput.value = String(normalizedGoal?.rationale || '');
+    }
+
+    this.goalModal.classList.remove('hidden');
+    this.goalTargetValueInput?.focus();
+    this.goalTargetValueInput?.select();
+  }
+
+  closeGoalModal() {
+    if (!this.goalModal) {
+      return;
+    }
+
+    this.goalModal.classList.add('hidden');
+    this.activeGoalDocId = null;
+    this.goalModal.dataset.source = 'manual';
+    this.goalModal.dataset.scope = 'all';
+  }
+
   renderBankAccountPickerOptions() {
     const query = this.bankAccountPickerInput.value.trim();
     const normalizedQuery = normalizeForSearch(query);
@@ -899,7 +1075,8 @@ export class DashboardView {
     pendingAiCount,
     categories,
     bankAccounts,
-    aiConsultant
+    aiConsultant,
+    goals
   }) {
     this.setAvailableCategories(categories);
     this.setAvailableBankAccounts(bankAccounts);
@@ -921,8 +1098,9 @@ export class DashboardView {
     const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
     const paginationMeta = this.paginateTransactions(orderedTableTransactions);
 
-    this.renderCategoryChart(summary, previousSummary);
-    this.renderCategoryStats(summary, previousSummary);
+    this.renderCategoryChart(summary, previousSummary, goals?.targetsByCategory || {});
+    this.renderCategoryStats(summary, previousSummary, goals?.targetsByCategory || {});
+    this.renderGoals(goals, summary);
     this.renderTransactions(paginationMeta.pageItems);
     this.renderTransactionsPagination(paginationMeta);
     this.renderSearchTotals(searchTotals);
@@ -1020,6 +1198,134 @@ export class DashboardView {
     this.searchSummaryShare.innerText = `${Number(searchTotals.percentageOfBase || 0).toFixed(2)}% da base ativa`;
   }
 
+  renderGoals(goalsState = {}, summary = {}) {
+    if (!this.goalsList) {
+      return;
+    }
+
+    const referenceMonthKey = String(goalsState?.referenceMonthKey || '').trim();
+    const currentMonthKey = getMonthKeyFromDate(new Date());
+    const isPastReferenceMonth = Boolean(referenceMonthKey) && referenceMonthKey < currentMonthKey;
+    this.isGoalCreationAllowed = !isPastReferenceMonth;
+
+    if (this.addGoalButton) {
+      this.addGoalButton.disabled = this.isBusy || isPastReferenceMonth;
+      this.addGoalButton.classList.toggle('opacity-50', isPastReferenceMonth);
+      this.addGoalButton.classList.toggle('cursor-not-allowed', isPastReferenceMonth);
+      this.addGoalButton.title = isPastReferenceMonth
+        ? 'Mês encerrado: metas apenas para consulta histórica.'
+        : 'Criar nova meta mensal';
+    }
+
+    if (this.autoGoalsButton) {
+      this.autoGoalsButton.disabled = this.isBusy || isPastReferenceMonth;
+      this.autoGoalsButton.classList.toggle('opacity-50', isPastReferenceMonth);
+      this.autoGoalsButton.classList.toggle('cursor-not-allowed', isPastReferenceMonth);
+      this.autoGoalsButton.title = isPastReferenceMonth
+        ? 'Mês encerrado: geração automática indisponível.'
+        : 'Gerar metas automáticas com base no histórico';
+    }
+
+    if (this.deleteGoalsByMonthButton) {
+      this.deleteGoalsByMonthButton.disabled = this.isBusy;
+      this.deleteGoalsByMonthButton.classList.remove('opacity-50', 'cursor-not-allowed');
+      this.deleteGoalsByMonthButton.title = 'Excluir todas as metas do mês em exibição';
+    }
+
+    const referenceMonthLabel = String(goalsState?.referenceMonthLabel || '').trim();
+    if (this.goalsReferenceMonthLabel) {
+      this.goalsReferenceMonthLabel.innerText = isPastReferenceMonth
+        ? `${referenceMonthLabel || 'Mês antigo'} · Histórico`
+        : referenceMonthLabel || 'Sem mês de referência';
+    }
+
+    const goals = Array.isArray(goalsState?.items) ? goalsState.items : [];
+    if (this.deleteGoalsByMonthButton) {
+      this.deleteGoalsByMonthButton.disabled = this.isBusy || goals.length === 0;
+      this.deleteGoalsByMonthButton.classList.toggle('opacity-50', goals.length === 0);
+      this.deleteGoalsByMonthButton.classList.toggle('cursor-not-allowed', goals.length === 0);
+    }
+
+    if (goals.length === 0) {
+      this.goalsList.innerHTML =
+        isPastReferenceMonth
+          ? '<p class="text-[11px] font-bold text-zinc-600">Não há metas históricas salvas para este mês.</p>'
+          : '<p class="text-[11px] font-bold text-zinc-600">Sem metas cadastradas para este mês. Use "+ Nova Meta" ou "Gerar Metas".</p>';
+      return;
+    }
+
+    const rows = goals
+      .map((goal) => {
+        const category = String(goal.category || 'Sem categoria').trim();
+        const targetValue = Number(goal.targetValue || 0);
+        const targetForPeriod = Number(goal.targetForPeriod || 0);
+        const currentValue = Number(goal.currentValue || summary?.categoryTotals?.[category] || 0);
+        const progressPercent = targetForPeriod > 0 ? (currentValue / targetForPeriod) * 100 : 0;
+        const cappedProgress = Math.max(0, Math.min(progressPercent, 180));
+        const progressClass =
+          progressPercent > 110 ? 'goal-progress-fill-danger' : progressPercent > 90 ? 'goal-progress-fill-warning' : 'goal-progress-fill-safe';
+        const sourceLabel = String(goal.source || 'manual') === 'auto' ? 'Automática' : 'Manual';
+
+        return `
+          <article class="goal-item-card">
+            <div class="goal-item-head">
+              <p class="goal-item-category">${escapeHtml(category)}</p>
+              <div class="goal-item-head-actions">
+                <span class="goal-item-source">${escapeHtml(sourceLabel)}</span>
+                ${
+                  isPastReferenceMonth
+                    ? '<span class="goal-item-historical-pill">Histórico</span>'
+                    : `
+                      <button
+                        type="button"
+                        data-action="edit-goal"
+                        data-doc-id="${escapeHtml(goal.docId || '')}"
+                        data-category="${escapeHtml(category)}"
+                        data-target-value="${escapeHtml(targetValue)}"
+                        data-rationale="${escapeHtml(goal.rationale || '')}"
+                        data-source="${escapeHtml(goal.source || 'manual')}"
+                        data-account-scope="${escapeHtml(goal.accountScope || 'all')}"
+                        class="goal-inline-action"
+                        title="Editar meta"
+                      >
+                        Editar
+                      </button>
+                    `
+                }
+              </div>
+            </div>
+            <p class="goal-item-values">
+              Meta mensal: <strong>${formatCurrencyBRL(targetValue)}</strong> | Meta no período: <strong>${formatCurrencyBRL(targetForPeriod)}</strong>
+            </p>
+            <p class="goal-item-values">Gasto atual no período: <strong>${formatCurrencyBRL(currentValue)}</strong></p>
+            <div class="goal-progress-track">
+              <div class="goal-progress-fill ${progressClass}" style="width: ${cappedProgress}%"></div>
+            </div>
+            <p class="goal-progress-label">${progressPercent.toFixed(1)}% da meta do período</p>
+            ${
+              isPastReferenceMonth
+                ? '<p class="goal-progress-label">Meta histórica (mês encerrado).</p>'
+                : `
+                  <div class="goal-item-actions goal-item-actions-compact">
+                    <button
+                      type="button"
+                      data-action="delete-goal"
+                      data-doc-id="${escapeHtml(goal.docId || '')}"
+                      class="goal-inline-action goal-inline-action-danger"
+                    >
+                      Excluir meta
+                    </button>
+                  </div>
+                `
+            }
+          </article>
+        `;
+      })
+      .join('');
+
+    this.goalsList.innerHTML = rows;
+  }
+
   renderAiConsultant(aiConsultantState = {}) {
     const usage = aiConsultantState?.usage || { limit: 3, used: 0, remaining: 3 };
     const report = aiConsultantState?.report || null;
@@ -1043,36 +1349,21 @@ export class DashboardView {
 
     const increased = Array.isArray(report.increased) ? report.increased : [];
     const reduced = Array.isArray(report.reduced) ? report.reduced : [];
-    const criticalActions = Array.isArray(report.criticalActions) ? report.criticalActions : [];
-    const dispensableCuts = Array.isArray(report.dispensableCuts) ? report.dispensableCuts : [];
-    const categoryHighlights = Array.isArray(report.categoryHighlights) ? report.categoryHighlights : [];
-    const topMerchants = Array.isArray(report.topMerchants) ? report.topMerchants : [];
     const smartAlerts = Array.isArray(report.smartAlerts) ? report.smartAlerts : [];
-    const outlierTransactions = Array.isArray(report.outlierTransactions) ? report.outlierTransactions : [];
 
     this.aiConsultantStatusLabel.innerText = 'Análise disponível';
     this.aiConsultantPlaceholder.classList.add('hidden');
     this.aiConsultantContent.classList.remove('hidden');
     this.aiConsultantContent.innerHTML = `
       <div class="bg-zinc-50 border-2 border-black p-3">
-        <p class="text-[10px] font-black uppercase text-zinc-500 mb-1">Leitura Geral</p>
+        <p class="text-[10px] font-black uppercase text-zinc-500 mb-1">Resumo do comportamento</p>
         <p class="text-sm font-bold text-zinc-800">${escapeHtml(report.overview || 'Sem resumo gerado.')}</p>
       </div>
-      ${this.renderIndicatorsBlock(report.indicators)}
-      ${this.renderProjectionBlock(report.projections, report.projectionSummary)}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         ${this.renderDeltaBlock('Aumentou vs Período Anterior', increased, 'bg-red-50')}
         ${this.renderDeltaBlock('Reduziu vs Período Anterior', reduced, 'bg-emerald-50')}
       </div>
-      ${this.renderCategoryHighlightsBlock(categoryHighlights)}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        ${this.renderTipsBlock('Ações Prioritárias', criticalActions)}
-        ${this.renderTipsBlock('Cortes Dispensáveis', dispensableCuts)}
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        ${this.renderTopMerchantsBlock(topMerchants)}
-        ${this.renderAlertsBlock(smartAlerts, outlierTransactions)}
-      </div>
+      ${this.renderAlertsBlock(smartAlerts, [])}
     `;
   }
 
@@ -1374,29 +1665,36 @@ export class DashboardView {
     `;
   }
 
-  renderCategoryChart(summary, previousSummary) {
-    const categories = [...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories])];
+  renderCategoryChart(summary, previousSummary, goalTargetsByCategory = {}) {
+    const categories = [
+      ...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories, ...Object.keys(goalTargetsByCategory || {})])
+    ];
     if (categories.length === 0) {
       this.chartBars.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dados no período selecionado.</p>';
       return;
     }
 
     const maxValue = Math.max(
-      ...categories.map((category) => Math.max(summary.categoryTotals[category] || 0, previousSummary.categoryTotals[category] || 0)),
+      ...categories.map((category) =>
+        Math.max(summary.categoryTotals[category] || 0, previousSummary.categoryTotals[category] || 0, goalTargetsByCategory?.[category] || 0)
+      ),
       1
     );
 
     const chartRows = categories.map((category) => {
       const currentValue = summary.categoryTotals[category] || 0;
       const previousValue = previousSummary.categoryTotals[category] || 0;
+      const targetValue = Number(goalTargetsByCategory?.[category] || 0);
       const currentHeight = (currentValue / maxValue) * 100;
       const previousHeight = (previousValue / maxValue) * 100;
+      const targetHeight = (targetValue / maxValue) * 100;
 
       return `
         <div class="flex flex-col items-center min-w-[70px] h-full">
           <div class="flex items-end gap-1 h-full mb-2">
             <div title="Período atual: ${formatCurrencyBRL(currentValue)}" class="w-5 bg-yellow-400 border-2 border-black" style="height: ${currentHeight}%"></div>
             <div title="Período anterior: ${formatCurrencyBRL(previousValue)}" class="w-5 bg-zinc-300 border-2 border-black" style="height: ${previousHeight}%"></div>
+            <div title="Meta no período: ${formatCurrencyBRL(targetValue)}" class="mix-goal-bar" style="height: ${targetHeight}%"></div>
           </div>
           <span class="text-[8px] font-bold uppercase truncate w-16 text-center">${escapeHtml(category)}</span>
         </div>`;
@@ -1405,40 +1703,47 @@ export class DashboardView {
     this.chartBars.innerHTML = chartRows.join('');
   }
 
-  renderCategoryStats(summary, previousSummary) {
-    const categories = [...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories])];
+  renderCategoryStats(summary, previousSummary, goalTargetsByCategory = {}) {
+    const categories = [
+      ...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories, ...Object.keys(goalTargetsByCategory || {})])
+    ];
     if (categories.length === 0) {
       this.statsList.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem mix para exibir.</p>';
       return;
     }
 
     const maxValue = Math.max(
-      ...categories.map((category) => Math.max(summary.categoryTotals[category] || 0, previousSummary.categoryTotals[category] || 0)),
+      ...categories.map((category) =>
+        Math.max(summary.categoryTotals[category] || 0, previousSummary.categoryTotals[category] || 0, goalTargetsByCategory?.[category] || 0)
+      ),
       1
     );
 
     const statsRows = categories.map((category) => {
       const currentValue = summary.categoryTotals[category] || 0;
       const previousValue = previousSummary.categoryTotals[category] || 0;
+      const targetValue = Number(goalTargetsByCategory?.[category] || 0);
 
       const currentWidth = (currentValue / maxValue) * 100;
       const previousWidth = (previousValue / maxValue) * 100;
+      const targetWidth = (targetValue / maxValue) * 100;
 
       return `
         <div>
           <div class="flex justify-between text-[10px] font-black uppercase mb-1">
             <span class="truncate">${escapeHtml(category)}</span>
-            <span>${formatCompactCurrency(currentValue)}</span>
+            <span>${formatCompactCurrency(currentValue)} / ${formatCompactCurrency(targetValue)}</span>
           </div>
           <div class="space-y-1">
-            <div class="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
+            <div class="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden relative">
               <div class="h-full bg-yellow-400" style="width: ${currentWidth}%"></div>
+              <div class="mix-goal-marker" style="left: ${targetWidth}%"></div>
             </div>
             <div class="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
               <div class="h-full bg-zinc-400" style="width: ${previousWidth}%"></div>
             </div>
           </div>
-          <p class="text-[9px] font-black uppercase text-zinc-500 mt-1">Anterior: ${formatCompactCurrency(previousValue)}</p>
+          <p class="text-[9px] font-black uppercase text-zinc-500 mt-1">Anterior: ${formatCompactCurrency(previousValue)} • Meta: ${formatCompactCurrency(targetValue)}</p>
         </div>`;
     });
 

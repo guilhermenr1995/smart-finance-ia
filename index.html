@@ -314,13 +314,52 @@
               <div class="dashboard-legend-row mix-chart-legend">
                 <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
                 <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 border border-black"></span> Meta do período</span>
               </div>
               <div id="chart-bars" class="mix-chart-canvas flex items-end justify-between h-44 gap-4 overflow-x-auto no-scrollbar"></div>
             </div>
 
-            <div class="md:col-span-1 bg-white p-5 neo-brutalism overflow-y-auto max-h-[350px] no-scrollbar">
-              <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Resumo do Mix</h3>
-              <div id="stats-list" class="space-y-5"></div>
+            <div class="md:col-span-1 bg-white p-5 neo-brutalism space-y-4">
+              <div>
+                <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Resumo do Mix</h3>
+                <div id="stats-list" class="space-y-5 max-h-[220px] overflow-y-auto pr-1"></div>
+              </div>
+
+              <div class="goals-panel border-2 border-black p-3 bg-zinc-50 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <h4 class="font-black text-[11px] uppercase tracking-wide">Metas Mensais</h4>
+                  <span id="goals-reference-month" class="text-[10px] font-black uppercase text-zinc-500">-</span>
+                </div>
+                <p class="text-[11px] font-bold text-zinc-600">
+                  Defina limites por categoria e acompanhe no mix quando estiver perto de ultrapassar.
+                </p>
+                <div class="grid grid-cols-1 gap-2">
+                  <button
+                    id="btn-goals-auto"
+                    type="button"
+                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-yellow-200"
+                  >
+                    Gerar metas automáticas
+                  </button>
+                  <button
+                    id="btn-goals-add"
+                    type="button"
+                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
+                  >
+                    + Nova meta
+                  </button>
+                  <button
+                    id="btn-goals-delete-month"
+                    type="button"
+                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-red-100 text-red-900"
+                  >
+                    Excluir metas do mês
+                  </button>
+                </div>
+                <div id="goals-list" class="space-y-3 max-h-[260px] overflow-y-auto pr-1">
+                  <p class="text-[11px] font-bold text-zinc-500">Sem metas cadastradas para este mês.</p>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -558,6 +597,48 @@
           </div>
           <button type="submit" class="w-full px-4 py-3 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300">
             Salvar descrição
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div id="goal-modal" class="hidden fixed inset-0 bg-black/50 z-[9998] p-6 flex items-center justify-center">
+      <div class="w-full max-w-lg bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 id="goal-modal-title" class="font-black text-sm uppercase">Nova Meta Mensal</h3>
+            <p id="goal-modal-month" class="text-[10px] font-black uppercase text-zinc-500 mt-1">-</p>
+          </div>
+          <button id="goal-close" class="px-3 py-1 border-2 border-black font-black text-[11px] uppercase">Fechar</button>
+        </div>
+        <form id="goal-form" class="space-y-4">
+          <div>
+            <label for="goal-category" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Categoria</label>
+            <select id="goal-category" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"></select>
+          </div>
+          <div>
+            <label for="goal-target-value" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Meta mensal (R$)</label>
+            <input
+              id="goal-target-value"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Ex.: 850.00"
+              class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label for="goal-rationale" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Observação (opcional)</label>
+            <textarea
+              id="goal-rationale"
+              rows="3"
+              placeholder="Ex.: reduzir idas ao restaurante para controlar o total."
+              class="w-full font-black border-2 border-black outline-none bg-transparent p-2 text-sm"
+            ></textarea>
+          </div>
+          <button type="submit" class="w-full px-4 py-3 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300">
+            Salvar meta
           </button>
         </form>
       </div>

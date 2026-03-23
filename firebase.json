@@ -8,6 +8,9 @@
     "ignore": [
       "firebase.json",
       "**/.*",
+      ".git/**",
+      ".serena/**",
+      ".firebase/**",
       "**/node_modules/**",
       "backend/**",
       "novas_demandas.md",

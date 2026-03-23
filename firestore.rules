@@ -77,6 +77,43 @@ service cloud.firestore {
         && data.createdAt is string;
     }
 
+    function hasValidMonthlyGoalShape(data) {
+      return data.keys().hasOnly([
+          'monthKey',
+          'periodStart',
+          'periodEnd',
+          'category',
+          'accountScope',
+          'targetValue',
+          'source',
+          'rationale',
+          'active',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.monthKey is string
+        && data.monthKey.size() == 7
+        && data.monthKey.matches('^[0-9]{4}-[0-9]{2}$')
+        && data.periodStart is string
+        && data.periodStart.size() == 10
+        && data.periodStart.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.periodEnd is string
+        && data.periodEnd.size() == 10
+        && data.periodEnd.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.category is string
+        && data.category.size() > 0
+        && data.category.size() <= 60
+        && (!('accountScope' in data) || data.accountScope in ['all', 'Crédito', 'Conta'])
+        && data.targetValue is number
+        && data.targetValue > 0
+        && data.targetValue <= 100000000
+        && (!('source' in data) || data.source in ['manual', 'auto'])
+        && (!('rationale' in data) || (data.rationale is string && data.rationale.size() <= 400))
+        && (!('active' in data) || data.active is bool)
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
     function hasValidUserProfileShape(data) {
       return data.keys().hasOnly([
           'uid',
@@ -174,6 +211,13 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidBankAccountShape(request.resource.data);
       allow update: if isOwner(userId) && hasValidBankAccountShape(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/metas_mensais/{goalId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidMonthlyGoalShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidMonthlyGoalShape(request.resource.data);
       allow delete: if isOwner(userId);
     }
 

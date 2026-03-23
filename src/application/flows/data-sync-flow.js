@@ -7,7 +7,8 @@ export function persistTransactionsCache(app) {
     transactions: app.state.transactions,
     categories: app.state.userCategories,
     bankAccounts: app.state.userBankAccounts,
-    consultantInsights: Object.values(app.state.aiConsultant.historyByKey || {})
+    consultantInsights: Object.values(app.state.aiConsultant.historyByKey || {}),
+    monthlyGoals: app.state.monthlyGoals
   });
 }
 
@@ -40,15 +41,20 @@ export async function syncDataFromCloud(app, options = {}) {
       return [];
     });
 
-    const [transactions, categories, bankAccounts, consultantInsights] = await Promise.all([
+    const [transactions, categories, bankAccounts, consultantInsights, monthlyGoals] = await Promise.all([
       app.repository.fetchAll(app.state.user.uid),
       app.repository.fetchCategories(app.state.user.uid),
       app.repository.fetchBankAccounts(app.state.user.uid),
-      consultantInsightsPromise
+      consultantInsightsPromise,
+      app.repository.fetchMonthlyGoals(app.state.user.uid).catch((error) => {
+        console.warn('Monthly goals sync skipped:', error);
+        return [];
+      })
     ]);
     app.state.setUserCategories(categories);
     app.state.setUserBankAccounts(bankAccounts);
     app.state.setAiConsultantHistory(consultantInsights);
+    app.state.setMonthlyGoals(monthlyGoals);
     setTransactionsAndRefresh(app, transactions);
     if (showOverlay) {
       app.overlayView.hide();

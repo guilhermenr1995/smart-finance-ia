@@ -21,7 +21,14 @@ const ALLOWED_ORIGINS = new Set([
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const DEFAULT_FALLBACK_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 const DEFAULT_ADMIN_EMAILS = ['guilhermenr1995@gmail.com'];
-const USER_JOURNEY_RESET_COLLECTIONS = ['transacoes', 'categorias', 'contas_bancarias', 'consultor_insights', 'metrics_daily'];
+const USER_JOURNEY_RESET_COLLECTIONS = [
+  'transacoes',
+  'categorias',
+  'contas_bancarias',
+  'metas_mensais',
+  'consultor_insights',
+  'metrics_daily'
+];
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -1237,7 +1244,10 @@ function buildCategoryComparisons(currentMetrics, previousMetrics) {
       deltaPercent: calculateGrowthPercent(current.total, previous.total),
       share: toPercent(current.share || 0),
       transactions: Math.max(0, Math.round(toFiniteNumber(current.transactions))),
-      ticketAverage: toCurrency(current.ticketAverage)
+      previousTransactions: Math.max(0, Math.round(toFiniteNumber(previous.transactions))),
+      transactionDelta: Math.max(0, Math.round(toFiniteNumber(current.transactions))) - Math.max(0, Math.round(toFiniteNumber(previous.transactions))),
+      ticketAverage: toCurrency(current.ticketAverage),
+      previousTicketAverage: toCurrency(previous.ticketAverage)
     });
   });
 
@@ -1324,12 +1334,6 @@ function buildFallbackActions(baseReport) {
   };
 }
 
-function buildDefaultProjectionSummary(current) {
-  return `Mantendo o padrão atual, a projeção de fechamento de ${current.projections.currentMonthLabel} é ${formatCurrencyBRL(
-    current.projections.projectedEndOfMonth
-  )}, e para ${current.projections.nextMonthLabel} é ${formatCurrencyBRL(current.projections.projectedNextMonthTotal)}.`;
-}
-
 function buildDeterministicConsultantReport(currentPeriod, previousPeriod) {
   const current = normalizeDeterministicPeriod(currentPeriod);
   const previous = normalizeDeterministicPeriod(previousPeriod);
@@ -1351,7 +1355,6 @@ function buildDeterministicConsultantReport(currentPeriod, previousPeriod) {
 
   const report = {
     overview: buildDeterministicOverview(current, previous, totalDelta, totalDeltaPercent),
-    projectionSummary: buildDefaultProjectionSummary(current),
     indicators: {
       periodDays: current.periodDays,
       transactionsCount: current.transactionsConsidered,
@@ -1365,21 +1368,6 @@ function buildDeterministicConsultantReport(currentPeriod, previousPeriod) {
       behavioralAverage: current.behavioralAverage,
       installmentsShare,
       outlierThreshold: current.outlierThreshold
-    },
-    projections: {
-      endOfMonth: {
-        monthLabel: current.projections.currentMonthLabel,
-        daysRemaining: current.projections.daysRemainingInMonth,
-        projectedAdditional: current.projections.projectedAdditionalEndOfMonth,
-        projectedTotal: current.projections.projectedEndOfMonth
-      },
-      nextMonth: {
-        monthLabel: current.projections.nextMonthLabel,
-        days: current.projections.nextMonthDays,
-        projectedInstallments: current.projections.projectedNextMonthInstallments,
-        projectedConsumption: current.projections.projectedNextMonthConsumption,
-        projectedTotal: current.projections.projectedNextMonthTotal
-      }
     },
     increased: comparisons.increased.map((item) => ({
       ...item,
@@ -1491,9 +1479,21 @@ function buildCategoryTransactionDrivers(category, currentTopTransactions, previ
 function buildDefaultDeltaInsight(item) {
   const deltaValue = formatCurrencyBRL(Math.abs(item.delta));
   const topDriver = Array.isArray(item.drivers) && item.drivers.length > 0 ? item.drivers[0] : null;
+  const transactionDelta = Number(item.transactionDelta || 0);
+  const ticketAverage = Number(item.ticketAverage || 0);
+  const previousTicketAverage = Number(item.previousTicketAverage || 0);
+  const ticketDelta = ticketAverage - previousTicketAverage;
 
   if (item.delta > 0) {
     if (topDriver) {
+      if (transactionDelta > 0) {
+        return `Subiu ${deltaValue} no período. Você teve ${transactionDelta} compra(s) a mais e o principal impacto foi "${topDriver.title}" (${formatCurrencyBRL(topDriver.delta)}).`;
+      }
+
+      if (ticketDelta > 0.01) {
+        return `Subiu ${deltaValue} no período. O ticket médio ficou maior e "${topDriver.title}" foi o principal impacto (${formatCurrencyBRL(topDriver.delta)}).`;
+      }
+
       return `Subiu ${deltaValue} no período. Principal impacto: "${topDriver.title}" (${formatCurrencyBRL(topDriver.delta)} a mais).`;
     }
 
@@ -1502,7 +1502,23 @@ function buildDefaultDeltaInsight(item) {
 
   if (item.delta < 0) {
     if (topDriver) {
+      if (transactionDelta < 0) {
+        return `Reduziu ${deltaValue} no período porque houve ${Math.abs(transactionDelta)} compra(s) a menos. Principal alívio: "${topDriver.title}" (${formatCurrencyBRL(Math.abs(topDriver.delta))} a menos).`;
+      }
+
+      if (ticketDelta < -0.01) {
+        return `Reduziu ${deltaValue} no período com queda no ticket médio. Destaque para "${topDriver.title}" (${formatCurrencyBRL(Math.abs(topDriver.delta))} a menos).`;
+      }
+
       return `Reduziu ${deltaValue} no período. Principal alívio: "${topDriver.title}" (${formatCurrencyBRL(Math.abs(topDriver.delta))} a menos).`;
+    }
+
+    if (transactionDelta < 0) {
+      return `Reduziu ${deltaValue} no período com ${Math.abs(transactionDelta)} compra(s) a menos nesta categoria.`;
+    }
+
+    if (ticketDelta < -0.01) {
+      return `Reduziu ${deltaValue} no período com ticket médio menor em relação ao ciclo anterior.`;
     }
 
     return `Reduziu ${deltaValue} no período, mantendo tendência positiva.`;
@@ -1563,7 +1579,6 @@ function mergeNarrativeWithDeterministic(baseReport, aiNarrative) {
   const merged = {
     ...baseReport,
     overview: String(narrative.overview || '').trim() || baseReport.overview,
-    projectionSummary: String(narrative.projectionSummary || '').trim() || baseReport.projectionSummary,
     increased: mergeArrayInsightsByCategory(baseReport.increased, narrative.increasedInsights, buildDefaultDeltaInsight),
     reduced: mergeArrayInsightsByCategory(baseReport.reduced, narrative.reducedInsights, buildDefaultDeltaInsight),
     categoryHighlights: mergeArrayInsightsByCategory(
@@ -1984,10 +1999,8 @@ exports.analyzeSpendingInsights = onRequest(
         filters,
         deterministicBase: {
           indicators: baseReport.indicators,
-          projections: baseReport.projections,
           increased: baseReport.increased,
           reduced: baseReport.reduced,
-          categoryHighlights: baseReport.categoryHighlights,
           increasedDrivers: baseReport.increased.map((item) => ({
             category: item.category,
             drivers: item.drivers || []
@@ -2007,11 +2020,13 @@ exports.analyzeSpendingInsights = onRequest(
         geminiApiKey,
         geminiModel,
         systemInstruction:
-          'Você é um consultor financeiro pessoal. Sempre retorne JSON válido e somente JSON. Responda em português do Brasil. Não invente números, use apenas os dados recebidos. Gere recomendações práticas, claras e realistas para o consumidor final.',
+          'Você é um consultor financeiro pessoal para consumidor final. Sempre retorne JSON válido e somente JSON. Responda em português do Brasil. Não invente números, use apenas os dados recebidos.',
         promptText:
           'Analise os dados e retorne estritamente este JSON: ' +
-          '{"overview":"...","projectionSummary":"...","increasedInsights":[{"category":"...","insight":"..."}],"reducedInsights":[{"category":"...","insight":"..."}],"categoryInsights":[{"category":"...","insight":"..."}],"criticalActions":["..."],"dispensableCuts":["..."],"smartAlerts":["..."]}. ' +
-          'Regras: textos objetivos, práticos, úteis para reduzir gastos; sem jargão técnico; destaque aumento/redução por categoria, risco de parcelas e oportunidades de corte. Sempre que possível, cite transações/estabelecimentos específicos que puxaram alta ou queda de cada categoria com base nos drivers fornecidos. Dados: ' +
+          '{"overview":"...","increasedInsights":[{"category":"...","insight":"..."}],"reducedInsights":[{"category":"...","insight":"..."}],"smartAlerts":["..."]}. ' +
+          'Regras: textos objetivos, simples e úteis; sem projeções futuras; destaque apenas categorias que aumentaram ou reduziram. ' +
+          'Nos insights de redução, explique o provável motivo (ex.: menos idas a restaurantes, ticket médio menor, menos frequência). ' +
+          'Sempre que possível cite as transações que mais influenciaram cada categoria usando os drivers recebidos. Dados: ' +
           JSON.stringify(promptPayload),
         temperature: 0.25
       });
