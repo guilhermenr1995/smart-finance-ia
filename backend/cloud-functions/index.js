@@ -1945,6 +1945,7 @@ exports.analyzeSpendingInsights = onRequest(
       const filters = request.body?.filters || {};
       const appId = request.body?.appId || null;
       const insightKey = resolveInsightKey(request.body?.insightKey, filters);
+      const forceRefresh = Boolean(request.body?.forceRefresh);
 
       if (!currentPeriod || typeof currentPeriod !== 'object') {
         response.status(400).json({ error: 'currentPeriod is required' });
@@ -1964,7 +1965,7 @@ exports.analyzeSpendingInsights = onRequest(
         dateKey: getDateKeyInTimezone()
       };
 
-      if (appId && insightKey) {
+      if (appId && insightKey && !forceRefresh) {
         const existingInsightDoc = await db
           .collection(`artifacts/${appId}/users/${decodedToken.uid}/consultor_insights`)
           .doc(insightKey)

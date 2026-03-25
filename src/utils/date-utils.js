@@ -1,6 +1,6 @@
 export function getDefaultCycleRange(referenceDate = new Date()) {
   const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0, 23, 59, 59, 999);
+  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 23, 59, 59, 999);
 
   return {
     startDate: toInputDateValue(start),

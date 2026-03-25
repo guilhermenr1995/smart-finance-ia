@@ -1,5 +1,5 @@
 import { parseDateFlexible, shiftInputDateByMonths } from '../../utils/date-utils.js';
-import { getInstallmentInfo } from '../../utils/transaction-utils.js';
+import { getDisplayCategory } from '../../utils/transaction-utils.js';
 
 function roundCurrency(value) {
   return Number(Number(value || 0).toFixed(2));
@@ -136,13 +136,18 @@ function buildOutlierStats(consumptionTransactions) {
 
 function buildDeterministicInsights(periodDates, summary) {
   const considered = Array.isArray(summary?.considered)
-    ? summary.considered.filter((transaction) => Number(transaction?.value || 0) > 0)
+    ? summary.considered
+        .filter((transaction) => Number(transaction?.value || 0) > 0)
+        .map((transaction) => ({
+          ...transaction,
+          category: String(getDisplayCategory(transaction) || transaction.category || 'Sem categoria').trim() || 'Sem categoria'
+        }))
     : [];
   const totalPeriod = roundCurrency(considered.reduce((sum, transaction) => sum + Number(transaction.value || 0), 0));
   const periodDays = getInclusivePeriodDays(periodDates.startDate, periodDates.endDate);
 
-  const installmentTransactions = considered.filter((transaction) => Boolean(getInstallmentInfo(transaction.title)));
-  const consumptionTransactions = considered.filter((transaction) => !getInstallmentInfo(transaction.title));
+  const installmentTransactions = considered.filter((transaction) => String(transaction.category || '').trim() === 'Parcelas');
+  const consumptionTransactions = considered.filter((transaction) => String(transaction.category || '').trim() !== 'Parcelas');
 
   const totalInstallments = roundCurrency(
     installmentTransactions.reduce((sum, transaction) => sum + Number(transaction.value || 0), 0)
@@ -320,7 +325,10 @@ export async function syncCategoriesWithAi(app) {
 export function buildConsultantPeriodSnapshot(app, periodDates, summary) {
   const consideredTransactions = (Array.isArray(summary?.considered) ? summary.considered : []).filter(
     (transaction) => Number(transaction?.value || 0) > 0
-  );
+  ).map((transaction) => ({
+    ...transaction,
+    category: String(getDisplayCategory(transaction) || transaction.category || 'Sem categoria').trim() || 'Sem categoria'
+  }));
   const deterministic = buildDeterministicInsights(periodDates, {
     ...summary,
     considered: consideredTransactions
@@ -408,37 +416,11 @@ export async function runAiConsultant(app) {
   }
 
   const insightKey = buildConsultantInsightKey(app.state.filters);
-  const existingInsight = app.state.getAiConsultantHistory(insightKey);
-  if (existingInsight?.insights) {
-    app.state.setAiConsultantReport(existingInsight.insights);
-    app.refreshDashboard();
-    app.overlayView.show('Consultor IA: carregando insight salvo...');
-    app.overlayView.log('Insight encontrado na base para este período. Nenhuma nova consulta foi necessária.');
-    setTimeout(() => app.overlayView.hide(), 800);
-    return;
-  }
-
-  let cloudInsight = null;
-  try {
-    cloudInsight = await app.repository.fetchConsultantInsightByKey(app.state.user.uid, insightKey);
-  } catch (error) {
-    console.warn('Consultor IA: falha ao consultar insight salvo no Firestore:', error);
-  }
-
-  if (cloudInsight?.insights) {
-    app.state.upsertAiConsultantHistory(cloudInsight);
-    app.state.setAiConsultantReport(cloudInsight.insights);
-    app.persistTransactionsCache();
-    app.refreshDashboard();
-    app.overlayView.show('Consultor IA: carregando insight salvo no banco...');
-    app.overlayView.log('Insight encontrado no Firestore para este período. Nenhuma nova chamada de IA foi feita.');
-    setTimeout(() => app.overlayView.hide(), 800);
-    return;
-  }
 
   const payload = {
     appId: app.config.appId,
     insightKey,
+    forceRefresh: true,
     filters: {
       startDate: app.state.filters.startDate,
       endDate: app.state.filters.endDate,
@@ -488,13 +470,7 @@ export async function runAiConsultant(app) {
     }
     setTimeout(() => app.overlayView.hide(), 900);
   } catch (error) {
-    if (Number(error?.status) === 429 || error?.details?.dailyLimitReached) {
-      app.state.setAiConsultantUsage(error?.details?.usage || { limit: 3, used: 3, remaining: 0 });
-      app.refreshDashboard();
-      app.overlayView.showError('Limite diário do Consultor IA atingido (3 análises por dia).');
-    } else {
-      app.overlayView.showError(app.normalizeError(error));
-    }
+    app.overlayView.showError(app.normalizeError(error));
   } finally {
     app.dashboardView.setBusy(false);
   }

@@ -861,7 +861,7 @@ export class DashboardView {
     if (this.paginationNextButton) {
       this.paginationNextButton.disabled = isBusy || this.pagination.page >= this.pagination.totalPages;
     }
-    this.aiConsultantButton.disabled = isBusy || !this.consultantHasRemaining;
+    this.aiConsultantButton.disabled = isBusy;
   }
 
   setAccountFilterButton(accountType) {
@@ -1322,17 +1322,13 @@ export class DashboardView {
   }
 
   renderAiConsultant(aiConsultantState = {}) {
-    const usage = aiConsultantState?.usage || { limit: 3, used: 0, remaining: 3 };
     const report = aiConsultantState?.report || null;
-    const limit = Number(usage.limit || 3);
-    const used = Number(usage.used || 0);
-    const remaining = Number.isFinite(usage.remaining) ? Number(usage.remaining) : Math.max(0, limit - used);
-    this.consultantHasRemaining = remaining > 0;
-
-    this.aiConsultantUsageLabel.innerText = `${remaining}/${limit} usos restantes hoje`;
-    this.aiConsultantButton.disabled = this.isBusy || !this.consultantHasRemaining;
-    this.aiConsultantButton.classList.toggle('opacity-50', remaining <= 0);
-    this.aiConsultantButton.classList.toggle('cursor-not-allowed', remaining <= 0);
+    this.consultantHasRemaining = true;
+    if (this.aiConsultantUsageLabel) {
+      this.aiConsultantUsageLabel.innerText = 'Atualize quando quiser';
+    }
+    this.aiConsultantButton.disabled = this.isBusy;
+    this.aiConsultantButton.classList.remove('opacity-50', 'cursor-not-allowed');
 
     if (!report) {
       this.aiConsultantStatusLabel.innerText = 'Aguardando análise';

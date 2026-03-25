@@ -58,6 +58,8 @@ export function refreshDashboard(app) {
 
   const referenceMonthKey = getMonthKeyFromDate(app.state.filters.endDate || app.state.filters.startDate);
   const referenceMonth = getMonthBounds(referenceMonthKey);
+  const referenceMonthStartDate = referenceMonth.startDateInput;
+  const referenceMonthEndDate = referenceMonth.endDateInput;
   const activeGoalScope = normalizeGoalScope(app.state.filters.accountType);
   const activeGoalScopeLabel = getGoalScopeLabel(activeGoalScope);
   const monthlyGoals = Array.isArray(app.state.monthlyGoals) ? app.state.monthlyGoals : [];
@@ -66,12 +68,12 @@ export function refreshDashboard(app) {
   );
   const goalTargetsByCategory = buildGoalTargetsByCategory(
     scopedMonthlyGoals,
-    app.state.filters.startDate,
-    app.state.filters.endDate
+    referenceMonthStartDate,
+    referenceMonthEndDate
   );
   const goalsForReferenceMonth = getGoalsForReferenceMonth(scopedMonthlyGoals, referenceMonthKey, activeGoalScope).map(
     (goal) => {
-      const targetForPeriod = computeGoalTargetForDateRange(goal, app.state.filters.startDate, app.state.filters.endDate);
+      const targetForPeriod = computeGoalTargetForDateRange(goal, referenceMonthStartDate, referenceMonthEndDate);
       const currentValue = Number(summary.categoryTotals[goal.category] || 0);
       const progressPercent = targetForPeriod > 0 ? (currentValue / targetForPeriod) * 100 : 0;
       return {
