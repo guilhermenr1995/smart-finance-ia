@@ -48,6 +48,9 @@ runtime-config.local.js
 *.p12
 *serviceAccount*.json
 
+# Agent folders may contain local auth/session artifacts
+.gemini/
+
 # -------------------------------
 # Temporary / coverage
 # -------------------------------
