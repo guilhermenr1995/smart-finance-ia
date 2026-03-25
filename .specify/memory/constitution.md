@@ -1,50 +1,88 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Constituição do Projeto Smart Finance IA
 
-## Core Principles
+## Princípios Essenciais
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Valor diário ao usuário e foco em despesas
+Cada evolução deve melhorar decisões financeiras do dia a dia, com linguagem simples e ação prática.
+O produto é orientado a **controle de despesas**; qualquer funcionalidade nova precisa deixar claro:
+- qual dor de gasto resolve,
+- qual decisão prática habilita,
+- e como se conecta aos fluxos já existentes (importar, categorizar, comparar períodos, metas, consultor IA).
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Segurança e isolamento de dados são inegociáveis
+Dados devem permanecer isolados por usuário em todas as camadas.
+Regras obrigatórias:
+- validar autenticação/autorização no backend (não confiar apenas no frontend),
+- manter escopo por `userId` no Firestore,
+- evitar exposição de segredos no cliente,
+- usar proxy backend para chamadas de IA em produção.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. IA em camadas com custo controlado e fallback confiável
+O comportamento padrão é: memória local primeiro, IA depois.
+Toda feature com IA deve:
+- reduzir chamadas desnecessárias (cache/memória/reaproveitamento),
+- registrar uso para operação e custo,
+- ter fallback determinístico quando o modelo falhar,
+- preservar consistência de categorização e experiência do usuário.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Integridade das regras financeiras e rastreabilidade
+Mudanças não podem quebrar regras críticas já estabelecidas (deduplicação, parcelas, transferências, escopo de conta/categoria).
+Toda automação deve manter rastreabilidade com metadados e origem das decisões para facilitar auditoria funcional e suporte.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Simplicidade operacional, evolução incremental e qualidade contínua
+Preferir mudanças pequenas, testáveis e com impacto claro.
+Cada entrega deve ser observável e reversível, preservando:
+- UX mobile/PWA,
+- performance de dashboard,
+- compatibilidade com arquitetura atual (HTML + JS modular + Firebase).
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Restrições Técnicas e de Plataforma
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+1. **Stack base**
+   - Frontend: HTML + JavaScript ES Modules + CSS utilitário.
+   - Backend: Firebase Cloud Functions (Node 22).
+   - Dados: Cloud Firestore.
+   - Auth: Firebase Authentication.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+2. **Padrões de projeto**
+   - Orquestração principal em `src/app.js` e `src/application/flows/`.
+   - Regras de domínio concentradas em `src/utils/` e `src/services/`.
+   - Endpoints administrativos e de IA devem manter contratos JSON previsíveis.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+3. **Segurança e configuração**
+   - Nunca versionar segredos reais (`.env`, chaves, configs sensíveis locais).
+   - Runtime config local deve permanecer fora de versionamento quando necessário.
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+4. **Escalabilidade e custo**
+   - Priorizar reaproveitamento de dados, cache e deduplicação de chamadas.
+   - Qualquer aumento de custo operacional deve ser justificado no plano da feature.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+## Workflow de Desenvolvimento e Portões de Qualidade
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. **Fluxo obrigatório Speckit**
+   - `/speckit.constitution` → `/speckit.specify` → (opcional `/speckit.clarify`) → `/speckit.plan` → (opcional `/speckit.checklist`) → `/speckit.tasks` → (opcional `/speckit.analyze`) → `/speckit.implement`.
+
+2. **Portões mínimos antes de implementar**
+   - Especificação sem ambiguidades críticas.
+   - Plano técnico coerente com stack real e com esta Constituição.
+   - Tarefas rastreáveis por história de usuário e executáveis em incrementos.
+
+3. **Validações obrigatórias após mudança relevante**
+   - autenticação e isolamento de dados,
+   - importação + deduplicação,
+   - categorização (memória + IA),
+   - dashboard com filtros/comparativo,
+   - regras de parcelas/transferências,
+   - fallback da IA e métricas operacionais.
+
+4. **Admin e operação**
+   - Alterações no painel admin devem manter autorização server-side, contrato do `getAdminDashboard` e consistência de métricas.
+
+## Governança
+
+- Esta Constituição prevalece sobre preferências locais de implementação.
+- Exceções só são aceitas quando documentadas no `plan.md` (seção de complexidade/justificativa) com alternativa mais simples considerada.
+- Toda PR/revisão deve checar conformidade com estes princípios.
+- Em caso de conflito entre rapidez e segurança/integridade de dados, vence segurança/integridade.
+
+**Versão**: 1.0.0 | **Ratificada em**: 2026-03-25 | **Última atualização**: 2026-03-25

@@ -1,104 +1,58 @@
-# Implementation Plan: [FEATURE]
+# Plano de Implementação: [NOME_DA_FEATURE]
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Branch**: `[###-nome-da-feature]` | **Data**: [DATA] | **Spec**: [link]
+**Entrada**: Especificação da feature em `/specs/[###-nome-da-feature]/spec.md`
 
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Observação**: Este template é preenchido pelo comando `/speckit.plan`.
 
-## Summary
+## Resumo
 
-[Extract from feature spec: primary requirement + technical approach from research]
+[Resumo da necessidade principal + abordagem técnica escolhida com base na pesquisa]
 
-## Technical Context
+## Contexto Técnico
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Linguagem/Versão**: [ex.: JavaScript ES Modules, Node 22 ou NEEDS CLARIFICATION]  
+**Dependências Principais**: [ex.: Firebase SDK, Cloud Functions, etc. ou NEEDS CLARIFICATION]  
+**Armazenamento**: [ex.: Firestore, arquivos, N/A]  
+**Testes**: [ex.: suíte existente, estratégia manual/e2e, ou NEEDS CLARIFICATION]  
+**Plataforma-Alvo**: [ex.: Web/PWA, Android/iOS via PWA, etc.]  
+**Tipo de Projeto**: [ex.: aplicação web, backend serverless, etc.]  
+**Metas de Performance**: [metas mensuráveis]  
+**Restrições**: [limites técnicos, segurança, custo, prazo]  
+**Escala/Escopo**: [volume de usuários/dados, escopo de entrega]
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+## Checagem da Constituição
 
-## Constitution Check
+*PORTÃO: deve passar antes da pesquisa (Fase 0) e ser revalidado após o design (Fase 1).* 
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+[Liste os critérios da constituição e valide aderência]
 
-[Gates determined based on constitution file]
+## Estrutura do Projeto
 
-## Project Structure
-
-### Documentation (this feature)
+### Documentação desta feature
 
 ```text
 specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+└── tasks.md
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Código-fonte (raiz do repositório)
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+[Descreva a estrutura real usada nesta feature]
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Decisão de Estrutura**: [registre qual estrutura foi escolhida e por quê]
 
-## Complexity Tracking
+## Rastreamento de Complexidade
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
+> Preencher somente se houver exceções aos princípios da Constituição.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Exceção/Violação | Por que foi necessária | Alternativa mais simples rejeitada por quê |
+|------------------|------------------------|-------------------------------------------|
+| [item] | [justificativa] | [motivo] |
