@@ -244,6 +244,49 @@ select.edit-mode {
   padding: 10px 12px 8px;
 }
 
+#open-finance-section {
+  background: linear-gradient(170deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.open-finance-connect-btn {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.open-finance-connect-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #111827;
+}
+
+#open-finance-connections article {
+  box-shadow: 2px 2px 0 #111827;
+}
+
+#ritmo-do-mes-section {
+  background: linear-gradient(170deg, #ffffff 0%, #f8fafc 100%);
+}
+
+#ritmo-status-pill {
+  min-width: 82px;
+  text-align: center;
+}
+
+#ritmo-daily-chart {
+  min-height: 206px;
+}
+
+.ritmo-day-column {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ritmo-day-column:hover {
+  transform: translateY(-2px);
+  box-shadow: 2px 2px 0 #111827;
+}
+
+#ritmo-daily-tooltip {
+  min-height: 18px;
+}
+
 .mix-goal-bar {
   width: 6px;
   min-height: 2px;

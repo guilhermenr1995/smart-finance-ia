@@ -20,6 +20,10 @@ window.SMART_FINANCE_CONFIG = {
     baseRetryDelayMs: 450,
     interChunkDelayMs: 180
   },
+  openFinance: {
+    proxyUrl: 'https://YOUR_OPEN_FINANCE_PROXY_URL.a.run.app',
+    supportedBanks: ['nubank', 'itau', 'bradesco', 'banco-do-brasil']
+  },
   admin: {
     dashboardProxyUrl: 'https://YOUR_ADMIN_DASHBOARD_PROXY_URL.a.run.app',
     maintenanceProxyUrl: 'https://YOUR_MAINTENANCE_PROXY_URL.a.run.app',

@@ -5,6 +5,7 @@ import { AiCategorizationService } from './services/ai-categorization-service.js
 import { AiConsultantService } from './services/ai-consultant-service.js';
 import { CsvImportService } from './services/csv-import-service.js';
 import { FirebaseService } from './services/firebase-service.js';
+import { OpenFinanceService } from './services/open-finance-service.js';
 import { CategoryMemoryService } from './services/category-memory-service.js';
 import { LocalCacheService } from './services/local-cache-service.js';
 import { PwaService } from './services/pwa-service.js';
@@ -46,6 +47,13 @@ import {
   generateAutomaticMonthlyGoals,
   saveMonthlyGoal
 } from './application/flows/goal-flow.js';
+import {
+  connectOpenFinanceBank,
+  loadOpenFinanceConnections,
+  renewOpenFinanceConnection,
+  revokeOpenFinanceConnection,
+  syncOpenFinanceConnection
+} from './application/flows/open-finance-flow.js';
 import { TransactionQueryService } from './utils/transaction-utils.js';
 
 class SmartFinanceApplication {
@@ -57,6 +65,7 @@ class SmartFinanceApplication {
     this.csvImportService = dependencies.csvImportService;
     this.aiService = dependencies.aiService;
     this.aiConsultantService = dependencies.aiConsultantService;
+    this.openFinanceService = dependencies.openFinanceService;
     this.queryService = dependencies.queryService;
     this.categoryMemoryService = dependencies.categoryMemoryService;
     this.localCacheService = dependencies.localCacheService;
@@ -126,7 +135,12 @@ class SmartFinanceApplication {
       onSaveGoal: (payload) => this.saveMonthlyGoal(payload),
       onDeleteGoal: (goalDocId) => this.deleteMonthlyGoal(goalDocId),
       onDeleteGoalsByMonth: () => this.deleteMonthlyGoalsForReferenceMonth(),
-      onGenerateAutomaticGoals: () => this.generateAutomaticMonthlyGoals()
+      onGenerateAutomaticGoals: () => this.generateAutomaticMonthlyGoals(),
+      onConnectOpenFinanceBank: (bankCode) => this.connectOpenFinanceBank(bankCode),
+      onSyncOpenFinanceConnection: (connectionId) => this.syncOpenFinanceConnection(connectionId),
+      onRenewOpenFinanceConnection: (connectionId) => this.renewOpenFinanceConnection(connectionId),
+      onRevokeOpenFinanceConnection: (connectionId) => this.revokeOpenFinanceConnection(connectionId),
+      onRefreshOpenFinanceConnections: () => this.loadOpenFinanceConnections({ showFeedback: true })
     });
 
     this.installButton.addEventListener('click', async () => {
@@ -250,6 +264,26 @@ class SmartFinanceApplication {
     return generateAutomaticMonthlyGoals(this);
   }
 
+  async loadOpenFinanceConnections(options = {}) {
+    return loadOpenFinanceConnections(this, options);
+  }
+
+  async connectOpenFinanceBank(bankCode) {
+    return connectOpenFinanceBank(this, bankCode);
+  }
+
+  async syncOpenFinanceConnection(connectionId) {
+    return syncOpenFinanceConnection(this, connectionId);
+  }
+
+  async renewOpenFinanceConnection(connectionId) {
+    return renewOpenFinanceConnection(this, connectionId);
+  }
+
+  async revokeOpenFinanceConnection(connectionId) {
+    return revokeOpenFinanceConnection(this, connectionId);
+  }
+
   normalizeError(error) {
     if (typeof error?.details === 'string' && error.details.trim()) {
       return error.details;
@@ -309,6 +343,16 @@ function bootstrap() {
           return '';
         }
 
+        return user.getIdToken();
+      }
+    }),
+    openFinanceService: new OpenFinanceService({
+      ...config.openFinance,
+      getAuthToken: async () => {
+        const user = firebaseContext.auth.currentUser;
+        if (!user) {
+          return '';
+        }
         return user.getIdToken();
       }
     }),

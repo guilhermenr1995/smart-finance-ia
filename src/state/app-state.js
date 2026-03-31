@@ -28,6 +28,10 @@ export class AppState {
       },
       historyByKey: {}
     };
+    this.openFinance = {
+      connections: [],
+      lastSyncedAt: ''
+    };
     this.filters = {
       startDate: defaultRange.startDate,
       endDate: defaultRange.endDate,
@@ -189,6 +193,30 @@ export class AppState {
     this.aiConsultant = {
       ...this.aiConsultant,
       historyByKey
+    };
+  }
+
+  setOpenFinanceConnections(connections) {
+    const normalized = Array.isArray(connections)
+      ? connections
+          .filter((item) => item && typeof item === 'object')
+          .map((item) => ({
+            ...item,
+            id: String(item.id || '').trim(),
+            bankCode: String(item.bankCode || '').trim(),
+            bankName: String(item.bankName || '').trim(),
+            status: String(item.status || 'unknown').trim(),
+            consentExpiresAt: String(item.consentExpiresAt || '').trim(),
+            lastSyncAt: String(item.lastSyncAt || '').trim(),
+            createdAt: String(item.createdAt || '').trim(),
+            lastSyncInserted: Number(item.lastSyncInserted || 0)
+          }))
+      : [];
+
+    this.openFinance = {
+      ...this.openFinance,
+      connections: normalized,
+      lastSyncedAt: new Date().toISOString()
     };
   }
 

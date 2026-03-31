@@ -387,10 +387,60 @@
             </div>
           </section>
 
+          <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="open-finance-section">
+            <div class="dashboard-section-head">
+              <div class="dashboard-section-title-wrap">
+                <span class="dashboard-step-badge">6</span>
+                <h3 class="dashboard-section-title">Open Finance</h3>
+              </div>
+              <button id="btn-open-finance-refresh" class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase bg-white">
+                Atualizar status
+              </button>
+            </div>
+            <p class="dashboard-section-subtitle text-left max-w-none">Conecte seu banco para sincronizar transações automaticamente.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <button data-bank-code="nubank" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Nubank</button>
+              <button data-bank-code="itau" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Itaú</button>
+              <button data-bank-code="bradesco" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Bradesco</button>
+              <button data-bank-code="banco-do-brasil" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Banco do Brasil</button>
+            </div>
+            <div id="open-finance-connections" class="space-y-2">
+              <p class="text-[11px] font-bold text-zinc-500">Nenhuma conexão ativa.</p>
+            </div>
+          </section>
+
+          <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="ritmo-do-mes-section">
+            <div class="dashboard-section-head">
+              <div class="dashboard-section-title-wrap">
+                <span class="dashboard-step-badge">7</span>
+                <h3 class="dashboard-section-title">Ritmo do Mês</h3>
+              </div>
+              <p id="ritmo-status-pill" class="text-[11px] font-black uppercase px-2 py-1 border-2 border-black bg-emerald-100">Verde</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-bold">
+              <div class="border-2 border-black p-3 bg-zinc-50">
+                <p>Orçamento mensal</p>
+                <p id="ritmo-budget" class="text-sm font-black">R$ 0,00</p>
+              </div>
+              <div class="border-2 border-black p-3 bg-zinc-50">
+                <p>Gasto realizado</p>
+                <p id="ritmo-realized" class="text-sm font-black">R$ 0,00</p>
+              </div>
+              <div class="border-2 border-black p-3 bg-zinc-50">
+                <p>Esperado até hoje</p>
+                <p id="ritmo-expected" class="text-sm font-black">R$ 0,00</p>
+              </div>
+            </div>
+            <p id="ritmo-recommendation" class="text-sm font-black text-zinc-700">Para fechar no alvo, reduza R$ 0,00 em 0 dias.</p>
+            <div id="ritmo-legend" class="dashboard-legend-row"></div>
+            <div id="ritmo-daily-chart" class="mix-chart-canvas"></div>
+            <div id="ritmo-daily-tooltip" class="text-[11px] font-bold text-zinc-600"></div>
+          </section>
+
           <section class="dashboard-section transactions-section bg-white p-4 neo-brutalism space-y-5">
             <div class="dashboard-section-head px-2 py-3 mb-2">
               <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">6</span>
+                <span class="dashboard-step-badge">8</span>
                 <h3 class="dashboard-section-title">Lançamentos Detalhados</h3>
                 <button
                   type="button"

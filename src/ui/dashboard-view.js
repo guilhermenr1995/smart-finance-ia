@@ -128,6 +128,18 @@ export class DashboardView {
     this.aiConsultantStatusLabel = document.getElementById('ai-consultant-status');
     this.aiConsultantPlaceholder = document.getElementById('ai-consultant-placeholder');
     this.aiConsultantContent = document.getElementById('ai-consultant-content');
+    this.openFinanceRefreshButton = document.getElementById('btn-open-finance-refresh');
+    this.openFinanceConnectionsContainer = document.getElementById('open-finance-connections');
+    this.openFinanceConnectButtons = Array.from(document.querySelectorAll('.open-finance-connect-btn'));
+
+    this.ritmoStatusPill = document.getElementById('ritmo-status-pill');
+    this.ritmoBudgetValue = document.getElementById('ritmo-budget');
+    this.ritmoRealizedValue = document.getElementById('ritmo-realized');
+    this.ritmoExpectedValue = document.getElementById('ritmo-expected');
+    this.ritmoRecommendation = document.getElementById('ritmo-recommendation');
+    this.ritmoLegend = document.getElementById('ritmo-legend');
+    this.ritmoDailyChart = document.getElementById('ritmo-daily-chart');
+    this.ritmoDailyTooltip = document.getElementById('ritmo-daily-tooltip');
 
     this.totalValue = document.getElementById('total-fatura-val');
     this.ignoredValue = document.getElementById('valor-ignorado');
@@ -479,6 +491,41 @@ export class DashboardView {
 
     this.aiConsultantButton.addEventListener('click', () => {
       handlers.onAiConsultant();
+    });
+
+    this.openFinanceRefreshButton?.addEventListener('click', () => {
+      handlers.onRefreshOpenFinanceConnections?.();
+    });
+
+    this.openFinanceConnectButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        handlers.onConnectOpenFinanceBank?.(button.dataset.bankCode);
+      });
+    });
+
+    this.openFinanceConnectionsContainer?.addEventListener('click', (event) => {
+      const actionButton = event.target.closest('[data-open-finance-action]');
+      if (!actionButton) {
+        return;
+      }
+
+      const action = actionButton.dataset.openFinanceAction;
+      const connectionId = actionButton.dataset.connectionId;
+      if (!connectionId) {
+        return;
+      }
+
+      if (action === 'sync') {
+        handlers.onSyncOpenFinanceConnection?.(connectionId);
+        return;
+      }
+      if (action === 'renew') {
+        handlers.onRenewOpenFinanceConnection?.(connectionId);
+        return;
+      }
+      if (action === 'revoke') {
+        handlers.onRevokeOpenFinanceConnection?.(connectionId);
+      }
     });
 
     this.tableBody.addEventListener('click', (event) => {
@@ -1077,6 +1124,8 @@ export class DashboardView {
     bankAccounts,
     aiConsultant,
     goals
+    ,openFinance
+    ,ritmoDoMes
   }) {
     this.setAvailableCategories(categories);
     this.setAvailableBankAccounts(bankAccounts);
@@ -1105,6 +1154,8 @@ export class DashboardView {
     this.renderTransactionsPagination(paginationMeta);
     this.renderSearchTotals(searchTotals);
     this.renderAiConsultant(aiConsultant);
+    this.renderOpenFinance(openFinance);
+    this.renderRitmoDoMes(ritmoDoMes);
 
     const baseCounterLabel = search.term.trim()
       ? `${tableTransactions.length} RESULTADOS (${search.useGlobalBase ? 'BASE TOTAL' : 'PERÍODO FILTRADO'})`
@@ -1114,6 +1165,203 @@ export class DashboardView {
         ? `${baseCounterLabel} • PÁGINA ${paginationMeta.currentPage}/${paginationMeta.totalPages}`
         : baseCounterLabel;
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
+  }
+
+  renderOpenFinance(openFinanceState = {}) {
+    if (!this.openFinanceConnectionsContainer) {
+      return;
+    }
+
+    const connections = Array.isArray(openFinanceState?.connections) ? openFinanceState.connections : [];
+    if (connections.length === 0) {
+      this.openFinanceConnectionsContainer.innerHTML =
+        '<p class="text-[11px] font-bold text-zinc-500">Nenhuma conexão ativa.</p>';
+      return;
+    }
+
+    const statusLabelMap = {
+      active: 'Ativa',
+      expired: 'Expirada',
+      error: 'Erro',
+      revoked: 'Revogada'
+    };
+
+    this.openFinanceConnectionsContainer.innerHTML = connections
+      .map((connection) => {
+        const status = String(connection.status || 'unknown').trim();
+        const label = statusLabelMap[status] || status || 'Desconhecido';
+        const syncLabel = connection.lastSyncAt ? `Última sync: ${escapeHtml(connection.lastSyncAt)}` : 'Sem sincronização';
+        return `
+          <article class="border-2 border-black p-3 bg-zinc-50">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs font-black uppercase">${escapeHtml(connection.bankName || connection.bankCode || 'Banco')}</p>
+              <span class="text-[10px] font-black uppercase px-2 py-1 border border-black bg-white">${escapeHtml(label)}</span>
+            </div>
+            <p class="text-[11px] font-bold text-zinc-600 mt-2">${syncLabel}</p>
+            <div class="grid grid-cols-3 gap-2 mt-3">
+              <button data-open-finance-action="sync" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Sync</button>
+              <button data-open-finance-action="renew" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Renovar</button>
+              <button data-open-finance-action="revoke" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-100">Revogar</button>
+            </div>
+          </article>
+        `;
+      })
+      .join('');
+  }
+
+  getCategoryColor(category, index) {
+    const palette = ['#facc15', '#38bdf8', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#94a3b8'];
+    const key = normalizeForSearch(category);
+    let hash = 0;
+    for (let i = 0; i < key.length; i += 1) {
+      hash = (hash * 31 + key.charCodeAt(i)) % 997;
+    }
+    return palette[(hash + index) % palette.length];
+  }
+
+  renderRitmoDoMes(ritmoState = {}) {
+    if (!this.ritmoStatusPill || !this.ritmoDailyChart) {
+      return;
+    }
+
+    const riskLevel = String(ritmoState?.riskLevel || 'verde').toLowerCase();
+    const riskLabelMap = {
+      verde: 'Verde',
+      amarelo: 'Amarelo',
+      vermelho: 'Vermelho'
+    };
+    const riskClassMap = {
+      verde: 'bg-emerald-100',
+      amarelo: 'bg-yellow-100',
+      vermelho: 'bg-red-100'
+    };
+    this.ritmoStatusPill.classList.remove('bg-emerald-100', 'bg-yellow-100', 'bg-red-100');
+    this.ritmoStatusPill.classList.add(riskClassMap[riskLevel] || 'bg-emerald-100');
+    this.ritmoStatusPill.innerText = riskLabelMap[riskLevel] || 'Verde';
+
+    this.ritmoBudgetValue.innerText = formatCurrencyBRL(Number(ritmoState?.monthlyBudget || 0));
+    this.ritmoRealizedValue.innerText = formatCurrencyBRL(Number(ritmoState?.realized || 0));
+    this.ritmoExpectedValue.innerText = formatCurrencyBRL(Number(ritmoState?.expectedUntilToday || 0));
+
+    const recommendationGap = Number(ritmoState?.recommendationGap || 0);
+    const daysRemaining = Number(ritmoState?.daysRemaining || 0);
+    this.ritmoRecommendation.innerText = `Para fechar no alvo, reduza ${formatCurrencyBRL(recommendationGap)} em ${daysRemaining} dias.`;
+
+    const daily = ritmoState?.daily || {};
+    const days = Array.isArray(daily.days) ? daily.days : [];
+    const series = Array.isArray(daily.series) ? daily.series : [];
+
+    if (days.length === 0 || series.length === 0) {
+      this.ritmoLegend.innerHTML = '<span class="text-[10px] font-black uppercase text-zinc-400">Sem dados diários para o período.</span>';
+      this.ritmoDailyChart.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dias com transação.</p>';
+      this.ritmoDailyTooltip.innerText = '';
+      return;
+    }
+
+    const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
+    const activeCategorySet = new Set(categories);
+    const colorMap = new Map(categories.map((category, index) => [category, this.getCategoryColor(category, index)]));
+
+    const renderChart = () => {
+      const totalsByDay = days.map((_, dayIndex) => {
+        return [...activeCategorySet].reduce((sum, category) => {
+          const row = series.find((item) => item.category === category);
+          return sum + Number(row?.values?.[dayIndex] || 0);
+        }, 0);
+      });
+      const maxTotal = Math.max(...totalsByDay, 1);
+
+      this.ritmoDailyChart.innerHTML = `
+        <div class="flex items-end gap-2 overflow-x-auto no-scrollbar min-h-[180px]">
+          ${days
+            .map((day, dayIndex) => {
+              const stacks = [...activeCategorySet].map((category) => {
+                const row = series.find((item) => item.category === category);
+                const value = Number(row?.values?.[dayIndex] || 0);
+                const percent = (value / maxTotal) * 100;
+                if (value <= 0) {
+                  return '';
+                }
+                return `<div class="w-8" style="height:${Math.max(2, percent)}%;background:${colorMap.get(category)}" title="${escapeHtml(
+                  `${category}: ${formatCurrencyBRL(value)}`
+                )}"></div>`;
+              });
+
+              const detail = (daily.details || []).find((item) => item.day === day);
+              const rankingText = (detail?.ranking || [])
+                .slice(0, 3)
+                .map((item) => `${item.category}: ${formatCurrencyBRL(item.value)} (${Number(item.percent || 0).toFixed(1)}%)`)
+                .join(' • ');
+
+              return `
+                <button data-day="${escapeHtml(day)}" class="ritmo-day-column flex flex-col items-center justify-end min-w-[52px] h-[180px] border border-zinc-200 bg-white p-1" title="${escapeHtml(
+                  rankingText
+                )}">
+                  <div class="flex flex-col-reverse items-center justify-end h-[140px] gap-[1px]">${stacks.join('')}</div>
+                  <span class="text-[10px] font-black uppercase mt-1">${escapeHtml(day.slice(8, 10))}</span>
+                </button>
+              `;
+            })
+            .join('')}
+        </div>
+      `;
+
+      this.ritmoDailyChart.querySelectorAll('.ritmo-day-column').forEach((button) => {
+        button.addEventListener('mouseenter', () => {
+          const day = button.dataset.day;
+          const detail = (daily.details || []).find((item) => item.day === day);
+          if (!detail) {
+            this.ritmoDailyTooltip.innerText = '';
+            return;
+          }
+          const rankingText = (detail.ranking || [])
+            .map((item) => `${item.category}: ${formatCurrencyBRL(item.value)} (${Number(item.percent || 0).toFixed(1)}%)`)
+            .join(' | ');
+          this.ritmoDailyTooltip.innerText = `${day}: Total ${formatCurrencyBRL(detail.total)}. ${rankingText}`;
+        });
+      });
+    };
+
+    this.ritmoLegend.innerHTML = categories
+      .map((category) => {
+        const color = colorMap.get(category);
+        return `
+          <button data-category-legend="${escapeHtml(category)}" class="inline-flex items-center gap-1 border border-black px-2 py-1 text-[10px] font-black uppercase bg-white">
+            <span style="width:10px;height:10px;background:${color};border:1px solid #111;"></span>
+            ${escapeHtml(category)}
+          </button>
+        `;
+      })
+      .join('');
+
+    this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const category = button.dataset.categoryLegend;
+        if (!category) {
+          return;
+        }
+
+        if (activeCategorySet.size === 1 && activeCategorySet.has(category)) {
+          categories.forEach((item) => activeCategorySet.add(item));
+        } else if (activeCategorySet.has(category)) {
+          activeCategorySet.delete(category);
+        } else {
+          activeCategorySet.add(category);
+        }
+
+        if (activeCategorySet.size === 0) {
+          activeCategorySet.add(category);
+        }
+
+        if (this.handlers?.onFiltersChange) {
+          this.handlers.onFiltersChange({ category });
+        }
+
+        renderChart();
+      });
+    });
+
+    renderChart();
   }
 
   paginateTransactions(orderedTransactions = []) {

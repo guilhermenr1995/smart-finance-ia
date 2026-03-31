@@ -8,6 +8,7 @@ export function persistTransactionsCache(app) {
     categories: app.state.userCategories,
     bankAccounts: app.state.userBankAccounts,
     consultantInsights: Object.values(app.state.aiConsultant.historyByKey || {}),
+    openFinanceConnections: app.state.openFinance?.connections || [],
     monthlyGoals: app.state.monthlyGoals
   });
 }
@@ -41,7 +42,7 @@ export async function syncDataFromCloud(app, options = {}) {
       return [];
     });
 
-    const [transactions, categories, bankAccounts, consultantInsights, monthlyGoals] = await Promise.all([
+    const [transactions, categories, bankAccounts, consultantInsights, monthlyGoals, openFinanceConnections] = await Promise.all([
       app.repository.fetchAll(app.state.user.uid),
       app.repository.fetchCategories(app.state.user.uid),
       app.repository.fetchBankAccounts(app.state.user.uid),
@@ -49,12 +50,17 @@ export async function syncDataFromCloud(app, options = {}) {
       app.repository.fetchMonthlyGoals(app.state.user.uid).catch((error) => {
         console.warn('Monthly goals sync skipped:', error);
         return [];
+      }),
+      app.repository.fetchOpenFinanceConnections(app.state.user.uid).catch((error) => {
+        console.warn('Open Finance connections sync skipped:', error);
+        return [];
       })
     ]);
     app.state.setUserCategories(categories);
     app.state.setUserBankAccounts(bankAccounts);
     app.state.setAiConsultantHistory(consultantInsights);
     app.state.setMonthlyGoals(monthlyGoals);
+    app.state.setOpenFinanceConnections(openFinanceConnections);
     setTransactionsAndRefresh(app, transactions);
     if (showOverlay) {
       app.overlayView.hide();

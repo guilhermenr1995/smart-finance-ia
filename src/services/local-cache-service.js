@@ -22,6 +22,7 @@ export class LocalCacheService {
         categories: [],
         bankAccounts: [DEFAULT_BANK_ACCOUNT],
         consultantInsights: [],
+        openFinanceConnections: [],
         monthlyGoals: [],
         lastSyncedAt: 0
       };
@@ -35,6 +36,7 @@ export class LocalCacheService {
           categories: [],
           bankAccounts: [DEFAULT_BANK_ACCOUNT],
           consultantInsights: [],
+          openFinanceConnections: [],
           monthlyGoals: [],
           lastSyncedAt: 0
         };
@@ -52,6 +54,7 @@ export class LocalCacheService {
         ? [...new Set(parsed.bankAccounts.map((name) => normalizeBankAccountName(name)))]
         : [DEFAULT_BANK_ACCOUNT];
       const consultantInsights = Array.isArray(parsed?.consultantInsights) ? parsed.consultantInsights : [];
+      const openFinanceConnections = Array.isArray(parsed?.openFinanceConnections) ? parsed.openFinanceConnections : [];
       const monthlyGoals = Array.isArray(parsed?.monthlyGoals) ? parsed.monthlyGoals : [];
       const lastSyncedAt = Number(parsed?.lastSyncedAt || 0);
 
@@ -60,6 +63,7 @@ export class LocalCacheService {
         categories,
         bankAccounts,
         consultantInsights,
+        openFinanceConnections,
         monthlyGoals,
         lastSyncedAt
       };
@@ -70,6 +74,7 @@ export class LocalCacheService {
         categories: [],
         bankAccounts: [DEFAULT_BANK_ACCOUNT],
         consultantInsights: [],
+        openFinanceConnections: [],
         monthlyGoals: [],
         lastSyncedAt: 0
       };
@@ -87,6 +92,7 @@ export class LocalCacheService {
       ? [...new Set(data.bankAccounts.map((name) => normalizeBankAccountName(name)))]
       : [DEFAULT_BANK_ACCOUNT];
     const consultantInsights = Array.isArray(data?.consultantInsights) ? data.consultantInsights : [];
+    const openFinanceConnections = Array.isArray(data?.openFinanceConnections) ? data.openFinanceConnections : [];
     const monthlyGoals = Array.isArray(data?.monthlyGoals) ? data.monthlyGoals : [];
 
     const cachePayload = {
@@ -94,6 +100,7 @@ export class LocalCacheService {
       categories,
       bankAccounts,
       consultantInsights,
+      openFinanceConnections,
       monthlyGoals,
       lastSyncedAt: Date.now()
     };

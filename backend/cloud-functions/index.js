@@ -25,10 +25,18 @@ const USER_JOURNEY_RESET_COLLECTIONS = [
   'transacoes',
   'categorias',
   'contas_bancarias',
+  'open_finance_conexoes',
   'metas_mensais',
   'consultor_insights',
   'metrics_daily'
 ];
+
+const OPEN_FINANCE_BANKS = {
+  nubank: 'Nubank',
+  itau: 'Itaú',
+  bradesco: 'Bradesco',
+  'banco-do-brasil': 'Banco do Brasil'
+};
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -1852,6 +1860,441 @@ async function askGeminiForJson({
     }
   );
 }
+
+function getOpenFinanceConnectionsCollection(appId, userId) {
+  return db.collection(`artifacts/${appId}/users/${userId}/open_finance_conexoes`);
+}
+
+function getTransactionsCollection(appId, userId) {
+  return db.collection(`artifacts/${appId}/users/${userId}/transacoes`);
+}
+
+function normalizeBankCode(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '');
+}
+
+function addDaysToIso(days) {
+  const target = new Date();
+  target.setDate(target.getDate() + Number(days || 0));
+  return target.toISOString();
+}
+
+function buildMockOpenFinanceTransactions(connection = {}, syncSeed = '') {
+  const bankLabel = String(connection.bankName || connection.bankCode || 'Banco').trim();
+  const seed = String(syncSeed || new Date().toISOString().slice(0, 16)).replace(/[^0-9]/g, '').slice(-8) || '00000000';
+  const year = Number(seed.slice(0, 4) || new Date().getFullYear());
+  const month = Number(seed.slice(4, 6) || new Date().getMonth() + 1);
+  const dayBase = Number(seed.slice(6, 8) || new Date().getDate());
+
+  const toDate = (offset) => {
+    const safeMonth = Math.max(1, Math.min(month, 12));
+    const date = new Date(year, safeMonth - 1, Math.max(1, Math.min(28, dayBase + offset)));
+    return date.toISOString().slice(0, 10);
+  };
+
+  const amountFactor = Math.max(1, (Number(seed.slice(-2)) || 17) % 19);
+
+  return [
+    {
+      date: toDate(-2),
+      title: `${bankLabel} Mercado Essencial ${seed.slice(-3)}`,
+      value: toCurrency(38 + amountFactor * 2.7),
+      category: 'Alimentação',
+      accountType: 'Conta'
+    },
+    {
+      date: toDate(-1),
+      title: `${bankLabel} Transporte Urbano ${seed.slice(-2)}`,
+      value: toCurrency(17 + amountFactor * 1.9),
+      category: 'Transporte',
+      accountType: 'Conta'
+    },
+    {
+      date: toDate(0),
+      title: `${bankLabel} Assinatura Digital ${seed.slice(-4)}`,
+      value: toCurrency(24 + amountFactor * 1.3),
+      category: 'Outros',
+      accountType: 'Crédito'
+    }
+  ];
+}
+
+function chunkArray(values = [], chunkSize = 10) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += chunkSize) {
+    chunks.push(values.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+function sanitizeOpenFinanceTransaction(raw = {}, context = {}) {
+  const nowIso = new Date().toISOString();
+  const accountType = String(raw.accountType || 'Conta').trim() === 'Crédito' ? 'Crédito' : 'Conta';
+  const value = Math.abs(toCurrency(raw.value));
+
+  const payload = {
+    date: normalizeTransactionDateKey(raw.date || nowIso.slice(0, 10)),
+    title: sanitizeString(raw.title || `Transação ${context.bankName || 'Open Finance'}`, 200),
+    value,
+    category: sanitizeString(raw.category || 'Outros', 50) || 'Outros',
+    accountType,
+    bankAccount: sanitizeString(context.bankName || DEFAULT_BANK_ACCOUNT, 60) || DEFAULT_BANK_ACCOUNT,
+    active: true,
+    createdBy: 'import',
+    createdAt: nowIso,
+    categorySource: 'open-finance',
+    categoryAutoAssigned: false,
+    categoryManuallyEdited: false,
+    lastCategoryUpdateAt: nowIso
+  };
+
+  payload.hash = buildTransactionHash(payload);
+  payload.dedupKey = buildTransactionDedupKey(payload);
+  return payload;
+}
+
+async function resolveExistingKeys(collectionRef, keys = [], fieldName) {
+  const keySet = new Set();
+  const nonEmpty = [...new Set(keys.map((item) => String(item || '').trim()).filter(Boolean))];
+  if (nonEmpty.length === 0) {
+    return keySet;
+  }
+
+  const chunks = chunkArray(nonEmpty, 10);
+  for (const chunk of chunks) {
+    const snapshot = await collectionRef.where(fieldName, 'in', chunk).get();
+    snapshot.forEach((doc) => {
+      const value = String(doc.data()?.[fieldName] || '').trim();
+      if (value) {
+        keySet.add(value);
+      }
+    });
+  }
+
+  return keySet;
+}
+
+async function persistOpenFinanceTransactions(appId, userId, rawTransactions = [], connection = {}) {
+  const collectionRef = getTransactionsCollection(appId, userId);
+  const sanitized = rawTransactions
+    .map((transaction) => sanitizeOpenFinanceTransaction(transaction, connection))
+    .filter((transaction) => transaction.title && transaction.value > 0 && /^\d{4}-\d{2}-\d{2}$/.test(transaction.date));
+
+  if (sanitized.length === 0) {
+    return {
+      insertedCount: 0,
+      skippedCount: 0,
+      insertedTransactions: []
+    };
+  }
+
+  const existingDedupKeys = await resolveExistingKeys(
+    collectionRef,
+    sanitized.map((item) => item.dedupKey),
+    'dedupKey'
+  );
+  const existingHashes = await resolveExistingKeys(
+    collectionRef,
+    sanitized.map((item) => item.hash),
+    'hash'
+  );
+
+  const toInsert = sanitized.filter(
+    (item) => !existingDedupKeys.has(item.dedupKey) && !existingHashes.has(item.hash)
+  );
+
+  if (toInsert.length === 0) {
+    return {
+      insertedCount: 0,
+      skippedCount: sanitized.length,
+      insertedTransactions: []
+    };
+  }
+
+  const insertedTransactions = [];
+  const batch = db.batch();
+  toInsert.forEach((transaction) => {
+    const docRef = collectionRef.doc();
+    batch.set(docRef, transaction);
+    insertedTransactions.push({
+      ...transaction,
+      docId: docRef.id
+    });
+  });
+  await batch.commit();
+
+  return {
+    insertedCount: insertedTransactions.length,
+    skippedCount: sanitized.length - insertedTransactions.length,
+    insertedTransactions
+  };
+}
+
+async function listOpenFinanceConnections(appId, userId) {
+  const snapshot = await getOpenFinanceConnectionsCollection(appId, userId).get();
+  const items = [];
+  snapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    items.push({
+      id: doc.id,
+      bankCode: String(data.bankCode || '').trim(),
+      bankName: String(data.bankName || '').trim(),
+      provider: String(data.provider || 'mock-open-finance').trim(),
+      status: String(data.status || 'unknown').trim(),
+      consentExpiresAt: String(data.consentExpiresAt || '').trim(),
+      lastSyncAt: String(data.lastSyncAt || '').trim(),
+      lastSyncInserted: Math.max(0, Math.round(toFiniteNumber(data.lastSyncInserted))),
+      errorMessage: String(data.errorMessage || '').trim(),
+      createdAt: String(data.createdAt || '').trim(),
+      updatedAt: String(data.updatedAt || '').trim()
+    });
+  });
+
+  return items.sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || '')));
+}
+
+exports.openFinanceProxy = onRequest(
+  {
+    invoker: 'public',
+    timeoutSeconds: 120,
+    memory: '256MiB'
+  },
+  async (request, response) => {
+    setCorsHeaders(request, response);
+
+    if (handlePreflightAndMethod(request, response)) {
+      return;
+    }
+
+    const decodedToken = await authenticateRequest(request, response);
+    if (!decodedToken) {
+      return;
+    }
+
+    try {
+      const action = String(request.body?.action || '').trim();
+      const appId = String(request.body?.appId || '').trim();
+      const userId = decodedToken.uid;
+
+      if (!appId) {
+        response.status(400).json({
+          error: 'appId is required'
+        });
+        return;
+      }
+
+      const connectionsCollection = getOpenFinanceConnectionsCollection(appId, userId);
+
+      if (action === 'list-connections') {
+        const connections = await listOpenFinanceConnections(appId, userId);
+        response.status(200).json({
+          connections
+        });
+        return;
+      }
+
+      if (action === 'connect-bank') {
+        const bankCode = normalizeBankCode(request.body?.bankCode);
+        if (!bankCode || !OPEN_FINANCE_BANKS[bankCode]) {
+          response.status(400).json({
+            error: 'bankCode is required and must be supported'
+          });
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const connectionRef = connectionsCollection.doc(bankCode);
+        const existingSnapshot = await connectionRef.get();
+        const createdAt = existingSnapshot.exists ? String(existingSnapshot.data()?.createdAt || nowIso) : nowIso;
+
+        await connectionRef.set(
+          {
+            bankCode,
+            bankName: OPEN_FINANCE_BANKS[bankCode],
+            provider: 'mock-open-finance',
+            status: 'active',
+            consentExpiresAt: addDaysToIso(90),
+            lastSyncAt: nowIso,
+            lastSyncInserted: 0,
+            errorMessage: '',
+            createdAt,
+            updatedAt: nowIso
+          },
+          { merge: true }
+        );
+
+        const persisted = await persistOpenFinanceTransactions(
+          appId,
+          userId,
+          buildMockOpenFinanceTransactions({
+            bankCode,
+            bankName: OPEN_FINANCE_BANKS[bankCode]
+          }, nowIso),
+          {
+            bankCode,
+            bankName: OPEN_FINANCE_BANKS[bankCode]
+          }
+        );
+
+        await connectionRef.set(
+          {
+            lastSyncInserted: persisted.insertedCount,
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+
+        const connections = await listOpenFinanceConnections(appId, userId);
+        response.status(200).json({
+          connectionId: bankCode,
+          insertedCount: persisted.insertedCount,
+          skippedCount: persisted.skippedCount,
+          transactions: persisted.insertedTransactions,
+          connections
+        });
+        return;
+      }
+
+      if (action === 'sync-connection') {
+        const connectionId = sanitizeString(request.body?.connectionId, 120);
+        if (!connectionId) {
+          response.status(400).json({
+            error: 'connectionId is required'
+          });
+          return;
+        }
+
+        const connectionRef = connectionsCollection.doc(connectionId);
+        const connectionSnapshot = await connectionRef.get();
+        if (!connectionSnapshot.exists) {
+          response.status(404).json({
+            error: 'Connection not found'
+          });
+          return;
+        }
+
+        const connection = connectionSnapshot.data() || {};
+        if (String(connection.status || '').trim() === 'revoked') {
+          response.status(400).json({
+            error: 'Connection is revoked'
+          });
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const persisted = await persistOpenFinanceTransactions(
+          appId,
+          userId,
+          buildMockOpenFinanceTransactions(connection, nowIso),
+          connection
+        );
+
+        await connectionRef.set(
+          {
+            status: 'active',
+            lastSyncAt: nowIso,
+            lastSyncInserted: persisted.insertedCount,
+            errorMessage: '',
+            updatedAt: nowIso
+          },
+          { merge: true }
+        );
+
+        const connections = await listOpenFinanceConnections(appId, userId);
+        response.status(200).json({
+          connectionId,
+          insertedCount: persisted.insertedCount,
+          skippedCount: persisted.skippedCount,
+          transactions: persisted.insertedTransactions,
+          connections
+        });
+        return;
+      }
+
+      if (action === 'renew-connection') {
+        const connectionId = sanitizeString(request.body?.connectionId, 120);
+        if (!connectionId) {
+          response.status(400).json({
+            error: 'connectionId is required'
+          });
+          return;
+        }
+
+        const connectionRef = connectionsCollection.doc(connectionId);
+        const snapshot = await connectionRef.get();
+        if (!snapshot.exists) {
+          response.status(404).json({
+            error: 'Connection not found'
+          });
+          return;
+        }
+
+        await connectionRef.set(
+          {
+            status: 'active',
+            consentExpiresAt: addDaysToIso(90),
+            errorMessage: '',
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+
+        const connections = await listOpenFinanceConnections(appId, userId);
+        response.status(200).json({
+          connectionId,
+          connections
+        });
+        return;
+      }
+
+      if (action === 'revoke-connection') {
+        const connectionId = sanitizeString(request.body?.connectionId, 120);
+        if (!connectionId) {
+          response.status(400).json({
+            error: 'connectionId is required'
+          });
+          return;
+        }
+
+        const connectionRef = connectionsCollection.doc(connectionId);
+        const snapshot = await connectionRef.get();
+        if (!snapshot.exists) {
+          response.status(404).json({
+            error: 'Connection not found'
+          });
+          return;
+        }
+
+        await connectionRef.set(
+          {
+            status: 'revoked',
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+
+        const connections = await listOpenFinanceConnections(appId, userId);
+        response.status(200).json({
+          connectionId,
+          connections
+        });
+        return;
+      }
+
+      response.status(400).json({
+        error: 'Unsupported action'
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: 'Unexpected error while handling Open Finance',
+        details: error?.message || 'unknown error'
+      });
+    }
+  }
+);
 
 exports.categorizeTransactions = onRequest(
   {

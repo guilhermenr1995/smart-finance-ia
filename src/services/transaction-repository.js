@@ -100,6 +100,10 @@ export class TransactionRepository {
     return this.db.collection(`artifacts/${this.appId}/users/${userId}/metas_mensais`);
   }
 
+  getOpenFinanceConnectionsCollection(userId) {
+    return this.db.collection(`artifacts/${this.appId}/users/${userId}/open_finance_conexoes`);
+  }
+
   async fetchAll(userId) {
     const snapshot = await this.getCollection(userId).get();
     const transactions = [];
@@ -218,6 +222,31 @@ export class TransactionRepository {
 
       return left.localeCompare(right, 'pt-BR');
     });
+  }
+
+  async fetchOpenFinanceConnections(userId) {
+    const snapshot = await this.getOpenFinanceConnectionsCollection(userId).get();
+    const connections = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data() || {};
+      connections.push({
+        id: doc.id,
+        bankCode: String(data.bankCode || '').trim(),
+        bankName: String(data.bankName || '').trim(),
+        provider: String(data.provider || 'mock-aggregator').trim(),
+        status: String(data.status || 'unknown').trim(),
+        consentExpiresAt: String(data.consentExpiresAt || '').trim(),
+        lastSyncAt: String(data.lastSyncAt || '').trim(),
+        lastSyncInserted: Number(data.lastSyncInserted || 0),
+        createdAt: String(data.createdAt || '').trim(),
+        updatedAt: String(data.updatedAt || '').trim(),
+        errorMessage: String(data.errorMessage || '').trim()
+      });
+    });
+
+    connections.sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || '')));
+    return connections;
   }
 
   async bulkInsert(userId, transactions, options = {}) {

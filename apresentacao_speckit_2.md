@@ -22,6 +22,17 @@ Implementar um novo fluxo de entrada de transações via **Open Finance** para c
 - **P2**: Vazamentos de Gasto
 - **P3**: Compromissos Fixos de Despesa
 
+### Escopo UX obrigatório do Ritmo do Mês (quando usar dados Open Finance)
+
+Para manter consistência com o planejamento da abordagem Ritmo do Mês, inclua estes comportamentos no planejamento e implementação:
+
+1. Exibir semáforo do ritmo (verde/amarelo/vermelho) por escopo (Tudo/Crédito/Conta/Categoria).
+2. Exibir insight acionável: **“Para fechar no alvo, reduza R$ X em Y dias”**.
+3. Exibir gráfico diário segmentado por categoria (barras empilhadas por cor).
+4. Mostrar no eixo X **somente dias com ao menos 1 transação** dentro do intervalo filtrado.
+5. Tooltip diária com total do dia + ranking de categorias + percentual por categoria.
+6. Clique/toque na legenda para filtro rápido por categoria na listagem do dashboard.
+
 ---
 
 ## 2) Contexto Open Finance (para orientar os prompts)
@@ -117,12 +128,19 @@ Requisitos funcionais obrigatórios:
 5) Reconexão e renovação de consentimento antes de expiração.
 6) Revogação/desconexão da conta pelo usuário.
 7) Observabilidade mínima (logs de erro e métricas de sucesso/falha da sincronização).
+8) Dados sincronizados devem alimentar corretamente o cálculo do Ritmo do Mês.
+9) No Ritmo do Mês, o gráfico diário deve mostrar apenas dias com transações no período filtrado.
 
 UX obrigatória:
 - Linguagem não técnica.
 - Barra de progresso no onboarding de conexão.
 - Mensagens acionáveis em erro (ex.: "Sua conexão expirou, reconecte em 1 toque").
 - Estado vazio com CTA para conectar banco.
+- Semáforo do ritmo por escopo (verde/amarelo/vermelho).
+- Insight prático "reduza R$ X em Y dias" quando acima do esperado.
+- Gráfico diário segmentado por categoria com cores fixas por categoria.
+- Tooltip por dia com total, ranking de categorias e percentuais.
+- Interação por legenda para filtro rápido de categoria.
 
 Adicionar seção de riscos e dependências (regulatórias/técnicas) de Open Finance.
 ```
@@ -173,6 +191,9 @@ Diretrizes arquiteturais:
 1) Frontend:
    - Nova jornada "Conectar banco" na dashboard.
    - Telas/estados: lista de bancos, consentimento, conectando, sucesso, erro, reconexão, gerenciamento de conexões.
+   - Módulo Ritmo do Mês com cálculo por escopo + semáforo + recomendação prática.
+   - Seção de gráfico diário por categoria (barras empilhadas), mostrando apenas dias com transações.
+   - Interações de UX no gráfico: tooltip detalhada e filtro rápido via legenda.
 2) Backend (Cloud Functions):
    - Endpoint para iniciar conexão.
    - Endpoint callback para retorno de autorização.
@@ -188,6 +209,11 @@ Diretrizes arquiteturais:
    - Idempotência e deduplicação de transações.
    - Controle de erros por categoria (autorização, disponibilidade, validação).
    - Logs estruturados e métricas operacionais.
+6) Analytics/UI data pipeline (Ritmo do Mês):
+   - Agregação por data e por categoria.
+   - Remoção de dias sem transação antes de renderizar o gráfico diário.
+   - Séries consistentes com os filtros ativos do dashboard.
+   - Compatibilidade com dados de importação manual e Open Finance sem duplicidade.
 
 Resultados esperados do plano:
 - plan.md, research.md, data-model.md, contracts/, quickstart.md
@@ -215,6 +241,9 @@ Gerar checklist de validação final da solução Open Finance com foco em:
 5) Aderência regulatória/consentimento
 6) Cobertura de bancos alvo (Nubank, Itaú, Bradesco, BB)
 7) Critérios de pronto para produção
+8) Ritmo do Mês com semáforo e recomendação prática corretos
+9) Gráfico diário por categoria exibindo somente dias com transações
+10) Tooltip e filtro por legenda funcionando sem regressão de performance
 ```
 
 ---
@@ -236,6 +265,15 @@ Fase 1 (Fundação): contratos, modelo de dados, segurança, integração base.
 Fase 2 (US1): conectar banco + consentimento + sync inicial.
 Fase 3 (US2): sync incremental + gestão de conexões + reconexão.
 Fase 4 (US3): refletir dados no Ritmo do Mês e preparar módulos Vazamentos/Compromissos.
+
+Detalhar na Fase 4 (Ritmo do Mês):
+- cálculo por escopo (Tudo/Crédito/Conta/Categoria),
+- semáforo (verde/amarelo/vermelho),
+- insight "reduza R$ X em Y dias",
+- agregação diária por categoria,
+- remoção de dias sem transação no gráfico,
+- tooltip com total/ranking/percentual,
+- filtro rápido por legenda.
 
 Inclua caminhos de arquivo reais do projeto e tarefas de teste para fluxos críticos.
 ```
@@ -284,7 +322,9 @@ Condição de aceite por fase:
 2) Sincronização inicial e incremental sem duplicidade.
 3) Gestão de consentimento (status, renovação, revogação) visível para o usuário.
 4) Dados Open Finance refletindo corretamente no dashboard e no módulo Ritmo do Mês.
-5) Base pronta para evolução dos módulos Vazamentos e Compromissos.
+5) Módulo Ritmo do Mês com semáforo + recomendação prática + gráfico diário segmentado por categoria.
+6) Gráfico diário exibe apenas dias com transação, com tooltip completa e filtro por legenda.
+7) Base pronta para evolução dos módulos Vazamentos e Compromissos.
 ```
 
 ---
@@ -298,6 +338,8 @@ Após executar todo o fluxo acima, você deve obter:
 3. **Sincronização de transações automática** com deduplicação e observabilidade.
 4. **Gestão de consentimento e conexões** dentro do app (status, renovar, revogar, reconectar).
 5. **Cobertura inicial de bancos alvo** (via provedor compatível no MVP): Nubank, Itaú, Bradesco e Banco do Brasil.
-6. **Ritmo do Mês alimentado por dados Open Finance**, com base preparada para Vazamentos e Compromissos.
+6. **Ritmo do Mês alimentado por dados Open Finance** com semáforo + recomendação “reduza R$ X em Y dias”.
+7. **Gráfico diário por categoria** no Ritmo do Mês, exibindo apenas dias com transação e UX interativa (tooltip + legenda).
+8. Base preparada para evolução de Vazamentos e Compromissos.
 
 

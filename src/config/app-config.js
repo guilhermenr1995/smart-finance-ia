@@ -19,6 +19,10 @@ const DEFAULT_CONFIG = {
     baseRetryDelayMs: 450,
     interChunkDelayMs: 180
   },
+  openFinance: {
+    proxyUrl: '',
+    supportedBanks: ['nubank', 'itau', 'bradesco', 'banco-do-brasil']
+  },
   admin: {
     dashboardProxyUrl: '',
     maintenanceProxyUrl: '',
@@ -68,6 +72,13 @@ export function loadAppConfig() {
         runtimeConfig.ai?.apiKey ||
         window.__gemini_api_key ||
         DEFAULT_CONFIG.ai.directApiKey
+    },
+    openFinance: {
+      ...DEFAULT_CONFIG.openFinance,
+      ...(runtimeConfig.openFinance || {}),
+      supportedBanks: Array.isArray(runtimeConfig.openFinance?.supportedBanks)
+        ? runtimeConfig.openFinance.supportedBanks
+        : DEFAULT_CONFIG.openFinance.supportedBanks
     },
     admin: {
       ...DEFAULT_CONFIG.admin,

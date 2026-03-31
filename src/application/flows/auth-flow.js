@@ -23,6 +23,7 @@ export async function handleAuthState(app, user) {
     app.state.setAiConsultantReport(null);
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
     app.state.setAiConsultantHistory([]);
+    app.state.setOpenFinanceConnections([]);
     app.refreshDashboard();
     app.authView.setBusy(false);
     return;
@@ -40,6 +41,7 @@ export async function handleAuthState(app, user) {
     (cached.categories || []).length > 0 ||
     (cached.bankAccounts || []).length > 0 ||
     (cached.consultantInsights || []).length > 0 ||
+    (cached.openFinanceConnections || []).length > 0 ||
     (cached.monthlyGoals || []).length > 0;
 
   if (hasCachedSnapshot) {
@@ -47,6 +49,7 @@ export async function handleAuthState(app, user) {
     app.state.setUserCategories(cached.categories || []);
     app.state.setUserBankAccounts(cached.bankAccounts || ['Padrão']);
     app.state.setAiConsultantHistory(cached.consultantInsights || []);
+    app.state.setOpenFinanceConnections(cached.openFinanceConnections || []);
     app.state.setMonthlyGoals(cached.monthlyGoals || []);
     app.refreshDashboard();
   }

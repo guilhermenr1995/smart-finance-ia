@@ -169,6 +169,35 @@ service cloud.firestore {
         && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
     }
 
+    function hasValidOpenFinanceConnectionShape(data) {
+      return data.keys().hasOnly([
+          'bankCode',
+          'bankName',
+          'provider',
+          'status',
+          'consentExpiresAt',
+          'lastSyncAt',
+          'lastSyncInserted',
+          'errorMessage',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.bankCode is string
+        && data.bankCode.size() > 0
+        && data.bankCode.size() <= 80
+        && data.bankName is string
+        && data.bankName.size() > 0
+        && data.bankName.size() <= 120
+        && (!('provider' in data) || (data.provider is string && data.provider.size() > 0 && data.provider.size() <= 80))
+        && (!('status' in data) || data.status in ['active', 'expired', 'error', 'revoked', 'unknown'])
+        && (!('consentExpiresAt' in data) || (data.consentExpiresAt is string && data.consentExpiresAt.size() <= 50))
+        && (!('lastSyncAt' in data) || (data.lastSyncAt is string && data.lastSyncAt.size() <= 50))
+        && (!('lastSyncInserted' in data) || isNonNegativeNumber(data.lastSyncInserted))
+        && (!('errorMessage' in data) || (data.errorMessage is string && data.errorMessage.size() <= 240))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
     match /artifacts/{appId}/users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidUserProfileShape(request.resource.data);
@@ -218,6 +247,13 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidMonthlyGoalShape(request.resource.data);
       allow update: if isOwner(userId) && hasValidMonthlyGoalShape(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/open_finance_conexoes/{connectionId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidOpenFinanceConnectionShape(request.resource.data);
+      allow update: if isOwner(userId) && hasValidOpenFinanceConnectionShape(request.resource.data);
       allow delete: if isOwner(userId);
     }
 
