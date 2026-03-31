@@ -1259,12 +1259,27 @@ export class DashboardView {
     }
 
     const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
-    const activeCategorySet = new Set(categories);
+    const selectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
+    let activeLegendCategory =
+      selectedCategory && selectedCategory !== 'all' && categories.includes(selectedCategory)
+        ? selectedCategory
+        : null;
     const colorMap = new Map(categories.map((category, index) => [category, this.getCategoryColor(category, index)]));
 
+    const getActiveCategories = () => (activeLegendCategory ? [activeLegendCategory] : categories);
+
+    const updateLegendSelectionState = () => {
+      this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
+        const category = button.dataset.categoryLegend;
+        const isActive = Boolean(activeLegendCategory) && category === activeLegendCategory;
+        button.classList.toggle('bg-yellow-200', isActive);
+      });
+    };
+
     const renderChart = () => {
+      const activeCategories = getActiveCategories();
       const totalsByDay = days.map((_, dayIndex) => {
-        return [...activeCategorySet].reduce((sum, category) => {
+        return activeCategories.reduce((sum, category) => {
           const row = series.find((item) => item.category === category);
           return sum + Number(row?.values?.[dayIndex] || 0);
         }, 0);
@@ -1275,7 +1290,7 @@ export class DashboardView {
         <div class="flex items-end gap-2 overflow-x-auto no-scrollbar min-h-[180px]">
           ${days
             .map((day, dayIndex) => {
-              const stacks = [...activeCategorySet].map((category) => {
+              const stacks = activeCategories.map((category) => {
                 const row = series.find((item) => item.category === category);
                 const value = Number(row?.values?.[dayIndex] || 0);
                 const percent = (value / maxTotal) * 100;
@@ -1341,26 +1356,19 @@ export class DashboardView {
           return;
         }
 
-        if (activeCategorySet.size === 1 && activeCategorySet.has(category)) {
-          categories.forEach((item) => activeCategorySet.add(item));
-        } else if (activeCategorySet.has(category)) {
-          activeCategorySet.delete(category);
-        } else {
-          activeCategorySet.add(category);
-        }
-
-        if (activeCategorySet.size === 0) {
-          activeCategorySet.add(category);
-        }
+        const shouldClearSelection = activeLegendCategory === category;
+        activeLegendCategory = shouldClearSelection ? null : category;
 
         if (this.handlers?.onFiltersChange) {
-          this.handlers.onFiltersChange({ category });
+          this.handlers.onFiltersChange({ category: shouldClearSelection ? 'all' : category });
         }
 
+        updateLegendSelectionState();
         renderChart();
       });
     });
 
+    updateLegendSelectionState();
     renderChart();
   }
 

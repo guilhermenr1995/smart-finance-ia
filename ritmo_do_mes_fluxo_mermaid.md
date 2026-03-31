@@ -241,3 +241,42 @@ mindmap
       Implementação rastreável
       Menor retrabalho
 ```
+
+---
+
+## 11) Complementos práticos para esta base atual (smart-finance-ia)
+
+Para esta aplicação, além do fluxo macro, a implementação da feature deve considerar explicitamente os pontos abaixo:
+
+1. **Selecionar e desmarcar categoria na legenda (UX crítica)**
+   - Primeiro clique em uma categoria da legenda: filtra para aquela categoria.
+   - Segundo clique na mesma categoria: remove seleção e volta para **todas as categorias**.
+   - O estado visual da legenda deve deixar claro quando existe filtro ativo.
+
+2. **Sincronismo entre legenda e filtros globais**
+   - Quando a legenda filtrar categoria, refletir no filtro global `category`.
+   - Quando o filtro global voltar para `all`, a legenda deve voltar sem seleção.
+
+3. **Resiliência de renderização do gráfico diário**
+   - Se não houver dias com transação, mostrar estado vazio amigável.
+   - Evitar divisão por zero no cálculo de alturas das barras.
+   - Tooltip deve se manter consistente com o subconjunto ativo de categorias.
+
+4. **Critérios de aceite de usabilidade do Ritmo do Mês**
+   - Usuário consegue identificar rapidamente dia de pico + categoria responsável.
+   - Usuário consegue aplicar e remover foco de categoria com no máximo 2 cliques.
+   - Usuário entende o semáforo e a recomendação prática sem apoio externo.
+
+---
+
+## 12) Roteiro Speckit recomendado para este refinamento
+
+```mermaid
+flowchart TD
+    A[/speckit.specify - refinamento UX ritmo/] --> B[/speckit.clarify - apenas dúvidas de interação/]
+    B --> C[/speckit.plan - arquitetura + estados de UI/]
+    C --> D[/speckit.tasks - tarefas técnicas ordenadas/]
+    D --> E[/speckit.implement - ajustes em dashboard-flow + dashboard-view + styles/]
+    E --> F[Testes de usabilidade e regressão]
+```
+
