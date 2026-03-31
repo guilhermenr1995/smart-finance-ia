@@ -1260,21 +1260,13 @@ export class DashboardView {
 
     const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
     const selectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
-    let activeLegendCategory =
+    const activeLegendCategory =
       selectedCategory && selectedCategory !== 'all' && categories.includes(selectedCategory)
         ? selectedCategory
         : null;
     const colorMap = new Map(categories.map((category, index) => [category, this.getCategoryColor(category, index)]));
 
     const getActiveCategories = () => (activeLegendCategory ? [activeLegendCategory] : categories);
-
-    const updateLegendSelectionState = () => {
-      this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
-        const category = button.dataset.categoryLegend;
-        const isActive = Boolean(activeLegendCategory) && category === activeLegendCategory;
-        button.classList.toggle('bg-yellow-200', isActive);
-      });
-    };
 
     const renderChart = () => {
       const activeCategories = getActiveCategories();
@@ -1350,6 +1342,10 @@ export class DashboardView {
       .join('');
 
     this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
+      const buttonCategory = button.dataset.categoryLegend;
+      const isActive = Boolean(activeLegendCategory) && buttonCategory === activeLegendCategory;
+      button.classList.toggle('bg-yellow-200', isActive);
+
       button.addEventListener('click', () => {
         const category = button.dataset.categoryLegend;
         if (!category) {
@@ -1357,18 +1353,44 @@ export class DashboardView {
         }
 
         const shouldClearSelection = activeLegendCategory === category;
-        activeLegendCategory = shouldClearSelection ? null : category;
 
         if (this.handlers?.onFiltersChange) {
           this.handlers.onFiltersChange({ category: shouldClearSelection ? 'all' : category });
+          return;
         }
 
-        updateLegendSelectionState();
-        renderChart();
+        // Fallback local caso não exista handler global.
+        const fallbackActiveCategories = shouldClearSelection ? categories : [category];
+        const fallbackTotalsByDay = days.map((_, dayIndex) => {
+          return fallbackActiveCategories.reduce((sum, activeCategory) => {
+            const row = series.find((item) => item.category === activeCategory);
+            return sum + Number(row?.values?.[dayIndex] || 0);
+          }, 0);
+        });
+        const fallbackMaxTotal = Math.max(...fallbackTotalsByDay, 1);
+        this.ritmoDailyChart.querySelectorAll('.ritmo-day-column').forEach((column, dayIndex) => {
+          const stacksContainer = column.querySelector('div');
+          if (!stacksContainer) {
+            return;
+          }
+
+          const stacks = fallbackActiveCategories
+            .map((activeCategory) => {
+              const row = series.find((item) => item.category === activeCategory);
+              const value = Number(row?.values?.[dayIndex] || 0);
+              if (value <= 0) {
+                return '';
+              }
+              const percent = (value / fallbackMaxTotal) * 100;
+              return `<div class="w-8" style="height:${Math.max(2, percent)}%;background:${colorMap.get(activeCategory)}"></div>`;
+            })
+            .join('');
+
+          stacksContainer.innerHTML = stacks;
+        });
       });
     });
 
-    updateLegendSelectionState();
     renderChart();
   }
 
