@@ -5,6 +5,22 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 
 ## Funções disponíveis
 
+### 0) `openFinanceProxy`
+
+- Objetivo: integração **real** de Open Finance via agregador externo (sem mocks).
+- Ações suportadas (via `action` no body):
+  - `list-connections`
+  - `connect-bank`
+  - `sync-connection`
+  - `renew-connection`
+  - `revoke-connection`
+- Persistência:
+  - conexões em `artifacts/{appId}/users/{userId}/open_finance_conexoes`
+  - transações importadas em `artifacts/{appId}/users/{userId}/transacoes`
+- Segurança operacional:
+  - se `OPEN_FINANCE_PROVIDER` estiver `mock`/`disabled`, a função bloqueia (503)
+  - se `OPEN_FINANCE_UPSTREAM_URL` estiver ausente, a função bloqueia (503)
+
 ### 1) `categorizeTransactions`
 
 - Objetivo: categorizar transações com Gemini.
@@ -68,6 +84,9 @@ backend/cloud-functions/
    - `GEMINI_API_KEY=...`
   - `GEMINI_MODEL=gemini-2.5-flash-lite` (ou modelo disponível no seu projeto)
    - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash` (opcional, recomendado)
+   - `OPEN_FINANCE_PROVIDER=pluggy` (ou outro agregador real)
+   - `OPEN_FINANCE_UPSTREAM_URL=https://seu-backend-open-finance.example.com/open-finance`
+   - `OPEN_FINANCE_UPSTREAM_API_KEY=...` (se o upstream exigir)
 
 5. Voltar para a raiz:
    - `cd ../..`
@@ -86,6 +105,7 @@ Ou apenas uma função específica:
 firebase deploy --only functions:categorizeTransactions
 firebase deploy --only functions:analyzeSpendingInsights
 firebase deploy --only functions:getAdminDashboard
+firebase deploy --only functions:openFinanceProxy
 ```
 
 ## Configuração do frontend
@@ -111,6 +131,115 @@ Para o painel admin, se `dashboardProxyUrl` não for informado, o frontend tenta
 trocando `analyzespendinginsights` ou `categorizetransactions` por `getadmindashboard`.
 
 ## Contrato da API
+
+### `POST openFinanceProxy`
+
+Body base:
+
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "action": "connect-bank"
+}
+```
+
+#### Exemplo `connect-bank`
+
+Request:
+
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "action": "connect-bank",
+  "bankCode": "nubank"
+}
+```
+
+Response (resumo):
+
+```json
+{
+  "connectionId": "nubank",
+  "providerConnectionId": "conn_123",
+  "authorizationUrl": "https://consent.provider.com/...",
+  "insertedCount": 12,
+  "skippedCount": 2,
+  "connections": []
+}
+```
+
+#### Exemplo `sync-connection`
+
+Request:
+
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "action": "sync-connection",
+  "connectionId": "nubank"
+}
+```
+
+#### Exemplo `renew-connection`
+
+Request:
+
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "action": "renew-connection",
+  "connectionId": "nubank"
+}
+```
+
+#### Exemplo `revoke-connection`
+
+Request:
+
+```json
+{
+  "appId": "smart-finance-production-v1",
+  "action": "revoke-connection",
+  "connectionId": "nubank"
+}
+```
+
+#### Contrato esperado do upstream (agregador)
+
+`openFinanceProxy` envia um `POST` para `OPEN_FINANCE_UPSTREAM_URL` com payload:
+
+```json
+{
+  "provider": "pluggy",
+  "action": "connect-bank",
+  "appId": "smart-finance-production-v1",
+  "bankCode": "nubank",
+  "bankName": "Nubank",
+  "context": { "userId": "firebase-uid" }
+}
+```
+
+Resposta mínima esperada do upstream:
+
+```json
+{
+  "connection": {
+    "id": "conn_123",
+    "status": "pending",
+    "consentUrl": "https://consent.provider.com/...",
+    "consentExpiresAt": "2026-06-30T00:00:00.000Z"
+  },
+  "transactions": [
+    {
+      "date": "2026-03-30",
+      "title": "UBER *TRIP",
+      "value": 23.9,
+      "category": "Transporte",
+      "accountType": "Conta"
+    }
+  ]
+}
+```
 
 ### `POST categorizeTransactions`
 
@@ -233,6 +362,7 @@ Resposta:
 - Erro de CORS: origem não está em `ALLOWED_ORIGINS`.
 - `404 model not found`: ajuste `GEMINI_MODEL` ou use `GEMINI_FALLBACK_MODELS` para fallback automático.
 - `403 Forbidden` em `getAdminDashboard`: usuário autenticado sem e-mail admin Google permitido.
+- `503` no `openFinanceProxy`: backend bloqueado por provider inválido (`mock`/`disabled`) ou ausência de `OPEN_FINANCE_UPSTREAM_URL`.
 
 ## Observação
 

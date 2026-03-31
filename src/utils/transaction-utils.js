@@ -193,7 +193,7 @@ export function sortTransactionsByDateDesc(transactions) {
 
 export class TransactionQueryService {
   getVisibleTransactions(transactions, filters) {
-    const { cycleStart, cycleEnd, accountType, category } = filters;
+    const { cycleStart, cycleEnd, accountType, category, source } = filters;
 
     return transactions.filter((transaction) => {
       const txDate = parseDateFlexible(transaction.date);
@@ -201,8 +201,14 @@ export class TransactionQueryService {
       const matchAccount = accountType === 'all' || transaction.accountType === accountType;
       const displayCategory = getDisplayCategory(transaction);
       const matchCategory = category === 'all' || displayCategory === category;
+      const normalizedSource = String(source || 'all').trim().toLowerCase();
+      const normalizedCategorySource = String(transaction?.categorySource || '').trim().toLowerCase();
+      const isOpenFinanceSource = normalizedCategorySource.includes('open-finance');
+      const matchSource =
+        normalizedSource === 'all' ||
+        (normalizedSource === 'open-finance' ? isOpenFinanceSource : true);
 
-      return matchPeriod && matchAccount && matchCategory;
+      return matchPeriod && matchAccount && matchCategory && matchSource;
     });
   }
 

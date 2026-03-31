@@ -2,6 +2,20 @@ function getErrorMessage(error) {
   return error?.message || 'Falha na operação de Open Finance.';
 }
 
+function handleAuthorizationUrl(app, authorizationUrl) {
+  const url = String(authorizationUrl || '').trim();
+  if (!url) {
+    return;
+  }
+
+  app.overlayView?.log?.('Aguardando consentimento no banco. Abrindo fluxo de autorização...');
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (error) {
+    app.overlayView?.log?.(`Abra manualmente o link de autorização: ${url}`);
+  }
+}
+
 export async function loadOpenFinanceConnections(app, options = {}) {
   if (!app.state.user || !app.openFinanceService) {
     return;
@@ -33,6 +47,7 @@ export async function connectOpenFinanceBank(app, bankCode) {
   try {
     const result = await app.openFinanceService.connectBank(app.config.appId, bankCode);
     app.state.setOpenFinanceConnections(result?.connections || []);
+    handleAuthorizationUrl(app, result?.authorizationUrl);
     if (Array.isArray(result?.transactions) && result.transactions.length > 0) {
       app.setTransactionsAndRefresh([...app.state.transactions, ...result.transactions]);
     } else {
@@ -59,6 +74,7 @@ export async function syncOpenFinanceConnection(app, connectionId) {
   try {
     const result = await app.openFinanceService.syncConnection(app.config.appId, connectionId);
     app.state.setOpenFinanceConnections(result?.connections || []);
+    handleAuthorizationUrl(app, result?.authorizationUrl);
     if (Array.isArray(result?.transactions) && result.transactions.length > 0) {
       app.setTransactionsAndRefresh([...app.state.transactions, ...result.transactions]);
     } else {
@@ -82,6 +98,7 @@ export async function renewOpenFinanceConnection(app, connectionId) {
   try {
     const result = await app.openFinanceService.renewConnection(app.config.appId, connectionId);
     app.state.setOpenFinanceConnections(result?.connections || []);
+    handleAuthorizationUrl(app, result?.authorizationUrl);
     app.persistTransactionsCache();
     app.refreshDashboard();
     app.authView.showMessage('Consentimento renovado com sucesso.', 'success');

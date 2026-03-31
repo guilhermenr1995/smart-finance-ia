@@ -37,6 +37,9 @@ const OPEN_FINANCE_BANKS = {
   bradesco: 'Bradesco',
   'banco-do-brasil': 'Banco do Brasil'
 };
+const OPEN_FINANCE_PROVIDER = String(process.env.OPEN_FINANCE_PROVIDER || 'disabled').trim().toLowerCase();
+const OPEN_FINANCE_UPSTREAM_URL = String(process.env.OPEN_FINANCE_UPSTREAM_URL || '').trim();
+const OPEN_FINANCE_UPSTREAM_API_KEY = String(process.env.OPEN_FINANCE_UPSTREAM_API_KEY || '').trim();
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -1882,44 +1885,50 @@ function addDaysToIso(days) {
   return target.toISOString();
 }
 
-function buildMockOpenFinanceTransactions(connection = {}, syncSeed = '') {
-  const bankLabel = String(connection.bankName || connection.bankCode || 'Banco').trim();
-  const seed = String(syncSeed || new Date().toISOString().slice(0, 16)).replace(/[^0-9]/g, '').slice(-8) || '00000000';
-  const year = Number(seed.slice(0, 4) || new Date().getFullYear());
-  const month = Number(seed.slice(4, 6) || new Date().getMonth() + 1);
-  const dayBase = Number(seed.slice(6, 8) || new Date().getDate());
+function assertOpenFinanceProviderConfigured() {
+  if (!OPEN_FINANCE_UPSTREAM_URL) {
+    const error = new Error(
+      'Integração Open Finance real não configurada no backend. Defina OPEN_FINANCE_UPSTREAM_URL e OPEN_FINANCE_PROVIDER no ambiente das functions.'
+    );
+    error.statusCode = 503;
+    throw error;
+  }
 
-  const toDate = (offset) => {
-    const safeMonth = Math.max(1, Math.min(month, 12));
-    const date = new Date(year, safeMonth - 1, Math.max(1, Math.min(28, dayBase + offset)));
-    return date.toISOString().slice(0, 10);
-  };
+  if (OPEN_FINANCE_PROVIDER === 'mock' || OPEN_FINANCE_PROVIDER === 'disabled') {
+    const error = new Error(
+      'Provider de Open Finance inválido para produção. Defina OPEN_FINANCE_PROVIDER com um agregador real.'
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+}
 
-  const amountFactor = Math.max(1, (Number(seed.slice(-2)) || 17) % 19);
+async function requestOpenFinanceUpstream(action, payload = {}, context = {}) {
+  assertOpenFinanceProviderConfigured();
 
-  return [
-    {
-      date: toDate(-2),
-      title: `${bankLabel} Mercado Essencial ${seed.slice(-3)}`,
-      value: toCurrency(38 + amountFactor * 2.7),
-      category: 'Alimentação',
-      accountType: 'Conta'
+  const response = await fetch(OPEN_FINANCE_UPSTREAM_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(OPEN_FINANCE_UPSTREAM_API_KEY ? { 'x-api-key': OPEN_FINANCE_UPSTREAM_API_KEY } : {})
     },
-    {
-      date: toDate(-1),
-      title: `${bankLabel} Transporte Urbano ${seed.slice(-2)}`,
-      value: toCurrency(17 + amountFactor * 1.9),
-      category: 'Transporte',
-      accountType: 'Conta'
-    },
-    {
-      date: toDate(0),
-      title: `${bankLabel} Assinatura Digital ${seed.slice(-4)}`,
-      value: toCurrency(24 + amountFactor * 1.3),
-      category: 'Outros',
-      accountType: 'Crédito'
-    }
-  ];
+    body: JSON.stringify({
+      provider: OPEN_FINANCE_PROVIDER,
+      action,
+      ...payload,
+      context
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(data?.message || data?.error || `Falha no agregador Open Finance (${response.status})`).trim();
+    const error = new Error(message);
+    error.statusCode = response.status;
+    throw error;
+  }
+
+  return data;
 }
 
 function chunkArray(values = [], chunkSize = 10) {
@@ -2042,7 +2051,7 @@ async function listOpenFinanceConnections(appId, userId) {
       id: doc.id,
       bankCode: String(data.bankCode || '').trim(),
       bankName: String(data.bankName || '').trim(),
-      provider: String(data.provider || 'mock-open-finance').trim(),
+      provider: String(data.provider || OPEN_FINANCE_PROVIDER || 'unknown').trim(),
       status: String(data.status || 'unknown').trim(),
       consentExpiresAt: String(data.consentExpiresAt || '').trim(),
       lastSyncAt: String(data.lastSyncAt || '').trim(),
@@ -2110,29 +2119,30 @@ exports.openFinanceProxy = onRequest(
         const existingSnapshot = await connectionRef.get();
         const createdAt = existingSnapshot.exists ? String(existingSnapshot.data()?.createdAt || nowIso) : nowIso;
 
-        await connectionRef.set(
+        const upstream = await requestOpenFinanceUpstream(
+          'connect-bank',
           {
+            appId,
             bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode],
-            provider: 'mock-open-finance',
-            status: 'active',
-            consentExpiresAt: addDaysToIso(90),
-            lastSyncAt: nowIso,
-            lastSyncInserted: 0,
-            errorMessage: '',
-            createdAt,
-            updatedAt: nowIso
+            bankName: OPEN_FINANCE_BANKS[bankCode]
           },
-          { merge: true }
+          {
+            userId
+          }
         );
+
+        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
+        const providerConnectionId = sanitizeString(
+          upstreamConnection.id || upstreamConnection.connectionId || bankCode,
+          140
+        ) || bankCode;
+        const connectionStatus = sanitizeString(upstreamConnection.status || 'pending', 40) || 'pending';
+        const consentExpiresAt = sanitizeString(upstreamConnection.consentExpiresAt || addDaysToIso(90), 80);
 
         const persisted = await persistOpenFinanceTransactions(
           appId,
           userId,
-          buildMockOpenFinanceTransactions({
-            bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode]
-          }, nowIso),
+          Array.isArray(upstream?.transactions) ? upstream.transactions : [],
           {
             bankCode,
             bankName: OPEN_FINANCE_BANKS[bankCode]
@@ -2141,8 +2151,18 @@ exports.openFinanceProxy = onRequest(
 
         await connectionRef.set(
           {
+            bankCode,
+            bankName: OPEN_FINANCE_BANKS[bankCode],
+            provider: OPEN_FINANCE_PROVIDER,
+            providerConnectionId,
+            status: connectionStatus,
+            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
+            consentExpiresAt,
+            lastSyncAt: nowIso,
             lastSyncInserted: persisted.insertedCount,
-            updatedAt: new Date().toISOString()
+            errorMessage: '',
+            createdAt,
+            updatedAt: nowIso
           },
           { merge: true }
         );
@@ -2150,6 +2170,8 @@ exports.openFinanceProxy = onRequest(
         const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
           connectionId: bankCode,
+          providerConnectionId,
+          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
           insertedCount: persisted.insertedCount,
           skippedCount: persisted.skippedCount,
           transactions: persisted.insertedTransactions,
@@ -2185,18 +2207,33 @@ exports.openFinanceProxy = onRequest(
         }
 
         const nowIso = new Date().toISOString();
+        const upstream = await requestOpenFinanceUpstream(
+          'sync-connection',
+          {
+            appId,
+            bankCode: sanitizeString(connection.bankCode, 60),
+            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
+          },
+          {
+            userId
+          }
+        );
+
+        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
         const persisted = await persistOpenFinanceTransactions(
           appId,
           userId,
-          buildMockOpenFinanceTransactions(connection, nowIso),
+          Array.isArray(upstream?.transactions) ? upstream.transactions : [],
           connection
         );
 
         await connectionRef.set(
           {
-            status: 'active',
+            status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
             lastSyncAt: nowIso,
             lastSyncInserted: persisted.insertedCount,
+            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
+            consentExpiresAt: sanitizeString(upstreamConnection.consentExpiresAt || connection.consentExpiresAt, 80),
             errorMessage: '',
             updatedAt: nowIso
           },
@@ -2206,6 +2243,7 @@ exports.openFinanceProxy = onRequest(
         const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
           connectionId,
+          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
           insertedCount: persisted.insertedCount,
           skippedCount: persisted.skippedCount,
           transactions: persisted.insertedTransactions,
@@ -2232,10 +2270,26 @@ exports.openFinanceProxy = onRequest(
           return;
         }
 
+        const connection = snapshot.data() || {};
+        const upstream = await requestOpenFinanceUpstream(
+          'renew-connection',
+          {
+            appId,
+            bankCode: sanitizeString(connection.bankCode, 60),
+            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
+          },
+          {
+            userId
+          }
+        );
+
+        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
+
         await connectionRef.set(
           {
-            status: 'active',
-            consentExpiresAt: addDaysToIso(90),
+            status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
+            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
+            consentExpiresAt: sanitizeString(upstreamConnection.consentExpiresAt || addDaysToIso(90), 80),
             errorMessage: '',
             updatedAt: new Date().toISOString()
           },
@@ -2245,6 +2299,7 @@ exports.openFinanceProxy = onRequest(
         const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
           connectionId,
+          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
           connections
         });
         return;
@@ -2268,6 +2323,19 @@ exports.openFinanceProxy = onRequest(
           return;
         }
 
+        const connection = snapshot.data() || {};
+        await requestOpenFinanceUpstream(
+          'revoke-connection',
+          {
+            appId,
+            bankCode: sanitizeString(connection.bankCode, 60),
+            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
+          },
+          {
+            userId
+          }
+        );
+
         await connectionRef.set(
           {
             status: 'revoked',
@@ -2288,7 +2356,8 @@ exports.openFinanceProxy = onRequest(
         error: 'Unsupported action'
       });
     } catch (error) {
-      response.status(500).json({
+      const statusCode = Math.max(400, Math.min(599, Number(error?.statusCode || 500)));
+      response.status(statusCode).json({
         error: 'Unexpected error while handling Open Finance',
         details: error?.message || 'unknown error'
       });

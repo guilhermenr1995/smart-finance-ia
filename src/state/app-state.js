@@ -36,7 +36,8 @@ export class AppState {
       startDate: defaultRange.startDate,
       endDate: defaultRange.endDate,
       accountType: 'all',
-      category: 'all'
+      category: 'all',
+      source: 'all'
     };
     this.installPromptEvent = null;
   }

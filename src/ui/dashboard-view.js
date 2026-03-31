@@ -104,6 +104,7 @@ export class DashboardView {
     this.searchTermInput = document.getElementById('search-term');
     this.clearSearchButton = document.getElementById('btn-clear-search');
     this.searchUseGlobalBaseCheckbox = document.getElementById('search-use-global-base');
+    this.sourceFilterSelect = document.getElementById('filter-source');
 
     this.accountFilterButtons = {
       all: document.getElementById('filter-all'),
@@ -318,6 +319,9 @@ export class DashboardView {
     if (this.categoryFilterSelect) {
       this.categoryFilterSelect.value = filters.category;
     }
+    if (this.sourceFilterSelect) {
+      this.sourceFilterSelect.value = filters.source || 'all';
+    }
     this.setAccountFilterButton(filters.accountType);
     this.searchModeSelect.value = search.mode || 'description';
     this.searchTermInput.value = search.term || '';
@@ -365,6 +369,12 @@ export class DashboardView {
     if (this.categoryFilterSelect) {
       this.categoryFilterSelect.addEventListener('change', () => {
         handlers.onFiltersChange({ category: this.categoryFilterSelect.value });
+      });
+    }
+
+    if (this.sourceFilterSelect) {
+      this.sourceFilterSelect.addEventListener('change', () => {
+        handlers.onFiltersChange({ source: this.sourceFilterSelect.value });
       });
     }
 
@@ -1135,6 +1145,9 @@ export class DashboardView {
     if (this.categoryFilterSelect) {
       this.categoryFilterSelect.value = filters.category;
     }
+    if (this.sourceFilterSelect) {
+      this.sourceFilterSelect.value = filters.source || 'all';
+    }
     this.searchModeSelect.value = search.mode;
     this.searchTermInput.value = search.term;
     if (this.searchUseGlobalBaseCheckbox) {
@@ -1253,6 +1266,22 @@ export class DashboardView {
     const days = Array.isArray(daily.days) ? daily.days : [];
     const series = Array.isArray(daily.series) ? daily.series : [];
 
+    const formatDayLabelPtBr = (day) => {
+      const raw = String(day || '').trim();
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) {
+        return escapeHtml(raw);
+      }
+
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const dayOfMonth = Number(match[3]);
+      const date = new Date(year, month - 1, dayOfMonth, 12, 0, 0);
+      const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(date);
+      const formattedDate = `${String(dayOfMonth).padStart(2, '0')}/${String(month).padStart(2, '0')}/${String(year).padStart(4, '0')}`;
+      return `${escapeHtml(formattedDate)} (${escapeHtml(weekday)})`;
+    };
+
     const buildDayTooltipHtml = (day, detail) => {
       if (!detail) {
         return '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
@@ -1274,7 +1303,7 @@ export class DashboardView {
 
       return `
         <div class="space-y-1 text-[10px]">
-          <p class="font-black uppercase text-zinc-600">Dia ${escapeHtml(day)}</p>
+          <p class="font-black uppercase text-zinc-600">Dia ${formatDayLabelPtBr(day)}</p>
           <p class="font-black text-zinc-900">Total: ${formatCurrencyBRL(Number(detail.total || 0))}</p>
           <div class="border-t border-zinc-200 pt-1 space-y-1">
             ${
@@ -2073,6 +2102,11 @@ export class DashboardView {
         const usageLabel = transaction.active === false ? 'Ignorado' : 'Ativo';
         const usageButtonLabel = transaction.active === false ? 'Reativar' : 'Ignorar';
         const bankAccount = escapeHtml(transaction.bankAccount || DEFAULT_BANK_ACCOUNT);
+        const categorySource = String(transaction.categorySource || '').trim().toLowerCase();
+        const isOpenFinance = categorySource.includes('open-finance');
+        const originBadge = isOpenFinance
+          ? '<span class="transaction-badge transaction-badge-neutral">Origem: Open Finance</span>'
+          : '';
 
         return `
           <article class="transaction-card transition-all ${transaction.active === false ? 'row-inactive' : ''}">
@@ -2096,6 +2130,7 @@ export class DashboardView {
               <div class="transaction-badges">
                 <span class="transaction-badge">${usageLabel}</span>
                 <span class="transaction-badge transaction-badge-bank">Conta: ${bankAccount}</span>
+                ${originBadge}
                 ${
                   installmentOverride
                     ? '<span class="transaction-badge transaction-badge-neutral">Mix: Parcelas</span>'
