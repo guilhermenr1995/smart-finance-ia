@@ -1129,6 +1129,8 @@ export class DashboardView {
   }) {
     this.setAvailableCategories(categories);
     this.setAvailableBankAccounts(bankAccounts);
+    this.startDateInput.value = filters.startDate;
+    this.endDateInput.value = filters.endDate;
     this.setAccountFilterButton(filters.accountType);
     if (this.categoryFilterSelect) {
       this.categoryFilterSelect.value = filters.category;
@@ -1251,12 +1253,48 @@ export class DashboardView {
     const days = Array.isArray(daily.days) ? daily.days : [];
     const series = Array.isArray(daily.series) ? daily.series : [];
 
+    const buildDayTooltipHtml = (day, detail) => {
+      if (!detail) {
+        return '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
+      }
+
+      const rankingRows = (detail.ranking || [])
+        .map((item) => {
+          const category = String(item?.category || 'Outros').trim() || 'Outros';
+          const value = Number(item?.value || 0);
+          const percent = Number(item?.percent || 0);
+          return `
+            <div class="flex items-center justify-between gap-2 text-[10px] font-bold text-zinc-700">
+              <span class="truncate">${escapeHtml(category)}</span>
+              <span class="whitespace-nowrap">${formatCurrencyBRL(value)} · ${percent.toFixed(1)}%</span>
+            </div>
+          `;
+        })
+        .join('');
+
+      return `
+        <div class="space-y-1 text-[10px]">
+          <p class="font-black uppercase text-zinc-600">Dia ${escapeHtml(day)}</p>
+          <p class="font-black text-zinc-900">Total: ${formatCurrencyBRL(Number(detail.total || 0))}</p>
+          <div class="border-t border-zinc-200 pt-1 space-y-1">
+            ${
+              rankingRows ||
+              '<p class="text-[10px] font-bold text-zinc-500">Sem categorias com gasto neste dia.</p>'
+            }
+          </div>
+        </div>
+      `;
+    };
+
     if (days.length === 0 || series.length === 0) {
       this.ritmoLegend.innerHTML = '<span class="text-[10px] font-black uppercase text-zinc-400">Sem dados diários para o período.</span>';
       this.ritmoDailyChart.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dias com transação.</p>';
-      this.ritmoDailyTooltip.innerText = '';
+      this.ritmoDailyTooltip.innerHTML = '';
       return;
     }
+
+    this.ritmoDailyTooltip.innerHTML =
+      '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
 
     const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
     const selectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
@@ -1317,14 +1355,22 @@ export class DashboardView {
         button.addEventListener('mouseenter', () => {
           const day = button.dataset.day;
           const detail = (daily.details || []).find((item) => item.day === day);
-          if (!detail) {
-            this.ritmoDailyTooltip.innerText = '';
+          this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+        });
+
+        button.addEventListener('click', () => {
+          const day = String(button.dataset.day || '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return;
           }
-          const rankingText = (detail.ranking || [])
-            .map((item) => `${item.category}: ${formatCurrencyBRL(item.value)} (${Number(item.percent || 0).toFixed(1)}%)`)
-            .join(' | ');
-          this.ritmoDailyTooltip.innerText = `${day}: Total ${formatCurrencyBRL(detail.total)}. ${rankingText}`;
+
+          const detail = (daily.details || []).find((item) => item.day === day);
+          this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+
+          this.handlers?.onFiltersChange?.({
+            startDate: day,
+            endDate: day
+          });
         });
       });
     };
