@@ -145,6 +145,10 @@ export class DashboardView {
     this.totalValue = document.getElementById('total-fatura-val');
     this.ignoredValue = document.getElementById('valor-ignorado');
     this.cycleLegend = document.getElementById('legenda-ciclo');
+    this.categoryPiePeriodLabel = document.getElementById('category-pie-period');
+    this.categoryPieChart = document.getElementById('category-pie-chart');
+    this.categoryPieTotal = document.getElementById('category-pie-total');
+    this.categoryPieLegend = document.getElementById('category-pie-legend');
 
     this.chartBars = document.getElementById('chart-bars');
     this.statsList = document.getElementById('stats-list');
@@ -1158,6 +1162,7 @@ export class DashboardView {
     this.totalValue.innerText = formatCurrencyBRL(summary.total);
     this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
     this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
+    this.renderCategoryPie(summary, filters);
 
     const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
     const paginationMeta = this.paginateTransactions(orderedTableTransactions);
@@ -1180,6 +1185,99 @@ export class DashboardView {
         ? `${baseCounterLabel} • PÁGINA ${paginationMeta.currentPage}/${paginationMeta.totalPages}`
         : baseCounterLabel;
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
+  }
+
+  renderCategoryPie(summary = {}, filters = {}) {
+    if (!this.categoryPieChart || !this.categoryPieLegend || !this.categoryPieTotal || !this.categoryPiePeriodLabel) {
+      return;
+    }
+
+    this.categoryPiePeriodLabel.innerText = `${toBrDate(filters.startDate)} • ${toBrDate(filters.endDate)}`;
+    const categoryEntries = Object.entries(summary?.categoryTotals || {})
+      .map(([category, value]) => [category, Number(value || 0)])
+      .filter(([, value]) => value > 0)
+      .sort((left, right) => right[1] - left[1]);
+
+    const total = categoryEntries.reduce((accumulator, [, value]) => accumulator + value, 0);
+    this.categoryPieTotal.innerText = formatCurrencyBRL(total);
+
+    if (categoryEntries.length === 0 || total <= 0) {
+      this.categoryPieChart.style.background = 'conic-gradient(#e4e4e7 0deg 360deg)';
+      this.categoryPieChart.setAttribute('aria-label', 'Sem gastos no período selecionado');
+      this.categoryPieLegend.innerHTML =
+        '<p class="text-[11px] font-black uppercase text-zinc-500">Sem gastos no período selecionado.</p>';
+      return;
+    }
+
+    const MAX_VISIBLE_SLICES = 7;
+    const visibleEntries = categoryEntries.slice(0, MAX_VISIBLE_SLICES);
+    const hiddenEntries = categoryEntries.slice(MAX_VISIBLE_SLICES);
+    if (hiddenEntries.length > 0) {
+      const hiddenTotal = hiddenEntries.reduce((accumulator, [, value]) => accumulator + value, 0);
+      visibleEntries.push(['Outros', hiddenTotal]);
+    }
+
+    let angleCursor = 0;
+    const slices = visibleEntries.map(([category, value], index) => {
+      const angle = (value / total) * 360;
+      const startAngle = angleCursor;
+      angleCursor += angle;
+      const color = this.getCategoryColor(category, index);
+      return {
+        category,
+        value,
+        percent: (value / total) * 100,
+        color,
+        startAngle,
+        endAngle: angleCursor
+      };
+    });
+
+    const gradient = slices
+      .map((slice) => `${slice.color} ${slice.startAngle.toFixed(2)}deg ${slice.endAngle.toFixed(2)}deg`)
+      .join(', ');
+
+    this.categoryPieChart.style.background = `conic-gradient(${gradient})`;
+    this.categoryPieChart.setAttribute(
+      'aria-label',
+      slices
+        .map((slice) => `${slice.category}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
+        .join(' | ')
+    );
+
+    const selectedCategory = String(filters?.category || 'all').trim();
+    this.categoryPieLegend.innerHTML = slices
+      .map((slice) => {
+        const isActive = selectedCategory !== 'all' && selectedCategory === slice.category;
+        return `
+          <button
+            type="button"
+            data-category-pie="${escapeHtml(slice.category)}"
+            class="category-pie-legend-item ${isActive ? 'is-active' : ''}"
+          >
+            <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
+            <span class="category-pie-legend-text">
+              <strong>${escapeHtml(slice.category)}</strong>
+              <small>${slice.percent.toFixed(1)}% • ${formatCurrencyBRL(slice.value)}</small>
+            </span>
+          </button>
+        `;
+      })
+      .join('');
+
+    this.categoryPieLegend.querySelectorAll('[data-category-pie]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const category = String(button.dataset.categoryPie || '').trim();
+        if (!category || !this.handlers?.onFiltersChange) {
+          return;
+        }
+
+        const shouldClearFilter = selectedCategory === category;
+        this.handlers.onFiltersChange({
+          category: shouldClearFilter ? 'all' : category
+        });
+      });
+    });
   }
 
   renderOpenFinance(openFinanceState = {}) {

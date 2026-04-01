@@ -1939,6 +1939,10 @@ function chunkArray(values = [], chunkSize = 10) {
   return chunks;
 }
 
+function resolveProviderConnectionId(connection = {}, fallback = '') {
+  return sanitizeString(connection.providerConnectionId || fallback, 140);
+}
+
 function sanitizeOpenFinanceTransaction(raw = {}, context = {}) {
   const nowIso = new Date().toISOString();
   const accountType = String(raw.accountType || 'Conta').trim() === 'Crédito' ? 'Crédito' : 'Conta';
@@ -2206,20 +2210,34 @@ exports.openFinanceProxy = onRequest(
           return;
         }
 
+        const bankCode = sanitizeString(connection.bankCode, 60);
+        const bankName = sanitizeString(connection.bankName || OPEN_FINANCE_BANKS[bankCode] || bankCode, 80);
+        const previousProviderConnectionId = resolveProviderConnectionId(connection);
+        const shouldReconnect = !previousProviderConnectionId;
+        const upstreamAction = shouldReconnect ? 'connect-bank' : 'sync-connection';
+
         const nowIso = new Date().toISOString();
         const upstream = await requestOpenFinanceUpstream(
-          'sync-connection',
-          {
-            appId,
-            bankCode: sanitizeString(connection.bankCode, 60),
-            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
-          },
+          upstreamAction,
+          shouldReconnect
+            ? {
+                appId,
+                bankCode,
+                bankName
+              }
+            : {
+                appId,
+                bankCode,
+                connectionId: previousProviderConnectionId
+              },
           {
             userId
           }
         );
 
         const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
+        const providerConnectionId =
+          resolveProviderConnectionId(upstreamConnection, previousProviderConnectionId || connectionId) || connectionId;
         const persisted = await persistOpenFinanceTransactions(
           appId,
           userId,
@@ -2230,6 +2248,7 @@ exports.openFinanceProxy = onRequest(
         await connectionRef.set(
           {
             status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
+            providerConnectionId,
             lastSyncAt: nowIso,
             lastSyncInserted: persisted.insertedCount,
             consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),

@@ -27,7 +27,12 @@ export class OpenFinanceService {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data?.message || data?.error || `Falha Open Finance (${response.status})`);
+      const details = String(data?.details || '').trim();
+      const message = String(data?.message || data?.error || '').trim();
+      const finalMessage = details || message || `Falha Open Finance (${response.status})`;
+      const error = new Error(finalMessage);
+      error.statusCode = response.status;
+      throw error;
     }
 
     return data;
