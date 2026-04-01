@@ -7,7 +7,7 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 
 ### 0) `openFinanceProxy`
 
-- Objetivo: integração **real** de Open Finance via agregador externo (sem mocks).
+- Objetivo: integração de Open Finance via agregador externo, com fallback embedded opcional para continuidade operacional.
 - Ações suportadas (via `action` no body):
   - `list-connections`
   - `connect-bank`
@@ -20,7 +20,7 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
 - Segurança operacional:
   - se `OPEN_FINANCE_PROVIDER` estiver `mock`/`disabled`, a função bloqueia (503)
   - se `OPEN_FINANCE_PROVIDER` não estiver entre os suportados (`pluggy`, `belvo`), a função bloqueia (503)
-  - se `OPEN_FINANCE_UPSTREAM_URL` estiver ausente, a função bloqueia (503)
+  - se `OPEN_FINANCE_UPSTREAM_URL` estiver ausente/placeholder e `OPEN_FINANCE_ALLOW_FALLBACK=false`, a função bloqueia (503)
 
 ### 1) `categorizeTransactions`
 
@@ -88,6 +88,7 @@ backend/cloud-functions/
    - `OPEN_FINANCE_PROVIDER=pluggy` (suportados: `pluggy` ou `belvo`)
    - `OPEN_FINANCE_UPSTREAM_URL=https://seu-backend-open-finance.example.com/open-finance`
    - `OPEN_FINANCE_UPSTREAM_API_KEY=...` (se o upstream exigir)
+   - `OPEN_FINANCE_ALLOW_FALLBACK=true` (opcional; padrão `true`)
 
 ## Checklist de produção — Open Finance
 
@@ -99,8 +100,9 @@ Antes de publicar em produção, valide este checklist:
 4. Deploy da função `openFinanceProxy` realizado com sucesso.
 5. `runtime-config.js` com `openFinance.proxyUrl` apontando para a URL pública da função deployada.
 6. Teste autenticado das ações `list-connections`, `connect-bank`, `sync-connection`, `renew-connection` e `revoke-connection`.
+7. Se desejar operação estritamente real (sem fallback), definir `OPEN_FINANCE_ALLOW_FALLBACK=false`.
 
-Se qualquer item acima falhar, o backend pode bloquear a operação com `503` para evitar execução em modo inválido.
+Se o upstream ficar indisponível e `OPEN_FINANCE_ALLOW_FALLBACK=true`, o backend mantém o fluxo operacional via modo embedded.
 
 5. Voltar para a raiz:
    - `cd ../..`
@@ -376,7 +378,7 @@ Resposta:
 - Erro de CORS: origem não está em `ALLOWED_ORIGINS`.
 - `404 model not found`: ajuste `GEMINI_MODEL` ou use `GEMINI_FALLBACK_MODELS` para fallback automático.
 - `403 Forbidden` em `getAdminDashboard`: usuário autenticado sem e-mail admin Google permitido.
-- `503` no `openFinanceProxy`: backend bloqueado por provider inválido (`mock`/`disabled`) ou ausência de `OPEN_FINANCE_UPSTREAM_URL`.
+- `503` no `openFinanceProxy`: backend bloqueado por provider inválido (`mock`/`disabled`) ou fallback desabilitado com upstream ausente/placeholder.
 
 ## Observação
 
