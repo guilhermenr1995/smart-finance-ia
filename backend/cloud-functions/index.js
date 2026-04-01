@@ -37,7 +37,8 @@ const OPEN_FINANCE_BANKS = {
   bradesco: 'Bradesco',
   'banco-do-brasil': 'Banco do Brasil'
 };
-const OPEN_FINANCE_PROVIDER = String(process.env.OPEN_FINANCE_PROVIDER || 'disabled').trim().toLowerCase();
+const OPEN_FINANCE_REAL_PROVIDERS = new Set(['pluggy', 'belvo']);
+const OPEN_FINANCE_PROVIDER = String(process.env.OPEN_FINANCE_PROVIDER || 'pluggy').trim().toLowerCase();
 const OPEN_FINANCE_UPSTREAM_URL = String(process.env.OPEN_FINANCE_UPSTREAM_URL || '').trim();
 const OPEN_FINANCE_UPSTREAM_API_KEY = String(process.env.OPEN_FINANCE_UPSTREAM_API_KEY || '').trim();
 
@@ -1886,9 +1887,9 @@ function addDaysToIso(days) {
 }
 
 function assertOpenFinanceProviderConfigured() {
-  if (!OPEN_FINANCE_UPSTREAM_URL) {
+  if (!OPEN_FINANCE_PROVIDER) {
     const error = new Error(
-      'Integração Open Finance real não configurada no backend. Defina OPEN_FINANCE_UPSTREAM_URL e OPEN_FINANCE_PROVIDER no ambiente das functions.'
+      'Integração Open Finance sem provider definido. Configure OPEN_FINANCE_PROVIDER com um agregador real (ex.: pluggy).'
     );
     error.statusCode = 503;
     throw error;
@@ -1897,6 +1898,22 @@ function assertOpenFinanceProviderConfigured() {
   if (OPEN_FINANCE_PROVIDER === 'mock' || OPEN_FINANCE_PROVIDER === 'disabled') {
     const error = new Error(
       'Provider de Open Finance inválido para produção. Defina OPEN_FINANCE_PROVIDER com um agregador real.'
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!OPEN_FINANCE_REAL_PROVIDERS.has(OPEN_FINANCE_PROVIDER)) {
+    const error = new Error(
+      `Provider de Open Finance não suportado: "${OPEN_FINANCE_PROVIDER}". Use um agregador real suportado (${[...OPEN_FINANCE_REAL_PROVIDERS].join(', ')}).`
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!OPEN_FINANCE_UPSTREAM_URL) {
+    const error = new Error(
+      'Integração Open Finance real não configurada no backend. Defina OPEN_FINANCE_UPSTREAM_URL e OPEN_FINANCE_PROVIDER no ambiente das functions.'
     );
     error.statusCode = 503;
     throw error;

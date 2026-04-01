@@ -147,6 +147,7 @@ export class DashboardView {
     this.cycleLegend = document.getElementById('legenda-ciclo');
     this.categoryPiePeriodLabel = document.getElementById('category-pie-period');
     this.categoryPieChart = document.getElementById('category-pie-chart');
+    this.categoryPieCenterLabel = document.getElementById('category-pie-center-label');
     this.categoryPieTotal = document.getElementById('category-pie-total');
     this.categoryPieLegend = document.getElementById('category-pie-legend');
 
@@ -1188,24 +1189,64 @@ export class DashboardView {
   }
 
   renderCategoryPie(summary = {}, filters = {}) {
-    if (!this.categoryPieChart || !this.categoryPieLegend || !this.categoryPieTotal || !this.categoryPiePeriodLabel) {
+    if (
+      !this.categoryPieChart ||
+      !this.categoryPieLegend ||
+      !this.categoryPieTotal ||
+      !this.categoryPiePeriodLabel ||
+      !this.categoryPieCenterLabel
+    ) {
       return;
     }
 
     this.categoryPiePeriodLabel.innerText = `${toBrDate(filters.startDate)} • ${toBrDate(filters.endDate)}`;
+    const selectedCategory = String(filters?.category || 'all').trim();
     const categoryEntries = Object.entries(summary?.categoryTotals || {})
       .map(([category, value]) => [category, Number(value || 0)])
       .filter(([, value]) => value > 0)
       .sort((left, right) => right[1] - left[1]);
 
     const total = categoryEntries.reduce((accumulator, [, value]) => accumulator + value, 0);
-    this.categoryPieTotal.innerText = formatCurrencyBRL(total);
+
+    const applyCenterValue = ({ label = 'Total', value = 0, isCategorySelected = false } = {}) => {
+      this.categoryPieCenterLabel.innerText = String(label || 'Total').trim() || 'Total';
+      this.categoryPieTotal.innerText = formatCurrencyBRL(Number(value || 0));
+      this.categoryPieTotal.classList.toggle('is-slice-selected', Boolean(isCategorySelected));
+      this.categoryPieChart.classList.toggle('is-slice-active', Boolean(isCategorySelected));
+      this.categoryPieChart.setAttribute('aria-pressed', isCategorySelected ? 'true' : 'false');
+    };
+
+    const clearPieInteraction = () => {
+      this.categoryPieChart.onclick = null;
+      this.categoryPieChart.onkeydown = null;
+    };
+
+    const applyCategoryFilter = (category) => {
+      const normalizedCategory = String(category || '').trim();
+      if (!normalizedCategory || !this.handlers?.onFiltersChange) {
+        return;
+      }
+
+      const shouldClearFilter = selectedCategory === normalizedCategory;
+      this.handlers.onFiltersChange({
+        category: shouldClearFilter ? 'all' : normalizedCategory
+      });
+    };
 
     if (categoryEntries.length === 0 || total <= 0) {
       this.categoryPieChart.style.background = 'conic-gradient(#e4e4e7 0deg 360deg)';
-      this.categoryPieChart.setAttribute('aria-label', 'Sem gastos no período selecionado');
+      this.categoryPieChart.setAttribute(
+        'aria-label',
+        'Sem gastos no período selecionado. Ajuste o filtro de data ou categoria para visualizar o gráfico de pizza.'
+      );
+      applyCenterValue({
+        label: selectedCategory !== 'all' ? selectedCategory : 'Total',
+        value: 0,
+        isCategorySelected: selectedCategory !== 'all'
+      });
       this.categoryPieLegend.innerHTML =
         '<p class="text-[11px] font-black uppercase text-zinc-500">Sem gastos no período selecionado.</p>';
+      clearPieInteraction();
       return;
     }
 
@@ -1238,14 +1279,92 @@ export class DashboardView {
       .join(', ');
 
     this.categoryPieChart.style.background = `conic-gradient(${gradient})`;
+    const selectedSlice =
+      selectedCategory && selectedCategory !== 'all'
+        ? slices.find((slice) => slice.category === selectedCategory) || null
+        : null;
+
+    applyCenterValue({
+      label: selectedSlice?.category || 'Total',
+      value: selectedSlice?.value ?? total,
+      isCategorySelected: Boolean(selectedSlice)
+    });
+
     this.categoryPieChart.setAttribute(
       'aria-label',
-      slices
-        .map((slice) => `${slice.category}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
-        .join(' | ')
+      [
+        slices
+          .map((slice) => `${slice.category}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
+          .join(' | '),
+        selectedSlice
+          ? `Categoria selecionada: ${selectedSlice.category}, valor ${formatCurrencyBRL(selectedSlice.value)}.`
+          : 'Nenhuma categoria selecionada no momento. Clique em uma fatia para ver o valor direto no gráfico.'
+      ].join(' ')
     );
 
-    const selectedCategory = String(filters?.category || 'all').trim();
+    const resolveSliceByAngle = (angle) => {
+      const normalizedAngle = Number(angle || 0);
+      return (
+        slices.find((slice, index) => {
+          const isLast = index === slices.length - 1;
+          if (isLast) {
+            return normalizedAngle >= slice.startAngle && normalizedAngle <= slice.endAngle + 0.01;
+          }
+
+          return normalizedAngle >= slice.startAngle && normalizedAngle < slice.endAngle;
+        }) || null
+      );
+    };
+
+    this.categoryPieChart.onclick = (event) => {
+      if (!this.handlers?.onFiltersChange) {
+        return;
+      }
+
+      const bounds = this.categoryPieChart.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) {
+        return;
+      }
+
+      const x = event.clientX - bounds.left;
+      const y = event.clientY - bounds.top;
+      const centerX = bounds.width / 2;
+      const centerY = bounds.height / 2;
+      const radius = Math.min(bounds.width, bounds.height) / 2;
+      const distanceFromCenter = Math.hypot(x - centerX, y - centerY);
+      if (distanceFromCenter > radius) {
+        return;
+      }
+
+      const angle = ((Math.atan2(y - centerY, x - centerX) * 180) / Math.PI + 450) % 360;
+      const clickedSlice = resolveSliceByAngle(angle);
+      if (!clickedSlice?.category) {
+        return;
+      }
+
+      applyCategoryFilter(clickedSlice.category);
+    };
+
+    this.categoryPieChart.onkeydown = (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (selectedSlice) {
+        applyCategoryFilter(selectedSlice.category);
+        return;
+      }
+
+      const firstSlice = slices[0];
+      if (!firstSlice?.category) {
+        return;
+      }
+
+      applyCategoryFilter(firstSlice.category);
+    };
+
     this.categoryPieLegend.innerHTML = slices
       .map((slice) => {
         const isActive = selectedCategory !== 'all' && selectedCategory === slice.category;
@@ -1268,14 +1387,7 @@ export class DashboardView {
     this.categoryPieLegend.querySelectorAll('[data-category-pie]').forEach((button) => {
       button.addEventListener('click', () => {
         const category = String(button.dataset.categoryPie || '').trim();
-        if (!category || !this.handlers?.onFiltersChange) {
-          return;
-        }
-
-        const shouldClearFilter = selectedCategory === category;
-        this.handlers.onFiltersChange({
-          category: shouldClearFilter ? 'all' : category
-        });
+        applyCategoryFilter(category);
       });
     });
   }

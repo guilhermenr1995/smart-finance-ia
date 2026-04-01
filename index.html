@@ -314,9 +314,15 @@
 
             <div class="category-pie-layout">
               <div class="category-pie-visual-wrap">
-                <div id="category-pie-chart" class="category-pie-chart" role="img" aria-label="Distribuição de gastos por categoria"></div>
+                <div
+                  id="category-pie-chart"
+                  class="category-pie-chart"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Distribuição de gastos por categoria. Clique em uma fatia para filtrar e ver o valor no centro"
+                ></div>
                 <div class="category-pie-center">
-                  <p class="category-pie-center-label">Total</p>
+                  <p id="category-pie-center-label" class="category-pie-center-label">Total</p>
                   <p id="category-pie-total" class="category-pie-center-value">R$ 0,00</p>
                 </div>
               </div>

@@ -280,6 +280,23 @@ select.edit-mode {
   border-radius: 999px;
   background: conic-gradient(#e4e4e7 0deg 360deg);
   box-shadow: 3px 3px 0 #111827;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.category-pie-chart:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #111827;
+}
+
+.category-pie-chart:focus-visible {
+  outline: 3px solid #111827;
+  outline-offset: 3px;
+}
+
+.category-pie-chart.is-slice-active {
+  box-shadow: 5px 5px 0 #111827;
+  filter: saturate(1.07);
 }
 
 .category-pie-center {
@@ -312,6 +329,10 @@ select.edit-mode {
   font-weight: 900;
   line-height: 1.2;
   color: #111827;
+}
+
+.category-pie-center-value.is-slice-selected {
+  color: #92400e;
 }
 
 .category-pie-legend {

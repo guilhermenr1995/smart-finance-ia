@@ -19,6 +19,7 @@ Ele não é um backend completo da aplicação, mas sim um conjunto de proxies H
   - transações importadas em `artifacts/{appId}/users/{userId}/transacoes`
 - Segurança operacional:
   - se `OPEN_FINANCE_PROVIDER` estiver `mock`/`disabled`, a função bloqueia (503)
+  - se `OPEN_FINANCE_PROVIDER` não estiver entre os suportados (`pluggy`, `belvo`), a função bloqueia (503)
   - se `OPEN_FINANCE_UPSTREAM_URL` estiver ausente, a função bloqueia (503)
 
 ### 1) `categorizeTransactions`
@@ -82,11 +83,24 @@ backend/cloud-functions/
 
 4. Preencher variáveis:
    - `GEMINI_API_KEY=...`
-  - `GEMINI_MODEL=gemini-2.5-flash-lite` (ou modelo disponível no seu projeto)
+   - `GEMINI_MODEL=gemini-2.5-flash-lite` (ou modelo disponível no seu projeto)
    - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash` (opcional, recomendado)
-   - `OPEN_FINANCE_PROVIDER=pluggy` (ou outro agregador real)
+   - `OPEN_FINANCE_PROVIDER=pluggy` (suportados: `pluggy` ou `belvo`)
    - `OPEN_FINANCE_UPSTREAM_URL=https://seu-backend-open-finance.example.com/open-finance`
    - `OPEN_FINANCE_UPSTREAM_API_KEY=...` (se o upstream exigir)
+
+## Checklist de produção — Open Finance
+
+Antes de publicar em produção, valide este checklist:
+
+1. `OPEN_FINANCE_PROVIDER` definido para um provider real suportado (`pluggy` ou `belvo`).
+2. `OPEN_FINANCE_UPSTREAM_URL` apontando para um backend agregador ativo (HTTPS) com contrato compatível.
+3. `OPEN_FINANCE_UPSTREAM_API_KEY` preenchida quando o upstream exigir autenticação por chave.
+4. Deploy da função `openFinanceProxy` realizado com sucesso.
+5. `runtime-config.js` com `openFinance.proxyUrl` apontando para a URL pública da função deployada.
+6. Teste autenticado das ações `list-connections`, `connect-bank`, `sync-connection`, `renew-connection` e `revoke-connection`.
+
+Se qualquer item acima falhar, o backend pode bloquear a operação com `503` para evitar execução em modo inválido.
 
 5. Voltar para a raiz:
    - `cd ../..`
