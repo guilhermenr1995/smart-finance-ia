@@ -3,15 +3,15 @@ import { AppState } from './state/app-state.js';
 import { AuthService } from './services/auth-service.js';
 import { AiCategorizationService } from './services/ai-categorization-service.js';
 import { AiConsultantService } from './services/ai-consultant-service.js';
-import { CsvImportService } from './services/csv-import-service.js';
 import { FirebaseService } from './services/firebase-service.js';
 import { OpenFinanceService } from './services/open-finance-service.js';
 import { CategoryMemoryService } from './services/category-memory-service.js';
 import { LocalCacheService } from './services/local-cache-service.js';
 import { PwaService } from './services/pwa-service.js';
-import { TransactionRepository } from './services/transaction-repository.js';
+import { CsvImportService } from './features/transactions/services/csv-import/csv-import-service.js';
+import { TransactionRepository } from './features/transactions/services/transaction-repository/transaction-repository.js';
 import { AuthView } from './ui/auth-view.js';
-import { DashboardView } from './ui/dashboard-view.js';
+import { DashboardView } from './features/dashboard/ui/dashboard-view/dashboard-view.js';
 import { OverlayView } from './ui/overlay-view.js';
 import { CATEGORIES } from './constants/categories.js';
 import {
@@ -34,19 +34,19 @@ import {
   createAndAssignBankAccount,
   createManualTransaction,
   updateTransactionDescription
-} from './application/flows/transaction-flow.js';
+} from './features/transactions/flows/transaction-flow.js';
 import {
   syncCategoriesWithAi,
   buildConsultantPeriodSnapshot,
   buildConsultantInsightKey,
   runAiConsultant
-} from './application/flows/ai-flow.js';
+} from './features/ai/flows/ai-flow.js';
 import {
   deleteMonthlyGoal,
   deleteMonthlyGoalsForReferenceMonth,
   generateAutomaticMonthlyGoals,
   saveMonthlyGoal
-} from './application/flows/goal-flow.js';
+} from './features/goals/flows/goal-flow.js';
 import {
   connectOpenFinanceBank,
   loadOpenFinanceConnections,
