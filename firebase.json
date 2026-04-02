@@ -21,6 +21,11 @@
         "source": "/admin",
         "destination": "/admin.html",
         "type": 302
+      },
+      {
+        "source": "/termos",
+        "destination": "/termos-de-uso.html",
+        "type": 302
       }
     ],
     "rewrites": [

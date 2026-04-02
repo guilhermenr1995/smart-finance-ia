@@ -51,11 +51,6 @@ export class DashboardView {
     this.openFinanceConnectionsContainer = document.getElementById('open-finance-connections');
     this.openFinanceConnectButtons = Array.from(document.querySelectorAll('.open-finance-connect-btn'));
 
-    this.ritmoStatusPill = document.getElementById('ritmo-status-pill');
-    this.ritmoBudgetValue = document.getElementById('ritmo-budget');
-    this.ritmoRealizedValue = document.getElementById('ritmo-realized');
-    this.ritmoExpectedValue = document.getElementById('ritmo-expected');
-    this.ritmoRecommendation = document.getElementById('ritmo-recommendation');
     this.ritmoLegend = document.getElementById('ritmo-legend');
     this.ritmoDailyChart = document.getElementById('ritmo-daily-chart');
     this.ritmoDailyTooltip = document.getElementById('ritmo-daily-tooltip');

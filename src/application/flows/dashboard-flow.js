@@ -23,15 +23,22 @@ function buildRhythmDailyByCategory(consideredTransactions = []) {
     if (!grouped.has(dateKey)) {
       grouped.set(dateKey, {
         total: 0,
-        categories: {}
+        categories: {},
+        transactions: []
       });
     }
 
     const current = grouped.get(dateKey);
     const category = String(transaction.category || 'Outros').trim() || 'Outros';
+    const title = String(transaction.title || '').trim() || 'Transação sem descrição';
     const value = Number(transaction.value || 0);
     current.total += value;
     current.categories[category] = Number(current.categories[category] || 0) + value;
+    current.transactions.push({
+      title,
+      category,
+      value
+    });
   });
 
   const days = [...grouped.keys()].sort((left, right) => left.localeCompare(right));
@@ -59,7 +66,14 @@ function buildRhythmDailyByCategory(consideredTransactions = []) {
     return {
       day,
       total: Number(info.total || 0),
-      ranking
+      ranking,
+      transactions: (Array.isArray(info.transactions) ? info.transactions : [])
+        .map((transaction) => ({
+          title: String(transaction?.title || '').trim() || 'Transação sem descrição',
+          category: String(transaction?.category || 'Outros').trim() || 'Outros',
+          value: Number(transaction?.value || 0)
+        }))
+        .sort((left, right) => right.value - left.value)
     };
   });
 
@@ -148,18 +162,6 @@ export function refreshDashboard(app) {
   const availableCategories = [...new Set([...CATEGORIES, ...app.state.userCategories])];
   const availableBankAccounts = app.state.userBankAccounts || ['Padrão'];
 
-  const currentDate = new Date(`${app.state.filters.endDate || app.state.filters.startDate}T12:00:00`);
-  const totalDaysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-  const elapsedDays = Math.max(1, Math.min(currentDate.getDate(), totalDaysInMonth));
-  const daysRemaining = Math.max(0, totalDaysInMonth - elapsedDays);
-  const monthlyBudget = scopedMonthlyGoals.reduce((sum, goal) => sum + Number(goal.targetValue || 0), 0);
-  const realized = Number(summary.total || 0);
-  const expectedUntilToday = monthlyBudget > 0 ? monthlyBudget * (elapsedDays / totalDaysInMonth) : realized;
-  const ratio = expectedUntilToday > 0 ? realized / expectedUntilToday : 1;
-  const riskLevel = ratio <= 1 ? 'verde' : ratio <= 1.1 ? 'amarelo' : 'vermelho';
-  const averageDailySoFar = realized / elapsedDays;
-  const projectedEndOfMonth = realized + averageDailySoFar * daysRemaining;
-  const recommendationGap = monthlyBudget > 0 ? Math.max(0, projectedEndOfMonth - monthlyBudget) : 0;
   const rhythmDaily = buildRhythmDailyByCategory(summary.considered || []);
 
   app.dashboardView.render({
@@ -195,12 +197,6 @@ export function refreshDashboard(app) {
     },
     openFinance: app.state.openFinance,
     ritmoDoMes: {
-      riskLevel,
-      monthlyBudget,
-      realized,
-      expectedUntilToday,
-      daysRemaining,
-      recommendationGap,
       selectedCategory: app.state.filters.category,
       daily: rhythmDaily
     }

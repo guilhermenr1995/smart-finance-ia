@@ -93,39 +93,8 @@ class DashboardViewRenderEngagementMethods {
   }
 
   renderRitmoDoMes(ritmoState = {}) {
-    if (!this.ritmoStatusPill || !this.ritmoDailyChart) {
+    if (!this.ritmoDailyChart || !this.ritmoLegend) {
       return;
-    }
-
-    const riskLevel = String(ritmoState?.riskLevel || 'verde').toLowerCase();
-    const riskLabelMap = {
-      verde: 'Verde',
-      amarelo: 'Amarelo',
-      vermelho: 'Vermelho'
-    };
-    const riskClassMap = {
-      verde: 'bg-emerald-100',
-      amarelo: 'bg-yellow-100',
-      vermelho: 'bg-red-100'
-    };
-    this.ritmoStatusPill.classList.remove('bg-emerald-100', 'bg-yellow-100', 'bg-red-100');
-    this.ritmoStatusPill.classList.add(riskClassMap[riskLevel] || 'bg-emerald-100');
-    this.ritmoStatusPill.innerText = riskLabelMap[riskLevel] || 'Verde';
-
-    if (this.ritmoBudgetValue) {
-      this.ritmoBudgetValue.innerText = formatCurrencyBRL(Number(ritmoState?.monthlyBudget || 0));
-    }
-    if (this.ritmoRealizedValue) {
-      this.ritmoRealizedValue.innerText = formatCurrencyBRL(Number(ritmoState?.realized || 0));
-    }
-    if (this.ritmoExpectedValue) {
-      this.ritmoExpectedValue.innerText = formatCurrencyBRL(Number(ritmoState?.expectedUntilToday || 0));
-    }
-
-    const recommendationGap = Number(ritmoState?.recommendationGap || 0);
-    const daysRemaining = Number(ritmoState?.daysRemaining || 0);
-    if (this.ritmoRecommendation) {
-      this.ritmoRecommendation.innerText = `Para fechar no alvo, reduza ${formatCurrencyBRL(recommendationGap)} em ${daysRemaining} dias.`;
     }
 
     const daily = ritmoState?.daily || {};
@@ -148,33 +117,101 @@ class DashboardViewRenderEngagementMethods {
       return `${escapeHtml(formattedDate)} (${escapeHtml(weekday)})`;
     };
 
-    const buildDayTooltipHtml = (day, detail) => {
+    const buildDayTooltipHtml = (day, detail, activeCategory = null) => {
       if (!detail) {
-        return '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
+        return '<p class="text-[10px] font-bold text-zinc-500">Selecione um dia para ver os lançamentos que compõem o total.</p>';
       }
 
-      const rankingRows = (detail.ranking || [])
-        .map((item) => {
-          const category = String(item?.category || 'Outros').trim() || 'Outros';
-          const value = Number(item?.value || 0);
-          const percent = Number(item?.percent || 0);
+      const normalizedActiveCategory = String(activeCategory || '').trim();
+      const resolveCategoryLabel = (category, title = '') => {
+        const rawCategory = String(category || '').trim() || 'Outros';
+        const displayFromTransaction = getDisplayCategory({ category: rawCategory, title });
+        return String(displayFromTransaction || rawCategory || 'Outros').trim() || 'Outros';
+      };
+
+      const transactions = (detail.transactions || [])
+        .filter((transaction) =>
+          normalizedActiveCategory
+            ? String(transaction?.category || '').trim() === normalizedActiveCategory
+            : true
+        )
+        .map((transaction) => ({
+          category: String(transaction?.category || 'Outros').trim() || 'Outros',
+          categoryLabel: resolveCategoryLabel(transaction?.category, transaction?.title),
+          title: String(transaction?.title || '').trim() || 'Transação sem descrição',
+          value: Number(transaction?.value || 0)
+        }))
+        .sort((left, right) => right.value - left.value);
+
+      const groupsMap = new Map();
+      transactions.forEach((transaction) => {
+        const groupKey = String(transaction.categoryLabel || 'Outros').trim() || 'Outros';
+        if (!groupsMap.has(groupKey)) {
+          groupsMap.set(groupKey, {
+            label: groupKey,
+            total: 0,
+            items: []
+          });
+        }
+
+        const current = groupsMap.get(groupKey);
+        current.total += Number(transaction.value || 0);
+        current.items.push({
+          title: transaction.title,
+          value: Number(transaction.value || 0)
+        });
+      });
+
+      const groupedTransactions = [...groupsMap.values()]
+        .map((group) => ({
+          ...group,
+          items: group.items.sort((left, right) => right.value - left.value)
+        }))
+        .sort((left, right) => right.total - left.total);
+
+      const groupedListMarkup = groupedTransactions
+        .map((group) => {
+          const rowsMarkup = group.items
+            .map(
+              (item) => `
+                <li class="ritmo-transaction-row">
+                  <span class="ritmo-transaction-row-value">${formatCurrencyBRL(item.value)}</span>
+                  <span class="ritmo-transaction-row-title">${escapeHtml(item.title)}</span>
+                </li>
+              `
+            )
+            .join('');
+
           return `
-            <div class="flex items-center justify-between gap-2 text-[10px] font-bold text-zinc-700">
-              <span class="truncate">${escapeHtml(category)}</span>
-              <span class="whitespace-nowrap">${formatCurrencyBRL(value)} · ${percent.toFixed(1)}%</span>
-            </div>
+            <article class="ritmo-transaction-group">
+              <div class="ritmo-transaction-group-head">
+                <span class="ritmo-transaction-group-title">${escapeHtml(group.label)}</span>
+                <span class="ritmo-transaction-group-total">${formatCurrencyBRL(group.total)}</span>
+              </div>
+              <ul class="ritmo-transaction-group-items">
+                ${rowsMarkup}
+              </ul>
+            </article>
           `;
         })
         .join('');
 
+      const selectedCategoryLabel = normalizedActiveCategory
+        ? resolveCategoryLabel(normalizedActiveCategory, '')
+        : '';
+      const categoryLabel = normalizedActiveCategory
+        ? `Categoria selecionada: ${escapeHtml(selectedCategoryLabel)}`
+        : 'Todas as categorias do dia';
+
       return `
-        <div class="space-y-1 text-[10px]">
+        <div class="space-y-2 text-[10px]">
           <p class="font-black uppercase text-zinc-600">Dia ${formatDayLabelPtBr(day)}</p>
           <p class="font-black text-zinc-900">Total: ${formatCurrencyBRL(Number(detail.total || 0))}</p>
-          <div class="border-t border-zinc-200 pt-1 space-y-1">
+          <p class="text-[10px] font-bold text-zinc-600">${categoryLabel}</p>
+          <div class="ritmo-transaction-list">
             ${
-              rankingRows ||
-              '<p class="text-[10px] font-bold text-zinc-500">Sem categorias com gasto neste dia.</p>'
+              groupedListMarkup ||
+              '<span class="ritmo-transaction-item">Sem lançamentos para este recorte.</span>'
             }
           </div>
         </div>
@@ -192,18 +229,37 @@ class DashboardViewRenderEngagementMethods {
 
     if (this.ritmoDailyTooltip) {
       this.ritmoDailyTooltip.innerHTML =
-        '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
+        '<p class="text-[10px] font-bold text-zinc-500">Selecione um dia para ver os lançamentos que compõem o total.</p>';
     }
 
     const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
-    const selectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
-    const activeLegendCategory =
-      selectedCategory && selectedCategory !== 'all' && categories.includes(selectedCategory)
-        ? selectedCategory
-        : null;
+    const stateSelectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
+    const localSelectedCategory = String(this.ritmoLegendCategory || '').trim();
+    let activeLegendCategory = null;
+
+    if (localSelectedCategory && categories.includes(localSelectedCategory)) {
+      activeLegendCategory = localSelectedCategory;
+    } else if (
+      stateSelectedCategory &&
+      stateSelectedCategory !== 'all' &&
+      categories.includes(stateSelectedCategory)
+    ) {
+      activeLegendCategory = stateSelectedCategory;
+    }
+
+    this.ritmoLegendCategory = activeLegendCategory;
     const colorMap = new Map(categories.map((category, index) => [category, this.getCategoryColor(category, index)]));
 
     const getActiveCategories = () => (activeLegendCategory ? [activeLegendCategory] : categories);
+    const getDetailByDay = (day) => (daily.details || []).find((item) => item.day === day);
+    const renderTooltipForDay = (day) => {
+      if (!this.ritmoDailyTooltip) {
+        return;
+      }
+
+      const detail = getDetailByDay(day);
+      this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail, activeLegendCategory);
+    };
 
     const renderChart = () => {
       const activeCategories = getActiveCategories();
@@ -216,7 +272,7 @@ class DashboardViewRenderEngagementMethods {
       const maxTotal = Math.max(...totalsByDay, 1);
 
       this.ritmoDailyChart.innerHTML = `
-        <div class="flex items-end gap-2 overflow-x-auto no-scrollbar min-h-[180px]">
+        <div class="ritmo-daily-grid" style="grid-template-columns: repeat(${Math.max(days.length, 1)}, minmax(0, 1fr));">
           ${days
             .map((day, dayIndex) => {
               const stacks = activeCategories.map((category) => {
@@ -226,7 +282,9 @@ class DashboardViewRenderEngagementMethods {
                 if (value <= 0) {
                   return '';
                 }
-                return `<div class="w-8" style="height:${Math.max(2, percent)}%;background:${colorMap.get(category)}" title="${escapeHtml(
+                return `<div class="ritmo-day-segment" style="height:${Math.max(2, percent)}%;background:${colorMap.get(
+                  category
+                )}" title="${escapeHtml(
                   `${category}: ${formatCurrencyBRL(value)}`
                 )}"></div>`;
               });
@@ -238,11 +296,11 @@ class DashboardViewRenderEngagementMethods {
                 .join(' • ');
 
               return `
-                <button data-day="${escapeHtml(day)}" class="ritmo-day-column flex flex-col items-center justify-end min-w-[52px] h-[180px] border border-zinc-200 bg-white p-1" title="${escapeHtml(
+                <button data-day="${escapeHtml(day)}" class="ritmo-day-column" title="${escapeHtml(
                   rankingText
                 )}">
-                  <div class="flex flex-col-reverse items-center justify-end h-[140px] gap-[1px]">${stacks.join('')}</div>
-                  <span class="text-[10px] font-black uppercase mt-1">${escapeHtml(day.slice(8, 10))}</span>
+                  <div class="ritmo-day-stack">${stacks.join('')}</div>
+                  <span class="ritmo-day-label">${escapeHtml(day.slice(8, 10))}</span>
                 </button>
               `;
             })
@@ -252,11 +310,23 @@ class DashboardViewRenderEngagementMethods {
 
       this.ritmoDailyChart.querySelectorAll('.ritmo-day-column').forEach((button) => {
         button.addEventListener('mouseenter', () => {
-          const day = button.dataset.day;
-          const detail = (daily.details || []).find((item) => item.day === day);
-          if (this.ritmoDailyTooltip) {
-            this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          const day = String(button.dataset.day || '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+            return;
           }
+
+          this.ritmoSelectedDay = day;
+          renderTooltipForDay(day);
+        });
+
+        button.addEventListener('focus', () => {
+          const day = String(button.dataset.day || '').trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+            return;
+          }
+
+          this.ritmoSelectedDay = day;
+          renderTooltipForDay(day);
         });
 
         button.addEventListener('click', () => {
@@ -265,81 +335,56 @@ class DashboardViewRenderEngagementMethods {
             return;
           }
 
-          const detail = (daily.details || []).find((item) => item.day === day);
-          if (this.ritmoDailyTooltip) {
-            this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          this.ritmoSelectedDay = day;
+          renderTooltipForDay(day);
+        });
+      });
+
+      const persistedDay = String(this.ritmoSelectedDay || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(persistedDay) && days.includes(persistedDay) && this.ritmoDailyTooltip) {
+        renderTooltipForDay(persistedDay);
+      }
+    };
+
+    const renderLegend = () => {
+      this.ritmoLegend.innerHTML = categories
+        .map((category) => {
+          const color = colorMap.get(category);
+          const isActive = Boolean(activeLegendCategory) && category === activeLegendCategory;
+          return `
+            <button data-category-legend="${escapeHtml(
+              category
+            )}" class="ritmo-legend-filter-btn inline-flex items-center gap-1 border border-black px-2 py-1 text-[10px] font-black uppercase bg-white ${
+              isActive ? 'bg-yellow-200' : ''
+            }">
+              <span style="width:10px;height:10px;background:${color};border:1px solid #111;"></span>
+              <span class="ritmo-legend-label">${escapeHtml(category)}</span>
+            </button>
+          `;
+        })
+        .join('');
+
+      this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const category = String(button.dataset.categoryLegend || '').trim();
+          if (!category) {
+            return;
           }
 
-          this.handlers?.onFiltersChange?.({
-            startDate: day,
-            endDate: day
-          });
+          activeLegendCategory = activeLegendCategory === category ? null : category;
+          this.ritmoLegendCategory = activeLegendCategory;
+          renderLegend();
+          renderChart();
+
+          const persistedDay = String(this.ritmoSelectedDay || '').trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(persistedDay) && days.includes(persistedDay)) {
+            renderTooltipForDay(persistedDay);
+          }
         });
       });
     };
 
-    this.ritmoLegend.innerHTML = categories
-      .map((category) => {
-        const color = colorMap.get(category);
-        return `
-          <button data-category-legend="${escapeHtml(category)}" class="inline-flex items-center gap-1 border border-black px-2 py-1 text-[10px] font-black uppercase bg-white">
-            <span style="width:10px;height:10px;background:${color};border:1px solid #111;"></span>
-            ${escapeHtml(category)}
-          </button>
-        `;
-      })
-      .join('');
-
-    this.ritmoLegend.querySelectorAll('[data-category-legend]').forEach((button) => {
-      const buttonCategory = button.dataset.categoryLegend;
-      const isActive = Boolean(activeLegendCategory) && buttonCategory === activeLegendCategory;
-      button.classList.toggle('bg-yellow-200', isActive);
-
-      button.addEventListener('click', () => {
-        const category = button.dataset.categoryLegend;
-        if (!category) {
-          return;
-        }
-
-        const shouldClearSelection = activeLegendCategory === category;
-
-        if (this.handlers?.onFiltersChange) {
-          this.handlers.onFiltersChange({ category: shouldClearSelection ? 'all' : category });
-          return;
-        }
-
-        // Fallback local caso não exista handler global.
-        const fallbackActiveCategories = shouldClearSelection ? categories : [category];
-        const fallbackTotalsByDay = days.map((_, dayIndex) => {
-          return fallbackActiveCategories.reduce((sum, activeCategory) => {
-            const row = series.find((item) => item.category === activeCategory);
-            return sum + Number(row?.values?.[dayIndex] || 0);
-          }, 0);
-        });
-        const fallbackMaxTotal = Math.max(...fallbackTotalsByDay, 1);
-        this.ritmoDailyChart.querySelectorAll('.ritmo-day-column').forEach((column, dayIndex) => {
-          const stacksContainer = column.querySelector('div');
-          if (!stacksContainer) {
-            return;
-          }
-
-          const stacks = fallbackActiveCategories
-            .map((activeCategory) => {
-              const row = series.find((item) => item.category === activeCategory);
-              const value = Number(row?.values?.[dayIndex] || 0);
-              if (value <= 0) {
-                return '';
-              }
-              const percent = (value / fallbackMaxTotal) * 100;
-              return `<div class="w-8" style="height:${Math.max(2, percent)}%;background:${colorMap.get(activeCategory)}"></div>`;
-            })
-            .join('');
-
-          stacksContainer.innerHTML = stacks;
-        });
-      });
-    });
-
+    renderLegend();
     renderChart();
   }
 

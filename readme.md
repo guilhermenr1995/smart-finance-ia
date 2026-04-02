@@ -1,204 +1,119 @@
 # Smart Finance IA
 
-Aplicação web/PWA para gestão de despesas pessoais com foco em praticidade:
-- importar extratos em CSV/OFX/PDF,
-- categorizar com inteligência (memória + IA),
-- comparar períodos,
+Aplicação web + PWA para controle financeiro pessoal com foco em execução rápida:
+- importar extratos,
+- organizar automaticamente com IA,
 - acompanhar metas,
-- e operar tudo em mobile com boa usabilidade.
+- analisar gastos por categoria e por dia,
+- operar tudo em um dashboard único (mobile e desktop).
 
-## Proposta de valor
+## Visão do produto (estado atual)
 
-- Fluxo simples para usuário final: importa arquivo, sincroniza categorias e acompanha gastos.
-- Redução de custo operacional com memória interna e cache local (menos chamadas de IA/Firestore).
-- Base preparada para escala (painel gerencial, métricas de uso, manutenção por usuário).
+O fluxo principal da aplicação hoje é:
+1. Login (e-mail/senha ou Google).
+2. Importação de dados (CSV, OFX, PDF) e/ou sincronização via Open Finance.
+3. Organização automática por categorias (memória + IA).
+4. Gestão diária no dashboard com filtros, metas e análise visual.
 
-## Funcionalidades implementadas
+A dashboard do usuário está estruturada em seções por acordeon, com foco em clareza e baixa fricção:
+- `1` Importação e guia rápido.
+- `2` Filtros avançados.
+- `3` Gastos por categoria (pizza).
+- `4` Mix de gastos + metas mensais.
+- `5` Consultor IA.
+- `6` Open Finance.
+- `7` Ritmo do mês (gasto diário com detalhamento por transação).
+- `8` Lançamentos detalhados.
 
-### 1) Autenticação e sessão
+Além disso, existe um painel administrativo em `/admin` para métricas e manutenção operacional.
+
+## Principais funcionalidades
+
+### Autenticação e sessão
 
 - Login com e-mail/senha.
 - Cadastro com e-mail/senha.
 - Login com Google.
-- Esqueci senha (reset por e-mail).
-- Logout.
-- Persistência de sessão (`LOCAL`) e sincronização de perfil de uso.
-- Loading de autenticação para melhorar UX no login.
-- Isolamento de dados por usuário autenticado.
+- Recuperação de senha por e-mail.
+- Persistência local de sessão.
+- Isolamento de dados por usuário.
 
-### 2) Importação de transações (CSV, OFX e PDF)
+### Importação e qualidade de dados
 
-- Importa:
-  - CSV de cartão e conta,
-  - OFX,
-  - PDF de extrato (inclui formatos bancários comuns e layouts genéricos com tabela/texto estruturado).
-- Conta bancária da importação: usuário escolhe a conta e todas as transações do arquivo entram nela.
-- Regras de qualidade na importação:
-  - ignora receitas/créditos indevidos para o objetivo do app (foco em despesas),
-  - ignora estornos/pagamentos/linhas inválidas,
-  - deduplica por `hash` e `dedupKey` (`date + title + value`).
-- Diagnóstico de importação no overlay:
-  - total lido,
-  - inválidos,
-  - descartados por regra,
-  - duplicados.
-- Reaproveita categoria pelo histórico do usuário já na importação (antes de IA).
+- Importação de `CSV`, `OFX` e `PDF`.
+- Seleção da conta bancária de destino na importação.
+- Regras de descarte para transações fora do escopo (ex.: receitas para o fluxo de despesas).
+- Deduplicação (`hash` e chave derivada de data/título/valor).
+- Diagnóstico de importação no overlay (lidos, inválidos, descartados e duplicados).
 
-### 3) Categorização inteligente em camadas
+### Categorização inteligente
 
-- Camada 1 (sem IA): memória de categorias do próprio usuário.
-- Camada 2 (com IA): Gemini via Cloud Function proxy para itens ainda pendentes.
-- Processamento em lotes com retry/backoff para 429/5xx.
-- Persistência de metadados de categorização por transação:
-  - `categorySource`,
-  - `categoryAutoAssigned`,
-  - `categoryManuallyEdited`,
-  - `lastCategoryUpdateAt`.
-- Métricas de uso (sync de IA) registradas por dia.
+- Reaproveitamento de memória de categoria do próprio usuário.
+- Categorização por IA apenas para itens pendentes.
+- Persistência de metadados de categorização por transação.
+- Propagação de categoria para cenários correlatos (ex.: séries de parcelas).
 
-### 4) Regras avançadas de parcelas e consistência de categoria
+### Dashboard financeira (usuário)
 
-- Transações que começam com `Transferência` nunca são tratadas como parcela.
-- Exibição do mix usa categoria visual (`Parcelas`) com regra consistente.
-- Ao editar categoria de uma transação parcelada, a categoria é propagada para a série relacionada.
-- Ao definir categoria manualmente, transações equivalentes em `Outros` (mesmo título normalizado) também são atualizadas.
-
-### 5) CRUD de categorias e contas bancárias
-
-- Categorias:
-  - base padrão + categorias do usuário,
-  - criação inline no seletor (`+ Criar ...`).
-- Contas bancárias:
-  - conta default `Padrão`,
-  - criação por usuário,
-  - troca por transação,
-  - seleção para importação em lote.
-
-### 6) Lançamentos manuais e edição de descrição
-
-- Botão `+` para criar transação manual com:
-  - descrição,
-  - categoria,
-  - conta bancária,
-  - valor,
-  - tipo (`Crédito`/`Conta`).
-- Edição inline da descrição (abre modal ao clicar no título).
-- Validação de duplicidade também em criação/edição manual (mesma data + descrição + valor).
-
-### 7) Dashboard do usuário
-
-- Filtros superiores:
-  - período (`data início`/`data fim`),
-  - tipo de conta (`Tudo`, `Crédito`, `Conta`).
-  - padrão de abertura: primeiro dia do mês atual até o dia vigente.
-- Busca inteligente na seção de lançamentos:
-  - por descrição,
-  - por valor,
-  - por categoria,
-  - com opção de buscar apenas no período filtrado ou na base inteira do usuário.
-- Totalizador da busca:
-  - total encontrado,
-  - total da base ativa,
-  - percentual de representatividade.
-- Mix de gastos:
-  - barra amarela (período atual),
-  - barra cinza (mesmo range do período anterior),
-  - marcador de meta.
-- Lista de lançamentos detalhados:
+- Barra superior flutuante com:
+  - total filtrado,
+  - período (`início` e `fim`),
+  - tipo de transação (`Todos`, `Crédito`, `Conta`).
+- Filtros avançados por categoria e origem.
+- Pizza por categoria com interação de hover/click (desktop/mobile).
+- Mix de gastos em barras horizontais + metas mensais na lateral.
+- Ritmo do mês por dia com detalhamento de transações do dia selecionado.
+- Lista de lançamentos com:
   - paginação,
-  - ignorar/reativar (soft ignore),
+  - busca inteligente,
+  - ignorar/reativar,
   - edição de categoria,
   - edição de conta,
-  - edição de descrição.
+  - edição de título,
+  - criação manual de transação.
 
-### 8) Metas mensais
+### Metas mensais
 
 - CRUD de metas por categoria.
-- Metas segmentadas por escopo:
-  - `Tudo`,
-  - `Crédito`,
-  - `Conta`.
-- Geração automática de metas com análise comportamental recente.
-- Edição individual de meta.
-- Exclusão:
-  - individual,
-  - todas as metas do mês/escopo filtrado.
-- Criação/edição bloqueada para meses já encerrados.
-- Exibição no mix com referência mensal consistente.
-- A referência de meta no mix usa o mês completo (evita distorção ao trocar apenas o dia final do filtro dentro do mesmo mês).
+- Escopo por tipo (`all`, `Crédito`, `Conta`).
+- Geração automática de metas.
+- Exclusão individual e exclusão por mês/escopo.
 
-### 9) Consultor IA
+### Consultor IA
 
-- Botão dedicado para análise comparativa `período atual vs período anterior`.
-- Insights focados em controle de gasto:
-  - categorias que aumentaram e principais transações que contribuíram,
-  - categorias que reduziram e provável motivo da redução,
-  - alertas práticos.
-- Persistência dos insights em Firestore por chave de filtro/período.
-- Nova consulta no mesmo dia/período sobrescreve o insight anterior.
-- Fallback determinístico se IA estiver indisponível.
-- Registro de uso diário em métricas.
+- Análise comparativa entre período atual e período anterior.
+- Insights de aumento/redução por categoria.
+- Persistência dos insights por chave de filtro.
 
-### 10) UX, mobile e PWA
+### Open Finance
 
-- Layout otimizado para mobile (incluindo telas com maior densidade de informação).
-- Tooltips de ajuda e guias rápidos de exportação por banco em modal.
-- PWA instalável (`manifest` + `service-worker` + botão de instalação).
+- Conexão de contas bancárias compatíveis.
+- Renovação e revogação de consentimento.
+- Sincronização de transações via proxy backend.
+- Atualização de status das conexões no dashboard.
 
-### 11) Painel gerencial separado (`/admin`)
+### Painel administrativo (`/admin`)
 
-- Acesso somente para e-mails administradores permitidos e login Google.
-- KPIs operacionais:
-  - usuários cadastrados,
-  - ativos 7d/30d,
-  - transações importadas/manuais,
-  - uso de IA,
-  - aderência da automação,
-  - pendências de categorização.
-- Gráficos de uso diário:
-  - Sync IA vs Consultor IA,
-  - Importadas vs Manuais.
-- Listagem de usuários com:
-  - paginação,
-  - busca por e-mail,
-  - datas de cadastro/último acesso,
-  - métricas por usuário,
-  - taxa de aderência da categorização automática.
-- Ações administrativas por usuário:
-  - `Remover duplicados`,
-  - `Resetar jornada` (hard reset da jornada mantendo cadastro).
+- Controle de acesso por e-mails permitidos + autenticação Google.
+- KPIs de produto e operação.
+- Gráficos de uso diário.
+- Listagem de usuários com paginação e busca.
+- Ações de manutenção:
+  - deduplicação,
+  - reset de jornada.
 
-## Cloud Functions (backend)
+## Arquitetura atual (feature-based)
 
-Funções HTTP atuais:
+A base foi reorganizada para reduzir acoplamento e evitar arquivos monolíticos.
 
-1. `categorizeTransactions`
-- Proxy seguro para categorização IA.
+### Princípios aplicados
 
-2. `analyzeSpendingInsights`
-- Gera insights do consultor IA.
-- Persiste resultado em `consultor_insights`.
+- Organização por domínio/feature.
+- Métodos de UI segmentados por responsabilidade.
+- Flows de aplicação desacoplados do rendering.
+- Serviços especializados por contexto.
 
-3. `getAdminDashboard`
-- Retorna métricas agregadas para o painel gerencial.
-
-4. `maintenanceDeduplicateTransactions`
-- Deduplicação administrativa por usuário (ou lote).
-
-5. `maintenanceResetUserJourney`
-- Reset administrativo completo da jornada do usuário (transações, categorias, contas, metas, insights e métricas), preservando cadastro.
-
-## Arquitetura técnica
-
-- Frontend: HTML + JavaScript ES Modules + CSS utilitário.
-- Backend serverless: Firebase Cloud Functions (Node 22).
-- Auth: Firebase Authentication.
-- Banco: Cloud Firestore.
-- IA: Gemini via proxy (produção).
-- Hosting: Firebase Hosting.
-- App mobile: PWA.
-
-## Estrutura do projeto
+### Estrutura de pastas
 
 ```text
 smart-finance-ia/
@@ -206,114 +121,98 @@ smart-finance-ia/
   admin.html
   runtime-config.js
   runtime-config.example.js
-  manifest.webmanifest
-  service-worker.js
-  firestore.rules
-  firebase.json
   src/
     app.js
     admin.js
     application/flows/
+      auth-flow.js
+      dashboard-flow.js
+      data-sync-flow.js
+      open-finance-flow.js
+      ...
+    features/
+      dashboard/ui/dashboard-view/
+        dashboard-view.js
+        shared.js
+        methods/
+          core-methods.js
+          bind-events-core-methods.js
+          bind-events-modal-methods.js
+          interaction-methods.js
+          render-summary-methods.js
+          render-engagement-methods.js
+          transaction-render-methods.js
+          pagination-goals-methods.js
+          ai-methods.js
+          modal-methods.js
+      transactions/
+        flows/
+        services/
+      goals/
+        flows/
+      ai/
+        flows/
+      admin/dashboard/
+        admin-dashboard-app.js
+        methods/
     services/
     state/
-    ui/
     utils/
     constants/
-  backend/
-    cloud-functions/
-      index.js
-      package.json
-      .env.example
+  backend/cloud-functions/
+    index.js
+    src/handlers/
 ```
 
-## Modelo de dados (Firestore)
+## Backend (Cloud Functions)
 
-Prefixo base:
+Funções expostas atualmente:
 
-`artifacts/{appId}/users/{userId}`
+- `openFinanceProxy`
+- `categorizeTransactions`
+- `analyzeSpendingInsights`
+- `getAdminDashboard`
+- `maintenanceDeduplicateTransactions`
+- `maintenanceResetUserJourney`
 
-Coleções principais:
+## Configuração
 
-- `transacoes`
-  - campos relevantes:
-    - `date`, `title`, `value`, `category`, `accountType`, `bankAccount`, `active`
-    - `hash`, `dedupKey`
-    - `createdBy`, `createdAt`
-    - `categorySource`, `categoryAutoAssigned`, `categoryManuallyEdited`, `lastCategoryUpdateAt`
-
-- `categorias`
-  - `name`, `normalizedName`, `createdAt`
-
-- `contas_bancarias`
-  - `name`, `normalizedName`, `createdAt`
-
-- `metas_mensais`
-  - `monthKey`, `periodStart`, `periodEnd`, `category`, `accountScope`, `targetValue`, `source`, `rationale`, `active`
-
-- `consultor_insights`
-  - `key`, `filters`, `currentPeriod`, `previousPeriod`, `insights`, `generatedAt`, `updatedAt`, `model`
-
-- `metrics_daily`
-  - `dateKey`, `aiCategorizationRuns`, `aiConsultantRuns`, `importOperations`, `importedTransactions`, `manualTransactions`
-
-Documento de perfil de usuário:
-
-- `artifacts/{appId}/users/{userId}`
-  - `createdAt`, `lastAccessAt`, `providerIds`, totais agregados de uso/importação.
-
-## Configuração local (didático)
-
-### Pré-requisitos
-
-- Node.js 22 (principalmente para Cloud Functions).
-- Firebase CLI instalado e autenticado.
-- Projeto Firebase com Authentication + Firestore + Functions + Hosting.
-
-### 1) Configurar frontend
+### 1) Frontend
 
 ```bash
 cp runtime-config.example.js runtime-config.js
 ```
 
-Preencha `runtime-config.js` com:
-- credenciais Firebase do projeto,
-- URLs das Cloud Functions (`proxyUrl`, `consultantProxyUrl`, `dashboardProxyUrl`, manutenção).
+Preencha o `runtime-config.js` com:
+- credenciais Firebase,
+- URLs das funções de IA,
+- URL do proxy de Open Finance,
+- URLs do painel/admin manutenção,
+- e-mails permitidos para admin.
 
-### 2) Configurar Cloud Functions
+### 2) Backend Functions
 
 ```bash
 cd backend/cloud-functions
 npm install
-cp .env.example .env
 ```
 
-Preencha `.env` com sua chave Gemini e modelo disponível no seu projeto.
+Observação:
+- Runtime configurado para Node `22` no backend (`engines.node`).
 
-### 3) Voltar para a raiz
+## Rodando localmente
 
-```bash
-cd ../..
-```
-
-### 4) Rodar localmente (frontend)
-
-Use servidor HTTP (não usar `file://`):
+Para desenvolvimento do frontend, use um servidor HTTP simples na raiz do projeto:
 
 ```bash
 python3 -m http.server 5173
 ```
 
-ou
-
-```bash
-npx http-server . -p 5173
-```
-
 Acesse:
+- `http://localhost:5173`
+- Admin: `http://localhost:5173/admin`
 
-`http://localhost:5173`
-
-## Deploy (resumo)
+## Deploy
 
 Na raiz do projeto:
 
@@ -323,19 +222,23 @@ firebase deploy --only firestore:rules
 firebase deploy --only functions
 ```
 
-Rota do painel admin após deploy:
+## Open Finance real (sem mocks)
 
-`/admin`
+Existe um guia prático no repositório:
 
-## Segurança e boas práticas
+- `tutorial_open_finance_real_sem_mock.md`
 
-- Não versionar segredos (`.env`, chaves privadas, runtime local real).
-- Usar IA via proxy no backend (não expor API key no frontend em produção).
-- Firestore protegido por regras de acesso por usuário autenticado.
-- Repositório já possui `.gitignore` para arquivos sensíveis comuns.
+Esse documento cobre um caminho de integração real com custo inicial baixo para piloto pequeno.
 
-## Observações operacionais
+## Segurança
 
-- O app é focado em gestão de despesas (não em controle de receitas).
-- Cache local + memória de categorias ajudam a reduzir custo e latência.
-- Em caso de chave exposta, faça rotação imediata.
+- Não versionar segredos (`.env`, tokens, chaves privadas).
+- Não expor API key de IA no frontend de produção.
+- Proteger dados por usuário nas regras do Firestore.
+- Usar proxy backend para integrações sensíveis.
+
+## Observações
+
+- O produto é focado em despesas e tomada de decisão rápida.
+- O app foi otimizado para evitar rolagem horizontal e manter boa usabilidade em mobile/desktop.
+- Para revisão de regressão, a recomendação operacional é validar primeiro os arquivos e fluxos alterados.

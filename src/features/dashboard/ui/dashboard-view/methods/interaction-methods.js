@@ -30,15 +30,28 @@ class DashboardViewInteractionMethods {
 
       const titleElement = section.querySelector('.dashboard-section-title');
       const badgeElement = section.querySelector('.dashboard-step-badge');
+      const titleWrapElement = titleElement?.closest('.dashboard-section-title-wrap') || null;
+      const titleTooltipElement = titleWrapElement?.querySelector(':scope > .help-tooltip') || null;
       const title = String(titleElement?.textContent || `Seção ${index + 1}`).trim();
       const badge = String(badgeElement?.textContent || `${index + 1}`).trim();
+      const accordionTooltip = titleTooltipElement ? titleTooltipElement.cloneNode(true) : null;
       const contentElement = document.createElement('div');
       contentElement.className = 'dashboard-accordion-content';
+
+      if (titleWrapElement) {
+        const headElement = titleWrapElement.closest('.dashboard-section-head');
+        titleWrapElement.remove();
+        if (headElement && headElement.children.length === 0) {
+          headElement.remove();
+        }
+      }
 
       while (section.firstChild) {
         contentElement.appendChild(section.firstChild);
       }
 
+      const triggerRow = document.createElement('div');
+      triggerRow.className = 'dashboard-accordion-trigger-row';
       const trigger = document.createElement('button');
       trigger.type = 'button';
       trigger.className = 'dashboard-accordion-trigger';
@@ -51,8 +64,14 @@ class DashboardViewInteractionMethods {
         <span class="dashboard-accordion-trigger-icon" aria-hidden="true">+</span>
       `;
 
+      if (accordionTooltip) {
+        accordionTooltip.classList.add('dashboard-accordion-trigger-tooltip');
+        triggerRow.appendChild(accordionTooltip);
+      }
+
       contentElement.id = `${sectionId}-accordion-content`;
-      section.appendChild(trigger);
+      triggerRow.prepend(trigger);
+      section.appendChild(triggerRow);
       section.appendChild(contentElement);
       section.classList.add('dashboard-accordion-section');
       section.dataset.accordionReady = 'true';

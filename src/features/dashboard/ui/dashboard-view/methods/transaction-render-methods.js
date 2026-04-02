@@ -19,11 +19,34 @@ import { applyClassMethods } from './register-methods.js';
 
 class DashboardViewTransactionRenderMethods {
   renderCategoryChart(summary, previousSummary, goalTargetsByCategory = {}) {
+    this.renderCategoryStats(summary, previousSummary, goalTargetsByCategory);
+  }
+
+  renderCategoryStats(summary, previousSummary, goalTargetsByCategory = {}) {
+    const targetContainer = this.chartBars || this.statsList;
+    if (!targetContainer) {
+      return;
+    }
+
     const categories = [
       ...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories, ...Object.keys(goalTargetsByCategory || {})])
-    ];
+    ]
+      .sort((leftCategory, rightCategory) => {
+        const leftValue = Math.max(
+          summary.categoryTotals[leftCategory] || 0,
+          previousSummary.categoryTotals[leftCategory] || 0,
+          Number(goalTargetsByCategory?.[leftCategory] || 0)
+        );
+        const rightValue = Math.max(
+          summary.categoryTotals[rightCategory] || 0,
+          previousSummary.categoryTotals[rightCategory] || 0,
+          Number(goalTargetsByCategory?.[rightCategory] || 0)
+        );
+        return rightValue - leftValue;
+      });
+
     if (categories.length === 0) {
-      this.chartBars.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dados no período selecionado.</p>';
+      targetContainer.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem mix para exibir.</p>';
       return;
     }
 
@@ -38,69 +61,51 @@ class DashboardViewTransactionRenderMethods {
       const currentValue = summary.categoryTotals[category] || 0;
       const previousValue = previousSummary.categoryTotals[category] || 0;
       const targetValue = Number(goalTargetsByCategory?.[category] || 0);
-      const currentHeight = (currentValue / maxValue) * 100;
-      const previousHeight = (previousValue / maxValue) * 100;
-      const targetHeight = (targetValue / maxValue) * 100;
-
-      return `
-        <div class="flex flex-col items-center min-w-[70px] h-full">
-          <div class="flex items-end gap-1 h-full mb-2">
-            <div title="Período atual: ${formatCurrencyBRL(currentValue)}" class="w-5 bg-yellow-400 border-2 border-black" style="height: ${currentHeight}%"></div>
-            <div title="Período anterior: ${formatCurrencyBRL(previousValue)}" class="w-5 bg-zinc-300 border-2 border-black" style="height: ${previousHeight}%"></div>
-            <div title="Meta no período: ${formatCurrencyBRL(targetValue)}" class="mix-goal-bar" style="height: ${targetHeight}%"></div>
-          </div>
-          <span class="text-[8px] font-bold uppercase truncate w-16 text-center">${escapeHtml(category)}</span>
-        </div>`;
-    });
-
-    this.chartBars.innerHTML = chartRows.join('');
-  }
-
-  renderCategoryStats(summary, previousSummary, goalTargetsByCategory = {}) {
-    const categories = [
-      ...new Set([...summary.sortedCategories, ...previousSummary.sortedCategories, ...Object.keys(goalTargetsByCategory || {})])
-    ];
-    if (categories.length === 0) {
-      this.statsList.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem mix para exibir.</p>';
-      return;
-    }
-
-    const maxValue = Math.max(
-      ...categories.map((category) =>
-        Math.max(summary.categoryTotals[category] || 0, previousSummary.categoryTotals[category] || 0, goalTargetsByCategory?.[category] || 0)
-      ),
-      1
-    );
-
-    const statsRows = categories.map((category) => {
-      const currentValue = summary.categoryTotals[category] || 0;
-      const previousValue = previousSummary.categoryTotals[category] || 0;
-      const targetValue = Number(goalTargetsByCategory?.[category] || 0);
 
       const currentWidth = (currentValue / maxValue) * 100;
       const previousWidth = (previousValue / maxValue) * 100;
       const targetWidth = (targetValue / maxValue) * 100;
+      const variation = currentValue - previousValue;
+      const variationPrefix = variation > 0 ? '+' : '';
+      const variationClassName =
+        variation > 0
+          ? 'mix-variation-badge is-up'
+          : variation < 0
+            ? 'mix-variation-badge is-down'
+            : 'mix-variation-badge is-stable';
+      const targetMarker = targetValue > 0 ? `<div class="mix-goal-marker" style="left: ${targetWidth}%"></div>` : '';
 
       return `
-        <div>
-          <div class="flex justify-between text-[10px] font-black uppercase mb-1">
-            <span class="truncate">${escapeHtml(category)}</span>
-            <span>${formatCompactCurrency(currentValue)} / ${formatCompactCurrency(targetValue)}</span>
+        <article class="mix-horizontal-row">
+          <div class="mix-horizontal-row-head">
+            <p class="mix-horizontal-category" title="${escapeHtml(category)}">${escapeHtml(category)}</p>
+            <p class="mix-horizontal-current">${formatCurrencyBRL(currentValue)}</p>
           </div>
-          <div class="space-y-1">
-            <div class="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden relative">
-              <div class="h-full bg-yellow-400" style="width: ${currentWidth}%"></div>
-              <div class="mix-goal-marker" style="left: ${targetWidth}%"></div>
+          <div class="mix-horizontal-tags">
+            <span class="mix-mini-tag current">Atual: ${formatCompactCurrency(currentValue)}</span>
+            <span class="mix-mini-tag previous">Anterior: ${formatCompactCurrency(previousValue)}</span>
+            <span class="mix-mini-tag target">Meta: ${formatCompactCurrency(targetValue)}</span>
+            <span class="${variationClassName}">${variationPrefix}${formatCompactCurrency(variation)}</span>
+          </div>
+          <div class="mix-horizontal-track-stack">
+            <div class="mix-horizontal-track-row">
+              <span class="mix-horizontal-track-label">Atual</span>
+              <div class="mix-horizontal-track">
+                <div class="mix-horizontal-fill current" style="width: ${currentWidth}%"></div>
+                ${targetMarker}
+              </div>
             </div>
-            <div class="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
-              <div class="h-full bg-zinc-400" style="width: ${previousWidth}%"></div>
+            <div class="mix-horizontal-track-row">
+              <span class="mix-horizontal-track-label">Anterior</span>
+              <div class="mix-horizontal-track">
+                <div class="mix-horizontal-fill previous" style="width: ${previousWidth}%"></div>
+              </div>
             </div>
           </div>
-          <p class="text-[9px] font-black uppercase text-zinc-500 mt-1">Anterior: ${formatCompactCurrency(previousValue)} • Meta: ${formatCompactCurrency(targetValue)}</p>
-        </div>`;
+        </article>`;
     });
 
-    this.statsList.innerHTML = statsRows.join('');
+    targetContainer.innerHTML = chartRows.join('');
   }
 
   renderTransactions(transactions) {

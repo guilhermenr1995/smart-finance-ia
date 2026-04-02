@@ -68,7 +68,6 @@ class DashboardViewRenderSummaryMethods {
     const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
     const paginationMeta = this.paginateTransactions(orderedTableTransactions);
 
-    this.renderCategoryChart(summary, previousSummary, goals?.targetsByCategory || {});
     this.renderCategoryStats(summary, previousSummary, goals?.targetsByCategory || {});
     this.renderGoals(goals, summary);
     this.renderTransactions(paginationMeta.pageItems);

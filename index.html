@@ -25,24 +25,24 @@
       <div class="auth-shell w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6">
         <aside class="auth-hero neo-brutalism p-8 lg:p-10">
           <p class="auth-chip">Smart Finance IA</p>
-          <h1 class="auth-title mt-6">Organize sua vida financeira em minutos, sem complicação.</h1>
+          <h1 class="auth-title mt-6">Transforme seus gastos em decisões inteligentes em poucos minutos.</h1>
           <p class="auth-subtitle mt-4">
-            Importe extrato em CSV, OFX ou PDF, escolha a conta bancária, clique para categorizar com IA
-            e tenha visão clara de gastos, excessos e oportunidades de economia.
+            Conecte Open Finance ou importe CSV, OFX e PDF. A IA organiza seus lançamentos, mostra o
+            ritmo diário de despesas e entrega clareza para você economizar com segurança.
           </p>
 
           <div class="auth-points mt-8 space-y-3">
             <div class="auth-point neo-brutalism">
-              <span>1. Importe seu extrato</span>
-              <small>Compatível com CSV, OFX e PDF dos principais bancos</small>
+              <span>1. Conecte e importe sem fricção</span>
+              <small>Open Finance + arquivos CSV/OFX/PDF para montar seu painel rapidamente</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>2. Organize em poucos cliques</span>
-              <small>A IA categoriza e aprende com suas decisões anteriores</small>
+              <span>2. Organize com inteligência real</span>
+              <small>A IA categoriza, aprende seu padrão e acelera o controle mês a mês</small>
             </div>
             <div class="auth-point neo-brutalism">
-              <span>3. Decida com segurança</span>
-              <small>Compare períodos, use o Consultor IA e reduza gastos desnecessários</small>
+              <span>3. Decida com visão completa</span>
+              <small>Metas, mix de gastos, ritmo do mês e consultor IA no mesmo fluxo</small>
             </div>
           </div>
         </aside>
@@ -50,7 +50,7 @@
         <div class="auth-card relative neo-brutalism p-8 lg:p-10">
           <div class="text-center">
             <h2 class="auth-form-title">Acesse sua conta</h2>
-            <p class="auth-form-subtitle mt-2">Seu financeiro centralizado com rapidez, clareza e controle.</p>
+            <p class="auth-form-subtitle mt-2">Seu financeiro centralizado com IA, metas e análise prática para agir melhor.</p>
           </div>
 
           <form id="auth-form" class="space-y-5 mt-8">
@@ -69,6 +69,19 @@
               <button id="btn-register" type="button" class="auth-btn auth-btn-light">Criar conta</button>
               <button id="btn-reset-password" type="button" class="auth-btn auth-btn-light">Esqueci senha</button>
             </div>
+
+            <p class="text-[11px] font-bold text-zinc-600 text-center leading-relaxed pt-1">
+              Ao continuar, você declara que leu e concorda com os
+              <a
+                href="./termos-de-uso.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="underline decoration-2 decoration-black underline-offset-2 text-zinc-900"
+              >
+                Termos de Uso
+              </a>
+              .
+            </p>
           </form>
 
           <p id="auth-message" class="hidden auth-message text-[11px] font-black uppercase text-center mt-5"></p>
@@ -98,6 +111,14 @@
             >
               Instalar App
             </button>
+            <a
+              href="./termos-de-uso.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Termos de Uso
+            </a>
             <a
               id="btn-admin-panel"
               href="./admin.html"
@@ -332,124 +353,128 @@
             </div>
           </section>
 
-          <section class="dashboard-section grid grid-cols-1 md:grid-cols-5 gap-5">
-            <div class="md:col-span-3 bg-white p-5 neo-brutalism mix-chart-panel">
-              <div class="dashboard-section-head">
-                <div class="dashboard-section-title-wrap">
-                  <span class="dashboard-step-badge">4</span>
-                  <h3 class="dashboard-section-title">Mix de Gastos</h3>
+          <section id="mix-section" class="dashboard-section">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-5">
+              <div class="md:col-span-3 bg-white p-5 neo-brutalism mix-chart-panel">
+                <div class="dashboard-section-head">
+                  <div class="dashboard-section-title-wrap">
+                    <span class="dashboard-step-badge">4</span>
+                    <h3 class="dashboard-section-title">Mix de Gastos</h3>
+                  </div>
                 </div>
-              </div>
-              <div class="dashboard-legend-row mix-chart-legend">
-                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 border border-black"></span> Meta do período</span>
-              </div>
-              <div id="chart-bars" class="mix-chart-canvas flex items-end justify-between h-44 gap-4 overflow-x-auto no-scrollbar"></div>
-            </div>
-
-            <div class="md:col-span-2 bg-white p-5 neo-brutalism space-y-4">
-              <div>
-                <h3 class="font-black text-xs uppercase italic border-b-2 border-black mb-4 pb-1">Resumo do Mix</h3>
-                <div id="stats-list" class="space-y-5 max-h-[220px] overflow-y-auto pr-1"></div>
+                <div class="dashboard-legend-row mix-chart-legend">
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 border border-black"></span> Período atual</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-zinc-300 border border-black"></span> Período anterior</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 border border-black"></span> Meta do período</span>
+                </div>
+                <div id="chart-bars" class="mix-chart-canvas mix-horizontal-canvas"></div>
               </div>
 
-              <div class="goals-panel border-2 border-black p-3 bg-zinc-50 space-y-3">
-                <div class="flex items-center justify-between gap-2">
-                  <h4 class="font-black text-[11px] uppercase tracking-wide">Metas Mensais</h4>
-                  <span id="goals-reference-month" class="text-[10px] font-black uppercase text-zinc-500">-</span>
-                </div>
-                <p class="text-[11px] font-bold text-zinc-600">
-                  Defina limites por categoria e acompanhe no mix quando estiver perto de ultrapassar.
-                </p>
-                <div class="grid grid-cols-1 gap-2">
-                  <button
-                    id="btn-goals-auto"
-                    type="button"
-                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-yellow-200"
-                  >
-                    Gerar metas automáticas
-                  </button>
-                  <button
-                    id="btn-goals-add"
-                    type="button"
-                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
-                  >
-                    + Nova meta
-                  </button>
-                  <button
-                    id="btn-goals-delete-month"
-                    type="button"
-                    class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-red-100 text-red-900"
-                  >
-                    Excluir metas do mês
-                  </button>
-                </div>
-                <div id="goals-list" class="space-y-3 max-h-[260px] overflow-y-auto pr-1">
-                  <p class="text-[11px] font-bold text-zinc-500">Sem metas cadastradas para este mês.</p>
+              <div class="md:col-span-2 bg-white p-5 neo-brutalism space-y-4 mix-goals-column">
+                <div class="goals-panel mix-goals-panel border-2 border-black p-3 bg-zinc-50 space-y-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <h4 class="font-black text-[11px] uppercase tracking-wide">Metas Mensais</h4>
+                    <span id="goals-reference-month" class="text-[10px] font-black uppercase text-zinc-500">-</span>
+                  </div>
+                  <p class="text-[11px] font-bold text-zinc-600">
+                    Defina limites por categoria e acompanhe no mix quando estiver perto de ultrapassar.
+                  </p>
+                  <div class="grid grid-cols-1 gap-2">
+                    <button
+                      id="btn-goals-auto"
+                      type="button"
+                      class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-yellow-200"
+                    >
+                      Gerar metas automáticas
+                    </button>
+                    <button
+                      id="btn-goals-add"
+                      type="button"
+                      class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-white"
+                    >
+                      + Nova meta
+                    </button>
+                    <button
+                      id="btn-goals-delete-month"
+                      type="button"
+                      class="w-full px-3 py-2 border-2 border-black font-black text-[10px] uppercase neo-brutalism bg-red-100 text-red-900"
+                    >
+                      Excluir metas do mês
+                    </button>
+                  </div>
+                  <div id="goals-list" class="space-y-3 overflow-y-auto pr-1 mix-goals-list">
+                    <p class="text-[11px] font-bold text-zinc-500">Sem metas cadastradas para este mês.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="dashboard-section grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
-            <button
-              id="btn-ai-consultant"
-              class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98] h-fit lg:self-start"
-            >
-              <span class="font-black text-sm uppercase tracking-widest">Consultor IA</span>
-              <p id="label-ai-consultant-usage" class="text-xs uppercase font-bold opacity-70 mt-1">Atualize quando quiser</p>
-            </button>
-
-            <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
-              <div class="dashboard-section-head">
-                <div class="dashboard-section-title-wrap">
-                  <span class="dashboard-step-badge">5</span>
-                  <h3 class="dashboard-section-title">Consultor IA</h3>
-                </div>
-                <span id="ai-consultant-status" class="text-xs font-black uppercase text-zinc-500">Aguardando análise</span>
-              </div>
-              <p id="ai-consultant-placeholder" class="text-sm font-bold text-zinc-600">
-                Clique em <strong>Consultor IA</strong> para comparar o período filtrado com o período anterior e receber recomendações práticas.
-              </p>
-              <div id="ai-consultant-content" class="hidden space-y-4"></div>
-            </div>
-          </section>
-
-          <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="open-finance-section">
-            <div class="dashboard-section-head">
-              <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">6</span>
-                <h3 class="dashboard-section-title">Open Finance</h3>
-              </div>
-              <button id="btn-open-finance-refresh" class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase bg-white">
-                Atualizar status
+          <section id="consultor-ia-section" class="dashboard-section">
+            <div class="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
+              <button
+                id="btn-ai-consultant"
+                class="bg-zinc-900 text-white p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98] h-fit lg:self-start"
+              >
+                <span class="font-black text-sm uppercase tracking-widest">Consultor IA</span>
+                <p id="label-ai-consultant-usage" class="text-xs uppercase font-bold opacity-70 mt-1">Atualize quando quiser</p>
               </button>
+
+              <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
+                <div class="dashboard-section-head">
+                  <div class="dashboard-section-title-wrap">
+                    <span class="dashboard-step-badge">5</span>
+                    <h3 class="dashboard-section-title">Consultor IA</h3>
+                  </div>
+                  <span id="ai-consultant-status" class="text-xs font-black uppercase text-zinc-500">Aguardando análise</span>
+                </div>
+                <p id="ai-consultant-placeholder" class="text-sm font-bold text-zinc-600">
+                  Clique em <strong>Consultor IA</strong> para comparar o período filtrado com o período anterior e receber recomendações práticas.
+                </p>
+                <div id="ai-consultant-content" class="hidden space-y-4"></div>
+              </div>
             </div>
-            <p class="dashboard-section-subtitle text-left max-w-none">Conecte seu banco para sincronizar transações automaticamente.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <button data-bank-code="nubank" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Nubank</button>
-              <button data-bank-code="itau" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Itaú</button>
-              <button data-bank-code="bradesco" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Bradesco</button>
-              <button data-bank-code="banco-do-brasil" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Banco do Brasil</button>
-            </div>
-            <div id="open-finance-connections" class="space-y-2">
-              <p class="text-[11px] font-bold text-zinc-500">Nenhuma conexão ativa.</p>
+          </section>
+
+          <section class="dashboard-section" id="open-finance-section">
+            <div class="open-finance-panel bg-white p-5 neo-brutalism space-y-4">
+              <div class="dashboard-section-head">
+                <div class="dashboard-section-title-wrap">
+                  <span class="dashboard-step-badge">6</span>
+                  <h3 class="dashboard-section-title">Open Finance</h3>
+                </div>
+                <button id="btn-open-finance-refresh" class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase bg-white">
+                  Atualizar status
+                </button>
+              </div>
+              <p class="dashboard-section-subtitle text-left max-w-none">Conecte seu banco para sincronizar transações automaticamente.</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <button data-bank-code="nubank" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Nubank</button>
+                <button data-bank-code="itau" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Itaú</button>
+                <button data-bank-code="bradesco" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Bradesco</button>
+                <button data-bank-code="banco-do-brasil" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Banco do Brasil</button>
+              </div>
+              <div id="open-finance-connections" class="space-y-2">
+                <p class="text-[11px] font-bold text-zinc-500">Nenhuma conexão ativa.</p>
+              </div>
             </div>
           </section>
 
           <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="ritmo-do-mes-section">
-            <div class="dashboard-section-head">
+            <div class="dashboard-section-head hidden">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">7</span>
                 <h3 class="dashboard-section-title">Ritmo do Mês</h3>
               </div>
-              <p id="ritmo-status-pill" class="text-[11px] font-black uppercase px-2 py-1 border-2 border-black bg-emerald-100">Verde</p>
             </div>
-            <p id="ritmo-recommendation" class="text-sm font-black text-zinc-700">Para fechar no alvo, reduza R$ 0,00 em 0 dias.</p>
-            <div id="ritmo-legend" class="dashboard-legend-row"></div>
-            <div id="ritmo-daily-chart" class="mix-chart-canvas"></div>
-            <div id="ritmo-daily-tooltip" class="text-[11px] font-bold text-zinc-600"></div>
+            <div class="ritmo-toolbar">
+              <p class="ritmo-toolbar-title">Filtros do Gráfico</p>
+              <div id="ritmo-legend" class="dashboard-legend-row ritmo-legend-filters"></div>
+            </div>
+            <div id="ritmo-daily-chart" class="mix-chart-canvas ritmo-chart-canvas"></div>
+            <div class="ritmo-details">
+              <div id="ritmo-daily-tooltip" class="text-[11px] font-bold text-zinc-600"></div>
+            </div>
           </section>
 
           <section id="transactions-section" class="dashboard-section transactions-section bg-white p-4 neo-brutalism space-y-5">
