@@ -61,13 +61,35 @@ class DashboardViewRenderEngagementMethods {
   }
 
   getCategoryColor(category, index) {
-    const palette = ['#facc15', '#38bdf8', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#94a3b8'];
     const key = normalizeForSearch(category);
+
+    const fixedCategoryColors = {
+      alimentacao: '#fb7185',
+      transporte: '#60a5fa',
+      mercado: '#34d399',
+      saude: '#22d3ee',
+      educacao: '#818cf8',
+      moradia: '#f59e0b',
+      lazer: '#f472b6',
+      assinaturas: '#a78bfa',
+      transferencia: '#64748b',
+      parcelas: '#f97316',
+      outros: '#94a3b8'
+    };
+
+    if (fixedCategoryColors[key]) {
+      return fixedCategoryColors[key];
+    }
+
     let hash = 0;
     for (let i = 0; i < key.length; i += 1) {
-      hash = (hash * 31 + key.charCodeAt(i)) % 997;
+      hash = (hash * 37 + key.charCodeAt(i)) % 1999;
     }
-    return palette[(hash + index) % palette.length];
+
+    const hue = hash % 360;
+    const saturation = 68 + (hash % 8);
+    const lightness = 42 + (hash % 10);
+    return `hsl(${hue}deg ${saturation}% ${lightness}%)`;
   }
 
   renderRitmoDoMes(ritmoState = {}) {

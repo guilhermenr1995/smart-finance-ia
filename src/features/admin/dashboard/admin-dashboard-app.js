@@ -1,4 +1,4 @@
-import { DEFAULT_ADMIN_EMAILS, normalizeEmail } from './shared.js';
+import { DEFAULT_ADMIN_EMAILS, DEFAULT_USERS_PAGE_SIZE, normalizeEmail } from './shared.js';
 import { registerLifecycleMethods } from './methods/lifecycle-methods.js';
 import { registerMaintenanceMethods } from './methods/maintenance-methods.js';
 import { registerAuthUiMethods } from './methods/auth-ui-methods.js';

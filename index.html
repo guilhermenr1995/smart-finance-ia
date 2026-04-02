@@ -114,8 +114,38 @@
           </div>
         </header>
 
-        <div class="space-y-6">
-          <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
+        <div id="dashboard-floating-filters" class="dashboard-floating-filters neo-brutalism">
+          <div class="dashboard-floating-total">
+            <p class="dashboard-floating-total-label">Total filtrado</p>
+            <p id="floating-total-value" class="dashboard-floating-total-value">R$ 0,00</p>
+          </div>
+          <div class="dashboard-floating-account-filters">
+            <button
+              id="floating-filter-all"
+              data-account-filter="all"
+              class="filter-active px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Todos
+            </button>
+            <button
+              id="floating-filter-credit"
+              data-account-filter="Crédito"
+              class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Crédito
+            </button>
+            <button
+              id="floating-filter-debit"
+              data-account-filter="Conta"
+              class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Conta
+            </button>
+          </div>
+        </div>
+
+        <div id="dashboard-sections" class="space-y-6">
+          <section id="importacao-section" class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">1</span>
@@ -224,7 +254,7 @@
             </div>
           </section>
 
-          <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
+          <section id="filtros-section" class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">2</span>
@@ -263,18 +293,21 @@
                 <div class="grid grid-cols-3 gap-2">
                   <button
                     id="filter-all"
+                    data-account-filter="all"
                     class="filter-active px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
                   >
-                    Tudo
+                    Todos
                   </button>
                   <button
                     id="filter-credit"
+                    data-account-filter="Crédito"
                     class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
                   >
                     Crédito
                   </button>
                   <button
                     id="filter-debit"
+                    data-account-filter="Conta"
                     class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
                   >
                     Conta
@@ -483,7 +516,7 @@
             <div id="ritmo-daily-tooltip" class="text-[11px] font-bold text-zinc-600"></div>
           </section>
 
-          <section class="dashboard-section transactions-section bg-white p-4 neo-brutalism space-y-5">
+          <section id="transactions-section" class="dashboard-section transactions-section bg-white p-4 neo-brutalism space-y-5">
             <div class="dashboard-section-head px-2 py-3 mb-2">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">9</span>

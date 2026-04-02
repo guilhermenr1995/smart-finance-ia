@@ -89,9 +89,11 @@ class DashboardViewBindEventsCoreMethods {
       handlers.onPaginationChange?.();
     });
 
-    Object.entries(this.accountFilterButtons).forEach(([accountType, button]) => {
-      button.addEventListener('click', () => {
-        handlers.onFiltersChange({ accountType });
+    Object.entries(this.accountFilterButtons).forEach(([accountType, buttons]) => {
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          handlers.onFiltersChange({ accountType });
+        });
       });
     });
   }

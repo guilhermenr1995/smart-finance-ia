@@ -52,6 +52,9 @@ class DashboardViewRenderSummaryMethods {
     this.clearSearchButton.disabled = !search.term.trim();
 
     this.totalValue.innerText = formatCurrencyBRL(summary.total);
+    if (this.floatingTotalValue) {
+      this.floatingTotalValue.innerText = formatCurrencyBRL(summary.total);
+    }
     this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
     this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
     this.renderCategoryPie(summary, filters);
@@ -97,8 +100,6 @@ class DashboardViewRenderSummaryMethods {
       .filter(([, value]) => value > 0)
       .sort((left, right) => right[1] - left[1]);
 
-    const total = categoryEntries.reduce((accumulator, [, value]) => accumulator + value, 0);
-
     const applyCenterValue = ({ label = 'Total', value = 0, isCategorySelected = false } = {}) => {
       this.categoryPieCenterLabel.innerText = String(label || 'Total').trim() || 'Total';
       this.categoryPieTotal.innerText = formatCurrencyBRL(Number(value || 0));
@@ -124,7 +125,7 @@ class DashboardViewRenderSummaryMethods {
       });
     };
 
-    if (categoryEntries.length === 0 || total <= 0) {
+    if (categoryEntries.length === 0) {
       this.categoryPieChart.style.background = 'conic-gradient(#e4e4e7 0deg 360deg)';
       this.categoryPieChart.setAttribute(
         'aria-label',
@@ -141,22 +142,77 @@ class DashboardViewRenderSummaryMethods {
       return;
     }
 
+    const hashCategory = (value) => {
+      const key = normalizeForSearch(value);
+      let hash = 0;
+      for (let index = 0; index < key.length; index += 1) {
+        hash = (hash * 33 + key.charCodeAt(index)) % 1543;
+      }
+      return Math.abs(hash);
+    };
+
+    const buildColorVariant = (category, attempt = 0) => {
+      const seed = hashCategory(`${category}-${attempt}`);
+      const hue = seed % 360;
+      const saturation = 68 + (seed % 10);
+      const lightness = 42 + (seed % 14);
+      return `hsl(${hue}deg ${saturation}% ${lightness}%)`;
+    };
+
     const MAX_VISIBLE_SLICES = 7;
-    const visibleEntries = categoryEntries.slice(0, MAX_VISIBLE_SLICES);
+    const visibleEntries = categoryEntries.slice(0, MAX_VISIBLE_SLICES).map(([category, value]) => ({
+      key: category,
+      label: category,
+      value,
+      filterCategory: category,
+      synthetic: false
+    }));
     const hiddenEntries = categoryEntries.slice(MAX_VISIBLE_SLICES);
     if (hiddenEntries.length > 0) {
       const hiddenTotal = hiddenEntries.reduce((accumulator, [, value]) => accumulator + value, 0);
-      visibleEntries.push(['Outros', hiddenTotal]);
+      visibleEntries.push({
+        key: '__others__',
+        label: 'Outras categorias',
+        value: hiddenTotal,
+        filterCategory: null,
+        synthetic: true
+      });
+    }
+
+    const total = visibleEntries.reduce((accumulator, item) => accumulator + Number(item.value || 0), 0);
+    if (total <= 0) {
+      this.categoryPieChart.style.background = 'conic-gradient(#e4e4e7 0deg 360deg)';
+      applyCenterValue({
+        label: 'Total',
+        value: 0,
+        isCategorySelected: false
+      });
+      this.categoryPieLegend.innerHTML =
+        '<p class="text-[11px] font-black uppercase text-zinc-500">Sem gastos no período selecionado.</p>';
+      clearPieInteraction();
+      return;
     }
 
     let angleCursor = 0;
-    const slices = visibleEntries.map(([category, value], index) => {
+    const usedColors = new Set();
+    const slices = visibleEntries.map((entry, index) => {
+      const value = Number(entry.value || 0);
       const angle = (value / total) * 360;
       const startAngle = angleCursor;
       angleCursor += angle;
-      const color = this.getCategoryColor(category, index);
+      let color = this.getCategoryColor(entry.label, index);
+      let attempt = 0;
+      while (usedColors.has(color) && attempt < 12) {
+        attempt += 1;
+        color = buildColorVariant(entry.label, attempt);
+      }
+      usedColors.add(color);
+
       return {
-        category,
+        key: entry.key,
+        label: entry.label,
+        filterCategory: entry.filterCategory,
+        synthetic: entry.synthetic,
         value,
         percent: (value / total) * 100,
         color,
@@ -172,11 +228,11 @@ class DashboardViewRenderSummaryMethods {
     this.categoryPieChart.style.background = `conic-gradient(${gradient})`;
     const selectedSlice =
       selectedCategory && selectedCategory !== 'all'
-        ? slices.find((slice) => slice.category === selectedCategory) || null
+        ? slices.find((slice) => slice.filterCategory === selectedCategory) || null
         : null;
 
     applyCenterValue({
-      label: selectedSlice?.category || 'Total',
+      label: selectedSlice?.label || 'Total',
       value: selectedSlice?.value ?? total,
       isCategorySelected: Boolean(selectedSlice)
     });
@@ -185,10 +241,10 @@ class DashboardViewRenderSummaryMethods {
       'aria-label',
       [
         slices
-          .map((slice) => `${slice.category}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
+          .map((slice) => `${slice.label}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
           .join(' | '),
         selectedSlice
-          ? `Categoria selecionada: ${selectedSlice.category}, valor ${formatCurrencyBRL(selectedSlice.value)}.`
+          ? `Categoria selecionada: ${selectedSlice.label}, valor ${formatCurrencyBRL(selectedSlice.value)}.`
           : 'Nenhuma categoria selecionada no momento. Clique em uma fatia para ver o valor direto no gráfico.'
       ].join(' ')
     );
@@ -222,18 +278,25 @@ class DashboardViewRenderSummaryMethods {
       const centerX = bounds.width / 2;
       const centerY = bounds.height / 2;
       const radius = Math.min(bounds.width, bounds.height) / 2;
+      const innerRadius = radius * 0.52;
       const distanceFromCenter = Math.hypot(x - centerX, y - centerY);
       if (distanceFromCenter > radius) {
+        return;
+      }
+      if (distanceFromCenter < innerRadius) {
+        if (selectedCategory !== 'all' && this.handlers?.onFiltersChange) {
+          this.handlers.onFiltersChange({ category: 'all' });
+        }
         return;
       }
 
       const angle = ((Math.atan2(y - centerY, x - centerX) * 180) / Math.PI + 450) % 360;
       const clickedSlice = resolveSliceByAngle(angle);
-      if (!clickedSlice?.category) {
+      if (!clickedSlice?.filterCategory) {
         return;
       }
 
-      applyCategoryFilter(clickedSlice.category);
+      applyCategoryFilter(clickedSlice.filterCategory);
     };
 
     this.categoryPieChart.onkeydown = (event) => {
@@ -244,31 +307,33 @@ class DashboardViewRenderSummaryMethods {
       event.preventDefault();
 
       if (selectedSlice) {
-        applyCategoryFilter(selectedSlice.category);
+        applyCategoryFilter(selectedSlice.filterCategory);
         return;
       }
 
-      const firstSlice = slices[0];
-      if (!firstSlice?.category) {
+      const firstSlice = slices.find((slice) => Boolean(slice.filterCategory));
+      if (!firstSlice?.filterCategory) {
         return;
       }
 
-      applyCategoryFilter(firstSlice.category);
+      applyCategoryFilter(firstSlice.filterCategory);
     };
 
     this.categoryPieLegend.innerHTML = slices
       .map((slice) => {
-        const isActive = selectedCategory !== 'all' && selectedCategory === slice.category;
+        const isActive = selectedCategory !== 'all' && selectedCategory === slice.filterCategory;
+        const canFilter = Boolean(slice.filterCategory);
         return `
           <button
             type="button"
-            data-category-pie="${escapeHtml(slice.category)}"
-            class="category-pie-legend-item ${isActive ? 'is-active' : ''}"
+            ${canFilter ? `data-category-pie="${escapeHtml(slice.filterCategory)}"` : ''}
+            class="category-pie-legend-item ${isActive ? 'is-active' : ''} ${!canFilter ? 'is-static' : ''}"
+            ${canFilter ? '' : 'disabled'}
           >
             <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
             <span class="category-pie-legend-text">
-              <strong>${escapeHtml(slice.category)}</strong>
-              <small>${slice.percent.toFixed(1)}% • ${formatCurrencyBRL(slice.value)}</small>
+              <strong>${escapeHtml(slice.label)}</strong>
+              <small>${slice.percent.toFixed(1)}% • ${formatCurrencyBRL(slice.value)}${!canFilter ? ' • agregado' : ''}</small>
             </span>
           </button>
         `;

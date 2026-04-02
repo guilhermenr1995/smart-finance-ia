@@ -2,6 +2,76 @@ import { BANK_EXPORT_GUIDES, BANK_GUIDE_STORAGE_KEY, DEFAULT_BANK_ACCOUNT } from
 import { applyClassMethods } from './register-methods.js';
 
 class DashboardViewInteractionMethods {
+  getAllAccountFilterButtons() {
+    return Object.values(this.accountFilterButtons)
+      .flat()
+      .filter(Boolean);
+  }
+
+  initSectionAccordions() {
+    if (!this.sectionsContainer) {
+      return;
+    }
+
+    const defaultOpenSections = new Set([
+      'importacao-section',
+      'filtros-section',
+      'category-pie-section',
+      'transactions-section'
+    ]);
+
+    const sections = Array.from(this.sectionsContainer.querySelectorAll(':scope > section'));
+    sections.forEach((section, index) => {
+      if (!section || section.dataset.accordionReady === 'true') {
+        return;
+      }
+
+      const sectionId = String(section.id || `dashboard-section-${index + 1}`).trim();
+      section.id = sectionId;
+
+      const titleElement = section.querySelector('.dashboard-section-title');
+      const badgeElement = section.querySelector('.dashboard-step-badge');
+      const title = String(titleElement?.textContent || `Seção ${index + 1}`).trim();
+      const badge = String(badgeElement?.textContent || `${index + 1}`).trim();
+      const contentElement = document.createElement('div');
+      contentElement.className = 'dashboard-accordion-content';
+
+      while (section.firstChild) {
+        contentElement.appendChild(section.firstChild);
+      }
+
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'dashboard-accordion-trigger';
+      trigger.setAttribute('aria-controls', `${sectionId}-accordion-content`);
+      trigger.innerHTML = `
+        <span class="dashboard-accordion-trigger-main">
+          <span class="dashboard-step-badge">${badge}</span>
+          <span class="dashboard-accordion-trigger-title">${title}</span>
+        </span>
+        <span class="dashboard-accordion-trigger-icon" aria-hidden="true">+</span>
+      `;
+
+      contentElement.id = `${sectionId}-accordion-content`;
+      section.appendChild(trigger);
+      section.appendChild(contentElement);
+      section.classList.add('dashboard-accordion-section');
+      section.dataset.accordionReady = 'true';
+
+      const shouldOpen = defaultOpenSections.has(sectionId);
+      section.classList.toggle('is-collapsed', !shouldOpen);
+      contentElement.hidden = !shouldOpen;
+      trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+
+      trigger.addEventListener('click', () => {
+        const isCollapsed = section.classList.contains('is-collapsed');
+        section.classList.toggle('is-collapsed', !isCollapsed);
+        contentElement.hidden = isCollapsed;
+        trigger.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+      });
+    });
+  }
+
   bindTooltipInteractions() {
     document.addEventListener('click', (event) => {
       const trigger = event.target.closest('.help-tooltip');
@@ -114,6 +184,9 @@ class DashboardViewInteractionMethods {
     this.openFinanceConnectButtons.forEach((button) => {
       button.disabled = isBusy;
     });
+    this.getAllAccountFilterButtons().forEach((button) => {
+      button.disabled = isBusy;
+    });
 
     if (this.paginationPageSizeSelect) {
       this.paginationPageSizeSelect.disabled = isBusy;
@@ -128,17 +201,19 @@ class DashboardViewInteractionMethods {
   }
 
   setAccountFilterButton(accountType) {
-    Object.values(this.accountFilterButtons).forEach((button) => {
+    this.getAllAccountFilterButtons().forEach((button) => {
       button.classList.remove('filter-active');
     });
 
-    const selectedButton = this.accountFilterButtons[accountType] || this.accountFilterButtons.all;
-    selectedButton.classList.add('filter-active');
+    const selectedButtons = this.accountFilterButtons[accountType] || this.accountFilterButtons.all || [];
+    selectedButtons.forEach((button) => {
+      button.classList.add('filter-active');
+    });
   }
 
   getActiveAccountScope() {
-    const activeEntry = Object.entries(this.accountFilterButtons).find(([, button]) =>
-      button.classList.contains('filter-active')
+    const activeEntry = Object.entries(this.accountFilterButtons).find(([, buttons]) =>
+      buttons.some((button) => button.classList.contains('filter-active'))
     );
     return activeEntry ? activeEntry[0] : 'all';
   }

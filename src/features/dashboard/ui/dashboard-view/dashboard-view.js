@@ -20,11 +20,14 @@ export class DashboardView {
     this.clearSearchButton = document.getElementById('btn-clear-search');
     this.searchUseGlobalBaseCheckbox = document.getElementById('search-use-global-base');
     this.sourceFilterSelect = document.getElementById('filter-source');
+    this.sectionsContainer = document.getElementById('dashboard-sections');
+    this.floatingFiltersBar = document.getElementById('dashboard-floating-filters');
+    this.floatingTotalValue = document.getElementById('floating-total-value');
 
     this.accountFilterButtons = {
-      all: document.getElementById('filter-all'),
-      'Crédito': document.getElementById('filter-credit'),
-      Conta: document.getElementById('filter-debit')
+      all: Array.from(document.querySelectorAll('[data-account-filter="all"]')),
+      'Crédito': Array.from(document.querySelectorAll('[data-account-filter="Crédito"]')),
+      Conta: Array.from(document.querySelectorAll('[data-account-filter="Conta"]'))
     };
 
     this.creditFileInput = document.getElementById('file-credit');
@@ -147,6 +150,7 @@ export class DashboardView {
     this.initPagination();
     this.initBankGuide();
     this.bindTooltipInteractions();
+    this.initSectionAccordions();
   }
 }
 

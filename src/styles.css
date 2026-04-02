@@ -42,6 +42,109 @@ select.edit-mode {
   --sf-gap: 16px;
 }
 
+.dashboard-floating-filters {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 8px);
+  z-index: 35;
+  background: linear-gradient(160deg, #fff7cc 0%, #fde68a 100%);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-floating-total {
+  min-width: 0;
+}
+
+.dashboard-floating-total-label {
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52525b;
+}
+
+.dashboard-floating-total-value {
+  font-size: clamp(1.15rem, 3vw, 1.5rem);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  color: #111827;
+  line-height: 1.1;
+}
+
+.dashboard-floating-account-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 6px;
+  width: min(100%, 360px);
+}
+
+.dashboard-accordion-section {
+  position: relative;
+}
+
+.dashboard-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid #111827;
+  background: #f8fafc;
+  color: #111827;
+  box-shadow: 2px 2px 0 #111827;
+  text-align: left;
+}
+
+.dashboard-accordion-trigger-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-accordion-trigger-title {
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.dashboard-accordion-trigger-icon {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #111827;
+  border-radius: 999px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dashboard-accordion-content {
+  margin-top: 10px;
+}
+
+.dashboard-accordion-section.is-collapsed .dashboard-accordion-trigger {
+  background: #f4f4f5;
+}
+
+.dashboard-accordion-section.is-collapsed .dashboard-accordion-trigger-icon {
+  background: #facc15;
+}
+
+.dashboard-accordion-section:not(.is-collapsed) .dashboard-accordion-trigger-icon {
+  transform: rotate(45deg);
+}
+
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -362,6 +465,11 @@ select.edit-mode {
 .category-pie-legend-item.is-active {
   background: #fde68a;
   box-shadow: 2px 2px 0 #111827;
+}
+
+.category-pie-legend-item.is-static {
+  opacity: 0.92;
+  cursor: default;
 }
 
 .category-pie-legend-dot {
@@ -2128,6 +2236,35 @@ select.edit-mode {
     flex: 1 1 auto;
     text-align: center;
     min-height: 42px;
+  }
+
+  .dashboard-floating-filters {
+    top: 6px;
+    padding: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .dashboard-floating-total {
+    text-align: center;
+  }
+
+  .dashboard-floating-account-filters {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-floating-account-filters > button {
+    min-height: 40px;
+  }
+
+  .dashboard-accordion-trigger {
+    padding: 9px 10px;
+  }
+
+  .dashboard-accordion-trigger-title {
+    font-size: 0.7rem;
   }
 
   .dashboard-section {
