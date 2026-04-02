@@ -51,12 +51,18 @@ class DashboardViewRenderSummaryMethods {
     }
     this.clearSearchButton.disabled = !search.term.trim();
 
-    this.totalValue.innerText = formatCurrencyBRL(summary.total);
+    if (this.totalValue) {
+      this.totalValue.innerText = formatCurrencyBRL(summary.total);
+    }
     if (this.floatingTotalValue) {
       this.floatingTotalValue.innerText = formatCurrencyBRL(summary.total);
     }
-    this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
-    this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
+    if (this.ignoredValue) {
+      this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
+    }
+    if (this.cycleLegend) {
+      this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
+    }
     this.renderCategoryPie(summary, filters);
 
     const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
@@ -94,11 +100,13 @@ class DashboardViewRenderSummaryMethods {
     }
 
     this.categoryPiePeriodLabel.innerText = `${toBrDate(filters.startDate)} • ${toBrDate(filters.endDate)}`;
-    const selectedCategory = String(filters?.category || 'all').trim();
     const categoryEntries = Object.entries(summary?.categoryTotals || {})
       .map(([category, value]) => [category, Number(value || 0)])
       .filter(([, value]) => value > 0)
       .sort((left, right) => right[1] - left[1]);
+    const tooltipElement = this.categoryPieTooltip;
+    const chartWrap = this.categoryPieChart.parentElement;
+    const supportsHover = Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches);
 
     const applyCenterValue = ({ label = 'Total', value = 0, isCategorySelected = false } = {}) => {
       this.categoryPieCenterLabel.innerText = String(label || 'Total').trim() || 'Total';
@@ -108,21 +116,66 @@ class DashboardViewRenderSummaryMethods {
       this.categoryPieChart.setAttribute('aria-pressed', isCategorySelected ? 'true' : 'false');
     };
 
-    const clearPieInteraction = () => {
-      this.categoryPieChart.onclick = null;
-      this.categoryPieChart.onkeydown = null;
-    };
-
-    const applyCategoryFilter = (category) => {
-      const normalizedCategory = String(category || '').trim();
-      if (!normalizedCategory || !this.handlers?.onFiltersChange) {
+    const hideTooltip = () => {
+      if (!tooltipElement) {
         return;
       }
 
-      const shouldClearFilter = selectedCategory === normalizedCategory;
-      this.handlers.onFiltersChange({
-        category: shouldClearFilter ? 'all' : normalizedCategory
-      });
+      tooltipElement.hidden = true;
+      tooltipElement.classList.add('hidden');
+      tooltipElement.removeAttribute('data-active-slice');
+    };
+
+    const clearPieInteraction = () => {
+      this.categoryPieChart.onclick = null;
+      this.categoryPieChart.onmousemove = null;
+      this.categoryPieChart.onmouseleave = null;
+      this.categoryPieChart.ontouchstart = null;
+      this.categoryPieChart.onkeydown = null;
+      this.categoryPieChart.onblur = null;
+      hideTooltip();
+    };
+
+    const showTooltip = ({ slice, clientX, clientY }) => {
+      if (!tooltipElement || !chartWrap || !slice) {
+        return;
+      }
+
+      tooltipElement.innerHTML = `
+        <p class="category-pie-tooltip-label">${escapeHtml(slice.label)}</p>
+        <p class="category-pie-tooltip-value">${formatCurrencyBRL(slice.value)}</p>
+      `;
+      tooltipElement.hidden = false;
+      tooltipElement.classList.remove('hidden');
+      tooltipElement.dataset.activeSlice = String(slice.key || '');
+
+      const wrapBounds = chartWrap.getBoundingClientRect();
+      const fallbackX = wrapBounds.left + wrapBounds.width / 2;
+      const fallbackY = wrapBounds.top + wrapBounds.height / 2;
+      const pointerX = Number.isFinite(clientX) ? clientX : fallbackX;
+      const pointerY = Number.isFinite(clientY) ? clientY : fallbackY;
+      const tooltipBounds = tooltipElement.getBoundingClientRect();
+      let left = pointerX - wrapBounds.left + 12;
+      let top = pointerY - wrapBounds.top - tooltipBounds.height - 12;
+
+      if (left + tooltipBounds.width > wrapBounds.width - 8) {
+        left = wrapBounds.width - tooltipBounds.width - 8;
+      }
+      if (left < 8) {
+        left = 8;
+      }
+      if (top < 8) {
+        top = pointerY - wrapBounds.top + 12;
+      }
+      if (top + tooltipBounds.height > wrapBounds.height - 8) {
+        top = wrapBounds.height - tooltipBounds.height - 8;
+      }
+      if (top < 8) {
+        top = 8;
+      }
+
+      tooltipElement.style.left = `${left}px`;
+      tooltipElement.style.top = `${top}px`;
     };
 
     if (categoryEntries.length === 0) {
@@ -132,9 +185,9 @@ class DashboardViewRenderSummaryMethods {
         'Sem gastos no período selecionado. Ajuste o filtro de data ou categoria para visualizar o gráfico de pizza.'
       );
       applyCenterValue({
-        label: selectedCategory !== 'all' ? selectedCategory : 'Total',
+        label: 'Total',
         value: 0,
-        isCategorySelected: selectedCategory !== 'all'
+        isCategorySelected: false
       });
       this.categoryPieLegend.innerHTML =
         '<p class="text-[11px] font-black uppercase text-zinc-500">Sem gastos no período selecionado.</p>';
@@ -226,15 +279,10 @@ class DashboardViewRenderSummaryMethods {
       .join(', ');
 
     this.categoryPieChart.style.background = `conic-gradient(${gradient})`;
-    const selectedSlice =
-      selectedCategory && selectedCategory !== 'all'
-        ? slices.find((slice) => slice.filterCategory === selectedCategory) || null
-        : null;
-
     applyCenterValue({
-      label: selectedSlice?.label || 'Total',
-      value: selectedSlice?.value ?? total,
-      isCategorySelected: Boolean(selectedSlice)
+      label: 'Total',
+      value: total,
+      isCategorySelected: false
     });
 
     this.categoryPieChart.setAttribute(
@@ -243,9 +291,7 @@ class DashboardViewRenderSummaryMethods {
         slices
           .map((slice) => `${slice.label}: ${slice.percent.toFixed(1)}% (${formatCurrencyBRL(slice.value)})`)
           .join(' | '),
-        selectedSlice
-          ? `Categoria selecionada: ${selectedSlice.label}, valor ${formatCurrencyBRL(selectedSlice.value)}.`
-          : 'Nenhuma categoria selecionada no momento. Clique em uma fatia para ver o valor direto no gráfico.'
+        'Passe o mouse nas fatias no desktop ou toque no gráfico no celular para ver detalhes.'
       ].join(' ')
     );
 
@@ -263,89 +309,115 @@ class DashboardViewRenderSummaryMethods {
       );
     };
 
-    this.categoryPieChart.onclick = (event) => {
-      if (!this.handlers?.onFiltersChange) {
-        return;
-      }
-
+    const resolveSliceByPointer = (clientX, clientY) => {
       const bounds = this.categoryPieChart.getBoundingClientRect();
       if (!bounds.width || !bounds.height) {
-        return;
+        return null;
       }
 
-      const x = event.clientX - bounds.left;
-      const y = event.clientY - bounds.top;
+      const x = clientX - bounds.left;
+      const y = clientY - bounds.top;
       const centerX = bounds.width / 2;
       const centerY = bounds.height / 2;
       const radius = Math.min(bounds.width, bounds.height) / 2;
       const innerRadius = radius * 0.52;
       const distanceFromCenter = Math.hypot(x - centerX, y - centerY);
       if (distanceFromCenter > radius) {
-        return;
+        return null;
       }
       if (distanceFromCenter < innerRadius) {
-        if (selectedCategory !== 'all' && this.handlers?.onFiltersChange) {
-          this.handlers.onFiltersChange({ category: 'all' });
-        }
-        return;
+        return null;
       }
 
       const angle = ((Math.atan2(y - centerY, x - centerX) * 180) / Math.PI + 450) % 360;
-      const clickedSlice = resolveSliceByAngle(angle);
-      if (!clickedSlice?.filterCategory) {
-        return;
-      }
-
-      applyCategoryFilter(clickedSlice.filterCategory);
+      return resolveSliceByAngle(angle);
     };
 
-    this.categoryPieChart.onkeydown = (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
-      }
+    if (supportsHover) {
+      this.categoryPieChart.onmousemove = (event) => {
+        const hoveredSlice = resolveSliceByPointer(event.clientX, event.clientY);
+        if (!hoveredSlice) {
+          hideTooltip();
+          return;
+        }
 
-      event.preventDefault();
+        showTooltip({
+          slice: hoveredSlice,
+          clientX: event.clientX,
+          clientY: event.clientY
+        });
+      };
 
-      if (selectedSlice) {
-        applyCategoryFilter(selectedSlice.filterCategory);
-        return;
-      }
+      this.categoryPieChart.onmouseleave = () => {
+        hideTooltip();
+      };
 
-      const firstSlice = slices.find((slice) => Boolean(slice.filterCategory));
-      if (!firstSlice?.filterCategory) {
-        return;
-      }
+      this.categoryPieChart.onblur = () => {
+        hideTooltip();
+      };
 
-      applyCategoryFilter(firstSlice.filterCategory);
-    };
+      this.categoryPieChart.onclick = null;
+      this.categoryPieChart.ontouchstart = null;
+      this.categoryPieChart.onkeydown = null;
+    } else {
+      this.categoryPieChart.onmousemove = null;
+      this.categoryPieChart.onmouseleave = null;
+      this.categoryPieChart.onblur = null;
+
+      const toggleTooltipForSlice = (slice, clientX, clientY) => {
+        const activeSlice = String(tooltipElement?.dataset?.activeSlice || '').trim();
+        const nextSlice = String(slice?.key || '').trim();
+        const isSameSlice = Boolean(activeSlice && nextSlice && activeSlice === nextSlice && !tooltipElement?.hidden);
+        if (isSameSlice) {
+          hideTooltip();
+          return;
+        }
+
+        showTooltip({ slice, clientX, clientY });
+      };
+
+      this.categoryPieChart.onclick = (event) => {
+        const clickedSlice = resolveSliceByPointer(event.clientX, event.clientY);
+        if (!clickedSlice) {
+          hideTooltip();
+          return;
+        }
+
+        toggleTooltipForSlice(clickedSlice, event.clientX, event.clientY);
+      };
+
+      this.categoryPieChart.ontouchstart = (event) => {
+        const touch = event.touches?.[0];
+        if (!touch) {
+          return;
+        }
+
+        const touchedSlice = resolveSliceByPointer(touch.clientX, touch.clientY);
+        if (!touchedSlice) {
+          hideTooltip();
+          return;
+        }
+
+        toggleTooltipForSlice(touchedSlice, touch.clientX, touch.clientY);
+      };
+
+      this.categoryPieChart.onkeydown = null;
+    }
 
     this.categoryPieLegend.innerHTML = slices
       .map((slice) => {
-        const isActive = selectedCategory !== 'all' && selectedCategory === slice.filterCategory;
         const canFilter = Boolean(slice.filterCategory);
         return `
-          <button
-            type="button"
-            ${canFilter ? `data-category-pie="${escapeHtml(slice.filterCategory)}"` : ''}
-            class="category-pie-legend-item ${isActive ? 'is-active' : ''} ${!canFilter ? 'is-static' : ''}"
-            ${canFilter ? '' : 'disabled'}
-          >
+          <div class="category-pie-legend-item is-static">
             <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
             <span class="category-pie-legend-text">
               <strong>${escapeHtml(slice.label)}</strong>
               <small>${slice.percent.toFixed(1)}% • ${formatCurrencyBRL(slice.value)}${!canFilter ? ' • agregado' : ''}</small>
             </span>
-          </button>
+          </div>
         `;
       })
       .join('');
-
-    this.categoryPieLegend.querySelectorAll('[data-category-pie]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const category = String(button.dataset.categoryPie || '').trim();
-        applyCategoryFilter(category);
-      });
-    });
   }
 
 }

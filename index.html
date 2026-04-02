@@ -82,7 +82,7 @@
     </section>
 
     <section id="app-screen" class="hidden dashboard-shell p-4 pb-24">
-      <div class="max-w-4xl mx-auto space-y-5">
+      <div class="w-full max-w-[1440px] mx-auto space-y-5">
         <header class="dashboard-header bg-yellow-300 p-5 neo-brutalism">
           <div class="dashboard-header-main">
             <h1 class="dashboard-brand-title">Smart Finance IA</h1>
@@ -119,6 +119,16 @@
             <p class="dashboard-floating-total-label">Total filtrado</p>
             <p id="floating-total-value" class="dashboard-floating-total-value">R$ 0,00</p>
           </div>
+          <div class="dashboard-floating-period">
+            <label class="dashboard-floating-period-field" for="data-inicio">
+              <span class="dashboard-floating-period-label">Início</span>
+              <input type="date" id="data-inicio" class="dashboard-floating-date-input" />
+            </label>
+            <label class="dashboard-floating-period-field" for="data-fim">
+              <span class="dashboard-floating-period-label">Fim</span>
+              <input type="date" id="data-fim" class="dashboard-floating-date-input" />
+            </label>
+          </div>
           <div class="dashboard-floating-account-filters">
             <button
               id="floating-filter-all"
@@ -144,7 +154,7 @@
           </div>
         </div>
 
-        <div id="dashboard-sections" class="space-y-6">
+        <div id="dashboard-sections" class="dashboard-sections">
           <section id="importacao-section" class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
@@ -258,62 +268,20 @@
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">2</span>
-                <h3 class="dashboard-section-title">Filtros de Período</h3>
+                <h3 class="dashboard-section-title">Filtros Avançados</h3>
                 <button
                   type="button"
                   class="help-tooltip"
-                  data-tooltip="Defina período e tipo de conta para montar o recorte principal dos gráficos e totais."
+                  data-tooltip="Aplique refinamentos adicionais para explorar apenas categorias e origens específicas."
                   aria-label="Ajuda sobre filtros"
                 >
                   ?
                 </button>
               </div>
-              <p class="dashboard-section-subtitle">Defina o recorte principal para gráficos, totais e lançamentos.</p>
+              <p class="dashboard-section-subtitle">Refine o recorte com filtros complementares.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div class="lg:col-span-4">
-                <label class="field-label">Início do Ciclo</label>
-                <input
-                  type="date"
-                  id="data-inicio"
-                  class="input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
-                />
-              </div>
-              <div class="lg:col-span-4">
-                <label class="field-label">Fim do Ciclo</label>
-                <input
-                  type="date"
-                  id="data-fim"
-                  class="input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
-                />
-              </div>
-              <div class="lg:col-span-4">
-                <label class="field-label">Tipo de Conta</label>
-                <div class="grid grid-cols-3 gap-2">
-                  <button
-                    id="filter-all"
-                    data-account-filter="all"
-                    class="filter-active px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
-                  >
-                    Todos
-                  </button>
-                  <button
-                    id="filter-credit"
-                    data-account-filter="Crédito"
-                    class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
-                  >
-                    Crédito
-                  </button>
-                  <button
-                    id="filter-debit"
-                    data-account-filter="Conta"
-                    class="px-3 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
-                  >
-                    Conta
-                  </button>
-                </div>
-              </div>
               <div class="lg:col-span-6">
                 <label class="field-label">Categoria</label>
                 <select
@@ -350,35 +318,17 @@
                 <div
                   id="category-pie-chart"
                   class="category-pie-chart"
-                  role="button"
+                  role="img"
                   tabindex="0"
-                  aria-label="Distribuição de gastos por categoria. Clique em uma fatia para filtrar e ver o valor no centro"
+                  aria-label="Distribuição de gastos por categoria. Passe o mouse para ver detalhes no desktop ou toque no gráfico no celular."
                 ></div>
                 <div class="category-pie-center">
                   <p id="category-pie-center-label" class="category-pie-center-label">Total</p>
                   <p id="category-pie-total" class="category-pie-center-value">R$ 0,00</p>
                 </div>
+                <div id="category-pie-tooltip" class="category-pie-tooltip hidden" aria-live="polite"></div>
               </div>
               <div id="category-pie-legend" class="category-pie-legend"></div>
-            </div>
-          </section>
-
-          <section class="dashboard-summary-section p-6 neo-brutalism text-white bg-zinc-900">
-            <div class="dashboard-section-head border-none pb-0">
-              <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">4</span>
-                <h3 class="dashboard-section-title text-white">Gastos do Ciclo</h3>
-              </div>
-            </div>
-            <div class="dashboard-summary-grid">
-              <div>
-                <h2 id="total-fatura-val" class="dashboard-total-value">R$ 0,00</h2>
-                <p id="legenda-ciclo" class="dashboard-cycle-caption"></p>
-              </div>
-              <div class="dashboard-ignored-card bg-white/5 p-4 border border-white/10">
-                <p class="dashboard-ignored-label">Itens Ignorados</p>
-                <p id="valor-ignorado" class="dashboard-ignored-value">R$ 0,00</p>
-              </div>
             </div>
           </section>
 
@@ -386,7 +336,7 @@
             <div class="md:col-span-3 bg-white p-5 neo-brutalism mix-chart-panel">
               <div class="dashboard-section-head">
                 <div class="dashboard-section-title-wrap">
-                  <span class="dashboard-step-badge">5</span>
+                  <span class="dashboard-step-badge">4</span>
                   <h3 class="dashboard-section-title">Mix de Gastos</h3>
                 </div>
               </div>
@@ -454,7 +404,7 @@
             <div id="ai-consultant-panel" class="bg-white p-5 neo-brutalism space-y-4">
               <div class="dashboard-section-head">
                 <div class="dashboard-section-title-wrap">
-                  <span class="dashboard-step-badge">6</span>
+                  <span class="dashboard-step-badge">5</span>
                   <h3 class="dashboard-section-title">Consultor IA</h3>
                 </div>
                 <span id="ai-consultant-status" class="text-xs font-black uppercase text-zinc-500">Aguardando análise</span>
@@ -469,7 +419,7 @@
           <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="open-finance-section">
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">7</span>
+                <span class="dashboard-step-badge">6</span>
                 <h3 class="dashboard-section-title">Open Finance</h3>
               </div>
               <button id="btn-open-finance-refresh" class="px-3 py-2 border-2 border-black font-black text-[10px] uppercase bg-white">
@@ -491,24 +441,10 @@
           <section class="dashboard-section bg-white p-5 neo-brutalism space-y-4" id="ritmo-do-mes-section">
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">8</span>
+                <span class="dashboard-step-badge">7</span>
                 <h3 class="dashboard-section-title">Ritmo do Mês</h3>
               </div>
               <p id="ritmo-status-pill" class="text-[11px] font-black uppercase px-2 py-1 border-2 border-black bg-emerald-100">Verde</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-bold">
-              <div class="border-2 border-black p-3 bg-zinc-50">
-                <p>Orçamento mensal</p>
-                <p id="ritmo-budget" class="text-sm font-black">R$ 0,00</p>
-              </div>
-              <div class="border-2 border-black p-3 bg-zinc-50">
-                <p>Gasto realizado</p>
-                <p id="ritmo-realized" class="text-sm font-black">R$ 0,00</p>
-              </div>
-              <div class="border-2 border-black p-3 bg-zinc-50">
-                <p>Esperado até hoje</p>
-                <p id="ritmo-expected" class="text-sm font-black">R$ 0,00</p>
-              </div>
             </div>
             <p id="ritmo-recommendation" class="text-sm font-black text-zinc-700">Para fechar no alvo, reduza R$ 0,00 em 0 dias.</p>
             <div id="ritmo-legend" class="dashboard-legend-row"></div>
@@ -519,7 +455,7 @@
           <section id="transactions-section" class="dashboard-section transactions-section bg-white p-4 neo-brutalism space-y-5">
             <div class="dashboard-section-head px-2 py-3 mb-2">
               <div class="dashboard-section-title-wrap">
-                <span class="dashboard-step-badge">9</span>
+                <span class="dashboard-step-badge">8</span>
                 <h3 class="dashboard-section-title">Lançamentos Detalhados</h3>
                 <button
                   type="button"
@@ -530,15 +466,21 @@
                   ?
                 </button>
               </div>
-              <div class="flex items-center gap-2">
-                <button
-                  id="btn-add-transaction"
-                  class="w-9 h-9 border-2 border-black bg-yellow-300 font-black text-lg leading-none neo-brutalism"
-                  title="Adicionar transação"
-                >
-                  +
-                </button>
-                <span id="contador-itens" class="text-xs font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
+              <div class="transactions-header-meta">
+                <div class="flex items-center gap-2">
+                  <button
+                    id="btn-add-transaction"
+                    class="w-9 h-9 border-2 border-black bg-yellow-300 font-black text-lg leading-none neo-brutalism"
+                    title="Adicionar transação"
+                  >
+                    +
+                  </button>
+                  <span id="contador-itens" class="text-xs font-black bg-black text-white px-3 py-1 uppercase italic">0 ITENS</span>
+                </div>
+                <p class="transactions-ignored-chip">
+                  Itens ignorados:
+                  <strong id="valor-ignorado">R$ 0,00</strong>
+                </p>
               </div>
             </div>
 

@@ -112,13 +112,21 @@ class DashboardViewRenderEngagementMethods {
     this.ritmoStatusPill.classList.add(riskClassMap[riskLevel] || 'bg-emerald-100');
     this.ritmoStatusPill.innerText = riskLabelMap[riskLevel] || 'Verde';
 
-    this.ritmoBudgetValue.innerText = formatCurrencyBRL(Number(ritmoState?.monthlyBudget || 0));
-    this.ritmoRealizedValue.innerText = formatCurrencyBRL(Number(ritmoState?.realized || 0));
-    this.ritmoExpectedValue.innerText = formatCurrencyBRL(Number(ritmoState?.expectedUntilToday || 0));
+    if (this.ritmoBudgetValue) {
+      this.ritmoBudgetValue.innerText = formatCurrencyBRL(Number(ritmoState?.monthlyBudget || 0));
+    }
+    if (this.ritmoRealizedValue) {
+      this.ritmoRealizedValue.innerText = formatCurrencyBRL(Number(ritmoState?.realized || 0));
+    }
+    if (this.ritmoExpectedValue) {
+      this.ritmoExpectedValue.innerText = formatCurrencyBRL(Number(ritmoState?.expectedUntilToday || 0));
+    }
 
     const recommendationGap = Number(ritmoState?.recommendationGap || 0);
     const daysRemaining = Number(ritmoState?.daysRemaining || 0);
-    this.ritmoRecommendation.innerText = `Para fechar no alvo, reduza ${formatCurrencyBRL(recommendationGap)} em ${daysRemaining} dias.`;
+    if (this.ritmoRecommendation) {
+      this.ritmoRecommendation.innerText = `Para fechar no alvo, reduza ${formatCurrencyBRL(recommendationGap)} em ${daysRemaining} dias.`;
+    }
 
     const daily = ritmoState?.daily || {};
     const days = Array.isArray(daily.days) ? daily.days : [];
@@ -176,12 +184,16 @@ class DashboardViewRenderEngagementMethods {
     if (days.length === 0 || series.length === 0) {
       this.ritmoLegend.innerHTML = '<span class="text-[10px] font-black uppercase text-zinc-400">Sem dados diários para o período.</span>';
       this.ritmoDailyChart.innerHTML = '<p class="text-[10px] font-bold text-zinc-400">Sem dias com transação.</p>';
-      this.ritmoDailyTooltip.innerHTML = '';
+      if (this.ritmoDailyTooltip) {
+        this.ritmoDailyTooltip.innerHTML = '';
+      }
       return;
     }
 
-    this.ritmoDailyTooltip.innerHTML =
-      '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
+    if (this.ritmoDailyTooltip) {
+      this.ritmoDailyTooltip.innerHTML =
+        '<p class="text-[10px] font-bold text-zinc-500">Passe o mouse em um dia para ver o detalhamento por categoria.</p>';
+    }
 
     const categories = series.map((item) => String(item.category || '').trim()).filter(Boolean);
     const selectedCategory = String(ritmoState?.selectedCategory || 'all').trim();
@@ -242,7 +254,9 @@ class DashboardViewRenderEngagementMethods {
         button.addEventListener('mouseenter', () => {
           const day = button.dataset.day;
           const detail = (daily.details || []).find((item) => item.day === day);
-          this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          if (this.ritmoDailyTooltip) {
+            this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          }
         });
 
         button.addEventListener('click', () => {
@@ -252,7 +266,9 @@ class DashboardViewRenderEngagementMethods {
           }
 
           const detail = (daily.details || []).find((item) => item.day === day);
-          this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          if (this.ritmoDailyTooltip) {
+            this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail);
+          }
 
           this.handlers?.onFiltersChange?.({
             startDate: day,

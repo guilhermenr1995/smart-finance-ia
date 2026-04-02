@@ -68,6 +68,7 @@ export class DashboardView {
     this.categoryPieCenterLabel = document.getElementById('category-pie-center-label');
     this.categoryPieTotal = document.getElementById('category-pie-total');
     this.categoryPieLegend = document.getElementById('category-pie-legend');
+    this.categoryPieTooltip = document.getElementById('category-pie-tooltip');
 
     this.chartBars = document.getElementById('chart-bars');
     this.statsList = document.getElementById('stats-list');

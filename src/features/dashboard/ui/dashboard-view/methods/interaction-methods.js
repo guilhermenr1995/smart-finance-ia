@@ -15,7 +15,6 @@ class DashboardViewInteractionMethods {
 
     const defaultOpenSections = new Set([
       'importacao-section',
-      'filtros-section',
       'category-pie-section',
       'transactions-section'
     ]);
@@ -65,9 +64,10 @@ class DashboardViewInteractionMethods {
 
       trigger.addEventListener('click', () => {
         const isCollapsed = section.classList.contains('is-collapsed');
-        section.classList.toggle('is-collapsed', !isCollapsed);
-        contentElement.hidden = isCollapsed;
-        trigger.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+        const nextCollapsed = !isCollapsed;
+        section.classList.toggle('is-collapsed', nextCollapsed);
+        contentElement.hidden = nextCollapsed;
+        trigger.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
       });
     });
   }

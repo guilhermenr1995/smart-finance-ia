@@ -39,7 +39,12 @@ select.edit-mode {
 }
 
 .dashboard-shell {
-  --sf-gap: 16px;
+  --sf-gap: clamp(14px, 1.2vw, 22px);
+}
+
+.dashboard-sections {
+  display: grid;
+  gap: var(--sf-gap);
 }
 
 .dashboard-floating-filters {
@@ -48,9 +53,9 @@ select.edit-mode {
   z-index: 35;
   background: linear-gradient(160deg, #fff7cc 0%, #fde68a 100%);
   padding: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.4fr) minmax(260px, 1.2fr);
+  align-items: end;
   gap: 12px;
 }
 
@@ -79,11 +84,42 @@ select.edit-mode {
   display: grid;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
   gap: 6px;
-  width: min(100%, 360px);
+  width: 100%;
+}
+
+.dashboard-floating-period {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-floating-period-field {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-floating-period-label {
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #3f3f46;
+}
+
+.dashboard-floating-date-input {
+  width: 100%;
+  min-height: 38px;
+  border: 2px solid #111827;
+  background: #ffffff;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #111827;
 }
 
 .dashboard-accordion-section {
   position: relative;
+  width: 100%;
 }
 
 .dashboard-accordion-trigger {
@@ -98,6 +134,13 @@ select.edit-mode {
   color: #111827;
   box-shadow: 2px 2px 0 #111827;
   text-align: left;
+  cursor: pointer;
+  transition: background-color 0.16s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dashboard-accordion-trigger:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #111827;
 }
 
 .dashboard-accordion-trigger-main {
@@ -130,7 +173,8 @@ select.edit-mode {
 }
 
 .dashboard-accordion-content {
-  margin-top: 10px;
+  margin-top: 12px;
+  width: 100%;
 }
 
 .dashboard-accordion-section.is-collapsed .dashboard-accordion-trigger {
@@ -149,7 +193,7 @@ select.edit-mode {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 14px;
+  gap: clamp(12px, 1.2vw, 20px);
 }
 
 .dashboard-header-main {
@@ -191,16 +235,24 @@ select.edit-mode {
 }
 
 .dashboard-section {
-  padding-top: 18px;
-  padding-bottom: 18px;
+  padding-top: clamp(16px, 1.25vw, 24px);
+  padding-bottom: clamp(16px, 1.25vw, 24px);
+}
+
+@media (min-width: 1280px) {
+  .dashboard-shell {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
 }
 
 .dashboard-section-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
   border-bottom: 2px solid #111827;
 }
 
@@ -226,13 +278,13 @@ select.edit-mode {
 }
 
 .dashboard-section-title {
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-style: italic;
   color: #111827;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .dashboard-section-subtitle {
@@ -241,6 +293,7 @@ select.edit-mode {
   color: #52525b;
   text-align: right;
   max-width: 35ch;
+  line-height: 1.45;
 }
 
 .dashboard-helper-text {
@@ -322,8 +375,8 @@ select.edit-mode {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 14px;
   font-size: 0.73rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -331,13 +384,13 @@ select.edit-mode {
 }
 
 .mix-chart-panel .dashboard-section-head {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .mix-chart-legend {
-  margin-top: 4px;
-  margin-bottom: 14px;
-  padding-top: 10px;
+  margin-top: 2px;
+  margin-bottom: 16px;
+  padding-top: 12px;
   border-top: 1px dashed #cbd5e1;
 }
 
@@ -352,6 +405,7 @@ select.edit-mode {
   background: linear-gradient(160deg, #fffef7 0%, #fef3c7 100%);
   border-width: 3px;
   box-shadow: 6px 6px 0 #111827;
+  padding-bottom: 20px;
 }
 
 .dashboard-pie-highlight::after {
@@ -365,7 +419,7 @@ select.edit-mode {
 .category-pie-layout {
   display: grid;
   grid-template-columns: minmax(220px, 320px) 1fr;
-  gap: 18px;
+  gap: 22px;
   align-items: center;
 }
 
@@ -383,7 +437,7 @@ select.edit-mode {
   border-radius: 999px;
   background: conic-gradient(#e4e4e7 0deg 360deg);
   box-shadow: 3px 3px 0 #111827;
-  cursor: pointer;
+  cursor: crosshair;
   transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
@@ -438,9 +492,40 @@ select.edit-mode {
   color: #92400e;
 }
 
+.category-pie-tooltip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  min-width: 140px;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 2px solid #111827;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 2px 2px 0 #111827;
+  pointer-events: none;
+}
+
+.category-pie-tooltip-label {
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: #fde68a;
+}
+
+.category-pie-tooltip-value {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
 .category-pie-legend {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   align-content: center;
 }
 
@@ -470,6 +555,11 @@ select.edit-mode {
 .category-pie-legend-item.is-static {
   opacity: 0.92;
   cursor: default;
+}
+
+.category-pie-legend-item.is-static:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .category-pie-legend-dot {
@@ -518,6 +608,8 @@ select.edit-mode {
 
 #ritmo-do-mes-section {
   background: linear-gradient(170deg, #ffffff 0%, #f8fafc 100%);
+  display: grid;
+  gap: 14px;
 }
 
 #ritmo-status-pill {
@@ -525,8 +617,20 @@ select.edit-mode {
   text-align: center;
 }
 
+#ritmo-recommendation {
+  margin: 0;
+  border: 2px solid #111827;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+#ritmo-legend {
+  margin-top: 0;
+}
+
 #ritmo-daily-chart {
-  min-height: 206px;
+  min-height: 216px;
+  padding: 12px 12px 8px;
 }
 
 .ritmo-day-column {
@@ -539,7 +643,33 @@ select.edit-mode {
 }
 
 #ritmo-daily-tooltip {
-  min-height: 18px;
+  min-height: 24px;
+  border: 1px solid #d4d4d8;
+  background: #ffffff;
+  padding: 6px 8px;
+}
+
+.transactions-header-meta {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.transactions-ignored-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #3f3f46;
+  border: 1px solid #111827;
+  background: #fef9c3;
+  padding: 4px 8px;
+}
+
+.transactions-ignored-chip strong {
+  color: #111827;
 }
 
 .mix-goal-bar {
@@ -698,9 +828,11 @@ select.edit-mode {
 }
 
 .search-panel {
-  margin-top: 2px;
+  margin-top: 4px;
   border-color: #111827;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 16px;
+  gap: 16px;
 }
 
 .search-panel-heading {
@@ -2228,6 +2360,10 @@ select.edit-mode {
     padding-right: 12px !important;
   }
 
+  .dashboard-sections {
+    gap: 12px;
+  }
+
   .dashboard-header {
     gap: 12px;
   }
@@ -2241,13 +2377,23 @@ select.edit-mode {
   .dashboard-floating-filters {
     top: 6px;
     padding: 10px;
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: stretch;
     gap: 8px;
   }
 
   .dashboard-floating-total {
     text-align: center;
+  }
+
+  .dashboard-floating-period {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .dashboard-floating-date-input {
+    min-height: 36px;
+    font-size: 0.68rem;
   }
 
   .dashboard-floating-account-filters {
@@ -2276,6 +2422,7 @@ select.edit-mode {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+    margin-bottom: 10px;
   }
 
   .dashboard-section-subtitle {
@@ -2332,8 +2479,25 @@ select.edit-mode {
     width: min(100%, 280px);
   }
 
+  .category-pie-chart {
+    cursor: pointer;
+  }
+
   .category-pie-center-value {
     font-size: 0.84rem;
+  }
+
+  .category-pie-tooltip {
+    max-width: 210px;
+    padding: 7px 9px;
+  }
+
+  .category-pie-tooltip-label {
+    font-size: 0.6rem;
+  }
+
+  .category-pie-tooltip-value {
+    font-size: 0.76rem;
   }
 
   .goals-panel {
@@ -2364,6 +2528,17 @@ select.edit-mode {
   .search-panel {
     padding: 14px;
     gap: 14px;
+  }
+
+  .transactions-header-meta {
+    width: 100%;
+    justify-items: start;
+    gap: 6px;
+  }
+
+  .transactions-ignored-chip {
+    font-size: 0.66rem;
+    padding: 4px 6px;
   }
 
   .search-panel-heading {
