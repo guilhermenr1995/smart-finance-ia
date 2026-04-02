@@ -1,5 +1,6 @@
 import { shiftInputDateByMonths } from '../../../utils/date-utils.js';
-import { buildDeterministicInsights, roundCurrency } from './ai-flow-helpers.js';
+import { getDisplayCategory } from '../../../utils/transaction-utils.js';
+import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
 export async function syncCategoriesWithAi(app) {
   if (!app.state.user) {

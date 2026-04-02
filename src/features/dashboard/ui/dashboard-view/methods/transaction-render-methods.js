@@ -65,27 +65,18 @@ class DashboardViewTransactionRenderMethods {
       const currentWidth = (currentValue / maxValue) * 100;
       const previousWidth = (previousValue / maxValue) * 100;
       const targetWidth = (targetValue / maxValue) * 100;
-      const variation = currentValue - previousValue;
-      const variationPrefix = variation > 0 ? '+' : '';
-      const variationClassName =
-        variation > 0
-          ? 'mix-variation-badge is-up'
-          : variation < 0
-            ? 'mix-variation-badge is-down'
-            : 'mix-variation-badge is-stable';
       const targetMarker = targetValue > 0 ? `<div class="mix-goal-marker" style="left: ${targetWidth}%"></div>` : '';
 
       return `
         <article class="mix-horizontal-row">
           <div class="mix-horizontal-row-head">
             <p class="mix-horizontal-category" title="${escapeHtml(category)}">${escapeHtml(category)}</p>
-            <p class="mix-horizontal-current">${formatCurrencyBRL(currentValue)}</p>
+            <p class="mix-horizontal-current" title="Total gasto na categoria no período filtrado">Total atual: ${formatCurrencyBRL(currentValue)}</p>
           </div>
           <div class="mix-horizontal-tags">
-            <span class="mix-mini-tag current">Atual: ${formatCompactCurrency(currentValue)}</span>
-            <span class="mix-mini-tag previous">Anterior: ${formatCompactCurrency(previousValue)}</span>
-            <span class="mix-mini-tag target">Meta: ${formatCompactCurrency(targetValue)}</span>
-            <span class="${variationClassName}">${variationPrefix}${formatCompactCurrency(variation)}</span>
+            <span class="mix-mini-tag current" title="Total gasto na categoria dentro do período filtrado">Atual: ${formatCompactCurrency(currentValue)}</span>
+            <span class="mix-mini-tag previous" title="Total da mesma categoria no período anterior equivalente">Anterior: ${formatCompactCurrency(previousValue)}</span>
+            <span class="mix-mini-tag target" title="Meta definida para a categoria no período">Meta: ${formatCompactCurrency(targetValue)}</span>
           </div>
           <div class="mix-horizontal-track-stack">
             <div class="mix-horizontal-track-row">

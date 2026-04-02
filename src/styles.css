@@ -494,7 +494,7 @@ select.edit-mode {
 .mix-goals-list {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 100%;
+  max-height: 520px;
   overflow-y: auto;
 }
 
@@ -556,6 +556,7 @@ select.edit-mode {
   color: #111827;
   margin: 0;
   flex-shrink: 0;
+  text-align: right;
 }
 
 .mix-horizontal-tags {
@@ -564,8 +565,7 @@ select.edit-mode {
   gap: 6px;
 }
 
-.mix-mini-tag,
-.mix-variation-badge {
+.mix-mini-tag {
   border: 1px solid #111827;
   padding: 2px 6px;
   font-size: 0.62rem;
@@ -588,21 +588,6 @@ select.edit-mode {
 .mix-mini-tag.target {
   background: #fee2e2;
   color: #7f1d1d;
-}
-
-.mix-variation-badge.is-up {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.mix-variation-badge.is-down {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.mix-variation-badge.is-stable {
-  background: #f4f4f5;
-  color: #3f3f46;
 }
 
 .mix-horizontal-track-stack {
@@ -2900,6 +2885,7 @@ select.edit-mode {
 
   .mix-goals-list {
     min-height: 180px;
+    max-height: 440px;
   }
 
   .mix-chart-legend {

@@ -14,6 +14,7 @@ import {
   resolveAdminDashboardUrl,
   resolveMaintenanceDedupUrl,
   resolveMaintenanceResetUrl,
+  sumSeriesByKey,
   toNumber
 } from '../shared.js';
 import { applyClassMethods } from './register-methods.js';

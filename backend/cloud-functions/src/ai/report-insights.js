@@ -1,7 +1,9 @@
 const {
+  toFiniteNumber,
   toCurrency,
   toPercent
 } = require('../core/domain-utils');
+const { uniqueNonEmpty } = require('../core/base');
 const {
   formatCurrencyBRL,
   calculateGrowthPercent,
@@ -9,6 +11,7 @@ const {
 } = require('./report-normalization');
 const {
   buildCategoryTransactionDrivers,
+  buildDefaultCategoryInsight,
   buildDefaultDeltaInsight,
   mergeNarrativeWithDeterministic
 } = require('./report-insights-support');
