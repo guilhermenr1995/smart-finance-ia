@@ -3,6 +3,7 @@ import {
   buildManualCategoryMetadata,
   buildPlatformCategorySource,
   generateTransactionDedupKey,
+  generateTransactionDedupKeyVariants,
   generateTransactionHash,
   getInstallmentGroupKey,
   getInstallmentInfo,
@@ -41,6 +42,10 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
       const transactionHash = String(transaction?.hash || '').trim();
       const transactionDedupKey =
         String(transaction?.dedupKey || '').trim() || generateTransactionDedupKey(transaction || {});
+      const transactionDedupVariants = generateTransactionDedupKeyVariants(transaction || {}, {
+        includeCurrentDay: true,
+        includePreviousDay: true
+      });
 
       if (transactionHash) {
         existingHashes.add(transactionHash);
@@ -49,6 +54,12 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
       if (transactionDedupKey) {
         existingHashes.add(transactionDedupKey);
       }
+
+      transactionDedupVariants.forEach((dedupVariant) => {
+        if (dedupVariant) {
+          existingHashes.add(dedupVariant);
+        }
+      });
     });
     const parseResult = await app.csvImportService.parseFileContent(file.name, fileContent, accountType, existingHashes);
     const diagnostics = parseResult?.diagnostics || {};
@@ -89,7 +100,7 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
         } else if (totalRows > 0 && skippedIgnoredRows === totalRows) {
           app.overlayView.log('Dica: os lançamentos foram lidos como receitas/estornos e foram descartados pelas regras.');
         } else if (totalRows > 0 && skippedDuplicateRows === totalRows) {
-          app.overlayView.log('Dica: todos os itens já existem na base (mesma descrição, data e valor).');
+          app.overlayView.log('Dica: todos os itens já existem na base (mesma descrição, valor e data/dia anterior).');
         }
       }
       setTimeout(() => app.overlayView.hide(), 1000);
@@ -172,4 +183,3 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
     app.dashboardView.setBusy(false);
   }
 }
-

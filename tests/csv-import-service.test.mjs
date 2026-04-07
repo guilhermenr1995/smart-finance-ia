@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CsvImportService } from '../src/services/csv-import-service.js';
+import { generateTransactionDedupKeyVariants } from '../src/utils/transaction-utils.js';
 
 const service = new CsvImportService();
 
@@ -55,6 +56,42 @@ test('keeps existing dedup behavior for repeated rows', () => {
 
   const result = service.parseCsvContent(csv, 'Conta', new Set());
   assert.equal(result.transactions.length, 1);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.diagnostics.skippedDuplicateRows, 1);
+});
+
+test('deduplicates same description and value when date differs by one day, keeping the newest date in file', () => {
+  const csv = [
+    'Data;Descrição;Valor',
+    '21/03/2026;Compra mercado;100,00-',
+    '22/03/2026;Compra mercado;100,00-'
+  ].join('\n');
+
+  const result = service.parseCsvContent(csv, 'Conta', new Set());
+  assert.equal(result.transactions.length, 1);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.diagnostics.skippedDuplicateRows, 1);
+  assert.equal(result.transactions[0].date, '2026-03-22');
+});
+
+test('marks as duplicate when transaction already exists on previous day', () => {
+  const existingHashes = new Set(
+    generateTransactionDedupKeyVariants(
+      {
+        date: '2026-03-21',
+        title: 'Compra mercado',
+        value: 100
+      },
+      {
+        includeCurrentDay: true,
+        includePreviousDay: true
+      }
+    )
+  );
+  const csv = ['Data;Descrição;Valor', '22/03/2026;Compra mercado;100,00-'].join('\n');
+
+  const result = service.parseCsvContent(csv, 'Conta', existingHashes);
+  assert.equal(result.transactions.length, 0);
   assert.equal(result.skipped, 1);
   assert.equal(result.diagnostics.skippedDuplicateRows, 1);
 });

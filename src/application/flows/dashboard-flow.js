@@ -130,7 +130,7 @@ export function refreshDashboard(app) {
   const previousVisibleTransactions = app.queryService.getVisibleTransactions(app.state.transactions, previousBounds);
   const previousSummary = app.queryService.buildSummary(previousVisibleTransactions);
 
-  const referenceMonthKey = getMonthKeyFromDate(app.state.filters.endDate || app.state.filters.startDate);
+  const referenceMonthKey = getMonthKeyFromDate(app.state.filters.startDate || app.state.filters.endDate);
   const referenceMonth = getMonthBounds(referenceMonthKey);
   const referenceMonthStartDate = referenceMonth.startDateInput;
   const referenceMonthEndDate = referenceMonth.endDateInput;

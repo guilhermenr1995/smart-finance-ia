@@ -9,7 +9,7 @@ export function normalizeTitleForMatching(value) {
     .trim();
 }
 
-function normalizeTransactionDateKey(value) {
+export function normalizeTransactionDateKey(value) {
   const raw = String(value || '').trim();
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) {
@@ -27,12 +27,76 @@ function normalizeTransactionDateKey(value) {
   return raw;
 }
 
+export function shiftTransactionDateKey(value, deltaDays = 0) {
+  const normalized = normalizeTransactionDateKey(value);
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!isoMatch) {
+    return '';
+  }
+
+  const shift = Number.parseInt(deltaDays, 10);
+  if (Number.isNaN(shift) || shift === 0) {
+    return normalized;
+  }
+
+  const parsed = parseDateFlexible(normalized);
+  if (!(parsed instanceof Date) || Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  parsed.setDate(parsed.getDate() + shift);
+  const year = String(parsed.getFullYear()).padStart(4, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function generateTransactionDedupKey({ date, title, value }) {
   const dateKey = normalizeTransactionDateKey(date);
   const titleKey = getTransactionTitleMatchKey(title);
   const numericValue = Math.abs(Number(value || 0));
   const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
   return `${dateKey}|${titleKey}|${valueKey}`;
+}
+
+export function generateTransactionDedupKeyVariants(
+  transaction = {},
+  { includeCurrentDay = true, includePreviousDay = false, includeNextDay = false } = {}
+) {
+  const dedupKeys = [];
+  const seen = new Set();
+
+  const pushDateKey = (dateKey) => {
+    if (!dateKey) {
+      return;
+    }
+
+    const dedupKey = generateTransactionDedupKey({
+      date: dateKey,
+      title: transaction?.title,
+      value: transaction?.value
+    });
+
+    if (!seen.has(dedupKey)) {
+      seen.add(dedupKey);
+      dedupKeys.push(dedupKey);
+    }
+  };
+
+  const baseDateKey = normalizeTransactionDateKey(transaction?.date);
+  if (includeCurrentDay) {
+    pushDateKey(baseDateKey);
+  }
+
+  if (includePreviousDay) {
+    pushDateKey(shiftTransactionDateKey(baseDateKey, -1));
+  }
+
+  if (includeNextDay) {
+    pushDateKey(shiftTransactionDateKey(baseDateKey, 1));
+  }
+
+  return dedupKeys;
 }
 
 function parseSearchAmount(rawValue) {

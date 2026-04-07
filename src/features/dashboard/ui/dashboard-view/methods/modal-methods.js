@@ -123,7 +123,7 @@ class DashboardViewModalMethods {
       return;
     }
 
-    const monthKey = getMonthKeyFromDate(this.endDateInput?.value || this.startDateInput?.value || new Date());
+    const monthKey = getMonthKeyFromDate(this.startDateInput?.value || this.endDateInput?.value || new Date());
     const monthBounds = getMonthBounds(monthKey);
     const normalizedGoal = goal || {};
 

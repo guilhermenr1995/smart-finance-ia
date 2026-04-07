@@ -45,7 +45,7 @@ function resolveReferenceMonthKey(app) {
   const dashboardStartDate = String(app?.dashboardView?.startDateInput?.value || '').trim();
   const filtersEndDate = String(app?.state?.filters?.endDate || '').trim();
   const filtersStartDate = String(app?.state?.filters?.startDate || '').trim();
-  return getMonthKeyFromDate(dashboardEndDate || dashboardStartDate || filtersEndDate || filtersStartDate || new Date());
+  return getMonthKeyFromDate(dashboardStartDate || dashboardEndDate || filtersStartDate || filtersEndDate || new Date());
 }
 function resolveGoalScope(app, preferredScope = '') {
   return normalizeGoalScope(preferredScope || app?.state?.filters?.accountType || 'all');

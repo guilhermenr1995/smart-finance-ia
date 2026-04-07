@@ -1,5 +1,6 @@
 import {
   generateTransactionDedupKey,
+  generateTransactionDedupKeyVariants,
   generateTransactionHash,
   getInstallmentGroupKey,
   getInstallmentInfo,
@@ -70,6 +71,7 @@ export {
   buildManualCategoryMetadata,
   buildPlatformCategorySource,
   generateTransactionDedupKey,
+  generateTransactionDedupKeyVariants,
   generateTransactionHash,
   getInstallmentGroupKey,
   getInstallmentInfo,

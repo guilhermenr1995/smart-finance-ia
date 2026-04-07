@@ -1,12 +1,11 @@
 import {
   DEFAULT_BANK_ACCOUNT,
+  deduplicateImportedTransactions,
   detectBaseCategory,
   detectCsvDelimiter,
   extractOfxTagValue,
   extractPdfAmountTokens,
   findHeaderIndex,
-  generateTransactionDedupKey,
-  generateTransactionHash,
   isIgnoredCreditEntry,
   isIncomeOrIgnoredStatement,
   normalizeForPdfMatching,
@@ -71,14 +70,14 @@ class CsvImportServiceFileParseMethods {
 
     const delimiter = detectCsvDelimiter(lines);
     const headerColumns = parseCsvLine(lines[0], delimiter).map((cell) => cell.replace(/^"|"$/g, '').trim());
-    const header = normalizeCsvHeader(headerColumns.join(' '));
+    const header = headerColumns.map((cell) => normalizeHeaderCell(cell)).join(' ');
     const forceCheckingByAccountType = String(accountType || '').trim() !== 'Crédito';
     const isCheckingAccountStatement =
       forceCheckingByAccountType ||
       header.includes('identificador') ||
       /\b(saldo|debito|débito|credito|crédito|conta corrente|movimentacao|movimentação)\b/i.test(header);
     const csvLayout = this.resolveCsvLayout(headerColumns, isCheckingAccountStatement);
-    const transactions = [];
+    const parsedCandidates = [];
     let skipped = 0;
     let skippedInvalidRows = 0;
     let skippedIgnoredRows = 0;
@@ -116,23 +115,16 @@ class CsvImportServiceFileParseMethods {
         continue;
       }
 
-      const hash = generateTransactionHash(parsed);
-      const dedupKey = generateTransactionDedupKey(parsed);
-      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
-        skipped += 1;
-        skippedDuplicateRows += 1;
-        continue;
-      }
-
-      existingHashes.add(hash);
-      existingHashes.add(dedupKey);
-      transactions.push({
+      parsedCandidates.push({
         ...parsed,
-        dedupKey,
-        hash,
-        active: true
+        originalIndex: lineIndex
       });
     }
+
+    const dedupResult = deduplicateImportedTransactions(parsedCandidates, existingHashes);
+    const transactions = dedupResult.transactions;
+    skipped += dedupResult.skippedDuplicateRows;
+    skippedDuplicateRows += dedupResult.skippedDuplicateRows;
 
     return {
       transactions,
@@ -178,13 +170,13 @@ class CsvImportServiceFileParseMethods {
       };
     }
 
-    const transactions = [];
+    const parsedCandidates = [];
     let skipped = 0;
     let skippedInvalidRows = 0;
     let skippedIgnoredRows = 0;
     let skippedDuplicateRows = 0;
 
-    blocks.forEach((block) => {
+    blocks.forEach((block, blockIndex) => {
       const date = parseOfxDate(extractOfxTagValue(block, 'DTPOSTED'));
       const value = parseOfxAmount(extractOfxTagValue(block, 'TRNAMT'));
       const memo = extractOfxTagValue(block, 'MEMO');
@@ -217,23 +209,16 @@ class CsvImportServiceFileParseMethods {
         bankAccount: DEFAULT_BANK_ACCOUNT
       };
 
-      const hash = generateTransactionHash(parsed);
-      const dedupKey = generateTransactionDedupKey(parsed);
-      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
-        skipped += 1;
-        skippedDuplicateRows += 1;
-        return;
-      }
-
-      existingHashes.add(hash);
-      existingHashes.add(dedupKey);
-      transactions.push({
+      parsedCandidates.push({
         ...parsed,
-        dedupKey,
-        hash,
-        active: true
+        originalIndex: blockIndex
       });
     });
+
+    const dedupResult = deduplicateImportedTransactions(parsedCandidates, existingHashes);
+    const transactions = dedupResult.transactions;
+    skipped += dedupResult.skippedDuplicateRows;
+    skippedDuplicateRows += dedupResult.skippedDuplicateRows;
 
     return {
       transactions,

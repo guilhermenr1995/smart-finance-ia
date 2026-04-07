@@ -2,6 +2,7 @@ import { detectCsvDelimiter, parseCsvLine, parseLocaleNumber, splitCsvLines, nor
 import {
   detectBaseCategory,
   generateTransactionDedupKey,
+  generateTransactionDedupKeyVariants,
   generateTransactionHash,
   isIgnoredCreditEntry,
   isIncomeOrIgnoredStatement
@@ -180,15 +181,82 @@ function extractPdfAmountTokens(line) {
   return String(line || '').match(/(?:R\$\s*)?[-+]?\d+\.\d{2}-?/g) || [];
 }
 
+function getCandidateTransactionDateKey(candidate = {}) {
+  return normalizeImportedDate(candidate?.date);
+}
+
+function deduplicateImportedTransactions(candidates = [], existingHashes = new Set()) {
+  const orderedCandidates = [...(Array.isArray(candidates) ? candidates : [])].sort((left, right) => {
+    const rightDate = getCandidateTransactionDateKey(right);
+    const leftDate = getCandidateTransactionDateKey(left);
+    if (rightDate !== leftDate) {
+      return rightDate.localeCompare(leftDate);
+    }
+
+    const leftIndex = Number.isFinite(left?.originalIndex) ? left.originalIndex : 0;
+    const rightIndex = Number.isFinite(right?.originalIndex) ? right.originalIndex : 0;
+    return leftIndex - rightIndex;
+  });
+
+  const acceptedCandidates = [];
+  let skippedDuplicateRows = 0;
+
+  orderedCandidates.forEach((candidate) => {
+    const parsed = { ...candidate };
+    const originalIndex = Number.isFinite(parsed.originalIndex) ? parsed.originalIndex : 0;
+    delete parsed.originalIndex;
+
+    const hash = generateTransactionHash(parsed);
+    const dedupKey = generateTransactionDedupKey(parsed);
+    const dedupMatchKeys = generateTransactionDedupKeyVariants(parsed, {
+      includeCurrentDay: true,
+      includePreviousDay: true
+    });
+
+    const duplicateByHash = existingHashes.has(hash);
+    const duplicateByDedup = dedupMatchKeys.some((key) => existingHashes.has(key));
+    if (duplicateByHash || duplicateByDedup) {
+      skippedDuplicateRows += 1;
+      return;
+    }
+
+    existingHashes.add(hash);
+    dedupMatchKeys.forEach((key) => existingHashes.add(key));
+
+    acceptedCandidates.push({
+      ...parsed,
+      dedupKey,
+      hash,
+      active: true,
+      originalIndex
+    });
+  });
+
+  const transactions = acceptedCandidates
+    .sort((left, right) => left.originalIndex - right.originalIndex)
+    .map((candidate) => {
+      const normalized = { ...candidate };
+      delete normalized.originalIndex;
+      return normalized;
+    });
+
+  return {
+    transactions,
+    skippedDuplicateRows
+  };
+}
+
 
 export {
   DEFAULT_BANK_ACCOUNT,
+  deduplicateImportedTransactions,
   detectBaseCategory,
   detectCsvDelimiter,
   extractOfxTagValue,
   extractPdfAmountTokens,
   findHeaderIndex,
   generateTransactionDedupKey,
+  generateTransactionDedupKeyVariants,
   generateTransactionHash,
   isIgnoredCreditEntry,
   isIncomeOrIgnoredStatement,

@@ -1,12 +1,11 @@
 import {
   DEFAULT_BANK_ACCOUNT,
+  deduplicateImportedTransactions,
   detectBaseCategory,
   detectCsvDelimiter,
   extractOfxTagValue,
   extractPdfAmountTokens,
   findHeaderIndex,
-  generateTransactionDedupKey,
-  generateTransactionHash,
   isIgnoredCreditEntry,
   isIncomeOrIgnoredStatement,
   normalizeForPdfMatching,
@@ -58,7 +57,7 @@ class CsvImportServicePdfMethods {
     }
 
     const inferredYear = this.resolvePdfYear(fileName, allLines);
-    const transactions = [];
+    const parsedCandidates = [];
     let skipped = 0;
     let skippedInvalidRows = 0;
     let skippedIgnoredRows = 0;
@@ -102,23 +101,16 @@ class CsvImportServicePdfMethods {
         bankAccount: DEFAULT_BANK_ACCOUNT
       };
 
-      const hash = generateTransactionHash(parsed);
-      const dedupKey = generateTransactionDedupKey(parsed);
-      if (existingHashes.has(hash) || existingHashes.has(dedupKey)) {
-        skipped += 1;
-        skippedDuplicateRows += 1;
-        continue;
-      }
-
-      existingHashes.add(hash);
-      existingHashes.add(dedupKey);
-      transactions.push({
+      parsedCandidates.push({
         ...parsed,
-        dedupKey,
-        hash,
-        active: true
+        originalIndex: lineIndex
       });
     }
+
+    const dedupResult = deduplicateImportedTransactions(parsedCandidates, existingHashes);
+    const transactions = dedupResult.transactions;
+    skipped += dedupResult.skippedDuplicateRows;
+    skippedDuplicateRows += dedupResult.skippedDuplicateRows;
 
     return {
       transactions,
