@@ -17,6 +17,10 @@ const {
 const {
   requestEmbeddedOpenFinanceUpstream
 } = require('../open-finance/embedded-provider');
+const {
+  hasPluggyDirectCredentials,
+  requestPluggyOpenFinance
+} = require('../open-finance/pluggy-provider');
 
 function getOpenFinanceConnectionsCollection(appId, userId) {
   return db.collection(`artifacts/${appId}/users/${userId}/open_finance_conexoes`);
@@ -53,6 +57,20 @@ function isPlaceholderUpstreamUrl(value) {
   return normalized.includes('your-open-finance-backend.example.com');
 }
 
+function isPluggyDirectModeEnabled() {
+  const mode = String(process.env.OPEN_FINANCE_PLUGGY_DIRECT_MODE || 'auto').trim().toLowerCase();
+  if (mode === 'false' || mode === '0' || mode === 'off' || mode === 'disabled') {
+    return false;
+  }
+
+  if (mode === 'true' || mode === '1' || mode === 'on' || mode === 'enabled' || mode === 'force') {
+    return true;
+  }
+
+  // auto mode: use direct adapter when there is no real upstream URL configured.
+  return !OPEN_FINANCE_UPSTREAM_URL || isPlaceholderUpstreamUrl(OPEN_FINANCE_UPSTREAM_URL);
+}
+
 function shouldUseEmbeddedProviderByConfig() {
   if (!isOpenFinanceFallbackAllowed()) {
     return false;
@@ -86,6 +104,14 @@ function assertOpenFinanceProviderConfigured() {
     throw error;
   }
 
+  if (
+    OPEN_FINANCE_PROVIDER === 'pluggy' &&
+    isPluggyDirectModeEnabled() &&
+    hasPluggyDirectCredentials()
+  ) {
+    return;
+  }
+
   if (!OPEN_FINANCE_UPSTREAM_URL && !isOpenFinanceFallbackAllowed()) {
     const error = new Error(
       'Integração Open Finance real não configurada no backend. Defina OPEN_FINANCE_UPSTREAM_URL e OPEN_FINANCE_PROVIDER no ambiente das functions, ou habilite OPEN_FINANCE_ALLOW_FALLBACK.'
@@ -104,6 +130,14 @@ function assertOpenFinanceProviderConfigured() {
 }
 
 async function requestOpenFinanceUpstream(action, payload = {}, context = {}) {
+  if (
+    OPEN_FINANCE_PROVIDER === 'pluggy' &&
+    isPluggyDirectModeEnabled() &&
+    hasPluggyDirectCredentials()
+  ) {
+    return requestPluggyOpenFinance(action, payload, context);
+  }
+
   assertOpenFinanceProviderConfigured();
 
   if (shouldUseEmbeddedProviderByConfig()) {

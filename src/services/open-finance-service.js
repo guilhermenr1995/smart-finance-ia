@@ -42,8 +42,12 @@ export class OpenFinanceService {
     return this.request('list-connections', { appId });
   }
 
-  async connectBank(appId, bankCode) {
-    return this.request('connect-bank', { appId, bankCode });
+  async connectBank(appId, bankCode, options = {}) {
+    return this.request('connect-bank', {
+      appId,
+      bankCode,
+      ...(options && typeof options === 'object' ? options : {})
+    });
   }
 
   async syncConnection(appId, connectionId) {

@@ -1,3 +1,18 @@
+<!--
+Sync Impact Report
+- Version change: 1.0.0 → 1.1.0
+- Modified principles:
+  - V. Simplicidade operacional, evolução incremental e qualidade contínua →
+    V. Simplicidade operacional, evolução incremental e qualidade verificável
+- Added sections: Nenhuma
+- Removed sections: Nenhuma
+- Templates requiring updates:
+  - ✅ .specify/templates/plan-template.md
+  - ✅ .specify/templates/spec-template.md
+  - ✅ .specify/templates/tasks-template.md
+- Deferred TODOs: Nenhum
+-->
+
 # Constituição do Projeto Smart Finance IA
 
 ## Princípios Essenciais
@@ -29,12 +44,16 @@ Toda feature com IA deve:
 Mudanças não podem quebrar regras críticas já estabelecidas (deduplicação, parcelas, transferências, escopo de conta/categoria).
 Toda automação deve manter rastreabilidade com metadados e origem das decisões para facilitar auditoria funcional e suporte.
 
-### V. Simplicidade operacional, evolução incremental e qualidade contínua
+### V. Simplicidade operacional, evolução incremental e qualidade verificável
 Preferir mudanças pequenas, testáveis e com impacto claro.
 Cada entrega deve ser observável e reversível, preservando:
 - UX mobile/PWA,
 - performance de dashboard,
 - compatibilidade com arquitetura atual (HTML + JS modular + Firebase).
+Além disso, toda funcionalidade nova MUST explicitar no `plan.md`:
+- arquivos/flows afetados,
+- estratégia de rollback,
+- validações mínimas de regressão por fluxo impactado.
 
 ## Restrições Técnicas e de Plataforma
 
@@ -85,4 +104,4 @@ Cada entrega deve ser observável e reversível, preservando:
 - Toda PR/revisão deve checar conformidade com estes princípios.
 - Em caso de conflito entre rapidez e segurança/integridade de dados, vence segurança/integridade.
 
-**Versão**: 1.0.0 | **Ratificada em**: 2026-03-25 | **Última atualização**: 2026-03-25
+**Versão**: 1.1.0 | **Ratificada em**: 2026-03-25 | **Última atualização**: 2026-04-28

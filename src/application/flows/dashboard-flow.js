@@ -1,5 +1,5 @@
 import { CATEGORIES } from '../../constants/categories.js';
-import { shiftInputDateByMonths } from '../../utils/date-utils.js';
+import { buildPreviousEquivalentPeriod } from '../../utils/date-utils.js';
 import {
   buildGoalTargetsByCategory,
   computeGoalTargetForDateRange,
@@ -120,8 +120,9 @@ export function refreshDashboard(app) {
   }, 0);
   const percentageOfBase = baseTotal > 0 ? (matchedTotal / baseTotal) * 100 : 0;
 
-  const previousStartDate = shiftInputDateByMonths(app.state.filters.startDate, -1);
-  const previousEndDate = shiftInputDateByMonths(app.state.filters.endDate, -1);
+  const previousPeriod = buildPreviousEquivalentPeriod(app.state.filters.startDate, app.state.filters.endDate);
+  const previousStartDate = previousPeriod.startDate;
+  const previousEndDate = previousPeriod.endDate;
   const previousBounds = {
     ...app.state.getFilterBoundaries(),
     cycleStart: new Date(`${previousStartDate}T00:00:00`),

@@ -23,6 +23,7 @@ export class DashboardView {
     this.sectionsContainer = document.getElementById('dashboard-sections');
     this.floatingFiltersBar = document.getElementById('dashboard-floating-filters');
     this.floatingTotalValue = document.getElementById('floating-total-value');
+    this.floatingTotalPrevious = document.getElementById('floating-total-previous');
 
     this.accountFilterButtons = {
       all: Array.from(document.querySelectorAll('[data-account-filter="all"]')),
@@ -57,6 +58,7 @@ export class DashboardView {
 
     this.totalValue = document.getElementById('total-fatura-val');
     this.ignoredValue = document.getElementById('valor-ignorado');
+    this.ignoredPreviousValue = document.getElementById('ignored-total-previous');
     this.cycleLegend = document.getElementById('legenda-ciclo');
     this.categoryPiePeriodLabel = document.getElementById('category-pie-period');
     this.categoryPieChart = document.getElementById('category-pie-chart');

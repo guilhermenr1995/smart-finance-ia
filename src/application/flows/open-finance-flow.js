@@ -2,6 +2,28 @@ function getErrorMessage(error) {
   return error?.message || 'Falha na operação de Open Finance.';
 }
 
+const MEU_PLUGGY_ITEM_STORAGE_KEY = 'smart-finance-open-finance-meu-pluggy-item-id';
+
+function resolveMeuPluggyItemId() {
+  const previous = String(localStorage.getItem(MEU_PLUGGY_ITEM_STORAGE_KEY) || '').trim();
+  const typed = window.prompt(
+    'Informe o Item ID do Meu Pluggy (uuid da conexão autorizada no meu.pluggy.ai).',
+    previous
+  );
+
+  if (typed === null) {
+    return null;
+  }
+
+  const itemId = String(typed || '').trim();
+  if (!itemId) {
+    return '';
+  }
+
+  localStorage.setItem(MEU_PLUGGY_ITEM_STORAGE_KEY, itemId);
+  return itemId;
+}
+
 function handleAuthorizationUrl(app, authorizationUrl) {
   const url = String(authorizationUrl || '').trim();
   if (!url) {
@@ -42,10 +64,23 @@ export async function connectOpenFinanceBank(app, bankCode) {
     return;
   }
 
+  const connectOptions = {};
+  if (String(bankCode || '').trim() === 'meu-pluggy') {
+    const itemId = resolveMeuPluggyItemId();
+    if (itemId === null) {
+      return;
+    }
+    if (!itemId) {
+      app.authView.showMessage('Para conectar via Meu Pluggy, informe um Item ID válido.', 'error');
+      return;
+    }
+    connectOptions.providerItemId = itemId;
+  }
+
   app.dashboardView.setBusy(true);
   app.overlayView.show('Conectando banco via Open Finance...');
   try {
-    const result = await app.openFinanceService.connectBank(app.config.appId, bankCode);
+    const result = await app.openFinanceService.connectBank(app.config.appId, bankCode, connectOptions);
     app.state.setOpenFinanceConnections(result?.connections || []);
     handleAuthorizationUrl(app, result?.authorizationUrl);
     if (Array.isArray(result?.transactions) && result.transactions.length > 0) {
@@ -55,6 +90,9 @@ export async function connectOpenFinanceBank(app, bankCode) {
     }
     app.persistTransactionsCache();
     app.overlayView.log('Conexão criada com sucesso.');
+    if (String(bankCode || '').trim() === 'meu-pluggy') {
+      app.overlayView.log('Dica: gerencie consentimentos e conexões direto no Meu Pluggy.');
+    }
     app.overlayView.log(`Transações sincronizadas: ${Number(result?.insertedCount || 0)}.`);
     setTimeout(() => app.overlayView.hide(), 900);
   } catch (error) {

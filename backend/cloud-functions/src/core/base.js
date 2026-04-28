@@ -32,6 +32,7 @@ const USER_JOURNEY_RESET_COLLECTIONS = [
 ];
 
 const OPEN_FINANCE_BANKS = {
+  'meu-pluggy': 'Meu Pluggy',
   nubank: 'Nubank',
   itau: 'Itaú',
   bradesco: 'Bradesco',

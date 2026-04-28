@@ -98,3 +98,73 @@ export function shiftInputDateByMonths(inputDate, deltaMonths) {
   );
   return toInputDateValue(shifted);
 }
+
+function getMonthLastDay(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function parseInputDateParts(inputDate) {
+  const safe = String(inputDate || '').trim();
+  const match = safe.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return { year, month, day };
+}
+
+export function buildPreviousEquivalentPeriod(startDateInput, endDateInput) {
+  const startParts = parseInputDateParts(startDateInput);
+  const endParts = parseInputDateParts(endDateInput);
+
+  if (!startParts || !endParts) {
+    return {
+      startDate: shiftInputDateByMonths(startDateInput, -1),
+      endDate: shiftInputDateByMonths(endDateInput, -1)
+    };
+  }
+
+  const isSameMonth = startParts.year === endParts.year && startParts.month === endParts.month;
+  const isMonthStart = startParts.day === 1;
+  const currentMonthLastDay = getMonthLastDay(endParts.year, endParts.month - 1);
+  const isMonthEnd = endParts.day === currentMonthLastDay;
+
+  if (isSameMonth && isMonthStart && isMonthEnd) {
+    const previousMonthDate = new Date(startParts.year, startParts.month - 2, 1, 12, 0, 0, 0);
+    const previousStart = new Date(
+      previousMonthDate.getFullYear(),
+      previousMonthDate.getMonth(),
+      1,
+      12,
+      0,
+      0,
+      0
+    );
+    const previousEnd = new Date(
+      previousMonthDate.getFullYear(),
+      previousMonthDate.getMonth() + 1,
+      0,
+      12,
+      0,
+      0,
+      0
+    );
+
+    return {
+      startDate: toInputDateValue(previousStart),
+      endDate: toInputDateValue(previousEnd)
+    };
+  }
+
+  return {
+    startDate: shiftInputDateByMonths(startDateInput, -1),
+    endDate: shiftInputDateByMonths(endDateInput, -1)
+  };
+}

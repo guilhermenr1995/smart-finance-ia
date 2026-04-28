@@ -1,4 +1,4 @@
-import { shiftInputDateByMonths } from '../../../utils/date-utils.js';
+import { buildPreviousEquivalentPeriod } from '../../../utils/date-utils.js';
 import { getDisplayCategory } from '../../../utils/transaction-utils.js';
 import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
@@ -188,8 +188,9 @@ export async function runAiConsultant(app) {
   const currentVisibleTransactions = app.getVisibleTransactions();
   const currentSummary = app.queryService.buildSummary(currentVisibleTransactions);
 
-  const previousStartDate = shiftInputDateByMonths(app.state.filters.startDate, -1);
-  const previousEndDate = shiftInputDateByMonths(app.state.filters.endDate, -1);
+  const previousPeriod = buildPreviousEquivalentPeriod(app.state.filters.startDate, app.state.filters.endDate);
+  const previousStartDate = previousPeriod.startDate;
+  const previousEndDate = previousPeriod.endDate;
   const previousBounds = {
     ...app.state.getFilterBoundaries(),
     cycleStart: new Date(`${previousStartDate}T00:00:00`),

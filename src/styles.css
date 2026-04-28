@@ -124,6 +124,15 @@ select.edit-mode {
   line-height: 1.1;
 }
 
+.dashboard-total-previous-hint {
+  margin-top: 3px;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3f3f46;
+}
+
 .dashboard-floating-account-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(84px, 1fr));
@@ -1061,6 +1070,12 @@ select.edit-mode {
 
 .transactions-ignored-chip strong {
   color: #111827;
+}
+
+.transactions-ignored-previous {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
 }
 
 .mix-goal-bar {

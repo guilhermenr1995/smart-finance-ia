@@ -89,6 +89,9 @@ backend/cloud-functions/
    - `OPEN_FINANCE_UPSTREAM_URL=https://seu-backend-open-finance.example.com/open-finance`
    - `OPEN_FINANCE_UPSTREAM_API_KEY=...` (se o upstream exigir)
    - `OPEN_FINANCE_ALLOW_FALLBACK=true` (opcional; padrão `true`)
+   - `OPEN_FINANCE_PLUGGY_DIRECT_MODE=auto` (opções: `auto`, `on`, `off`)
+   - `OPEN_FINANCE_PLUGGY_CLIENT_ID=...` e `OPEN_FINANCE_PLUGGY_CLIENT_SECRET=...` (para modo direto Pluggy/Meu Pluggy)
+   - `OPEN_FINANCE_PLUGGY_ITEM_IDS=...` (opcional; use quando houver um único Item ID fixo)
 
 ## Checklist de produção — Open Finance
 
@@ -103,6 +106,16 @@ Antes de publicar em produção, valide este checklist:
 7. Se desejar operação estritamente real (sem fallback), definir `OPEN_FINANCE_ALLOW_FALLBACK=false`.
 
 Se o upstream ficar indisponível e `OPEN_FINANCE_ALLOW_FALLBACK=true`, o backend mantém o fluxo operacional via modo embedded.
+
+### Modo direto Pluggy (Meu Pluggy)
+
+Você pode operar sem `OPEN_FINANCE_UPSTREAM_URL` quando:
+
+1. `OPEN_FINANCE_PROVIDER=pluggy`
+2. `OPEN_FINANCE_PLUGGY_DIRECT_MODE=auto` (ou `on`)
+3. `OPEN_FINANCE_PLUGGY_CLIENT_ID` e `OPEN_FINANCE_PLUGGY_CLIENT_SECRET` preenchidos
+
+Nesse modo, o `openFinanceProxy` conversa direto com a API da Pluggy e aceita `providerItemId` no `connect-bank`.
 
 5. Voltar para a raiz:
    - `cd ../..`
@@ -167,7 +180,8 @@ Request:
 {
   "appId": "smart-finance-production-v1",
   "action": "connect-bank",
-  "bankCode": "nubank"
+  "bankCode": "meu-pluggy",
+  "providerItemId": "uuid-do-item-no-pluggy"
 }
 ```
 

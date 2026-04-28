@@ -57,8 +57,14 @@ class DashboardViewRenderSummaryMethods {
     if (this.floatingTotalValue) {
       this.floatingTotalValue.innerText = formatCurrencyBRL(summary.total);
     }
+    if (this.floatingTotalPrevious) {
+      this.floatingTotalPrevious.innerText = `Anterior: ${formatCurrencyBRL(previousSummary.total)}`;
+    }
     if (this.ignoredValue) {
       this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
+    }
+    if (this.ignoredPreviousValue) {
+      this.ignoredPreviousValue.innerText = `Ignorados no período anterior: ${formatCurrencyBRL(previousSummary.ignoredTotal)}`;
     }
     if (this.cycleLegend) {
       this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;

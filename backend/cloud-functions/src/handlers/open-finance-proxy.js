@@ -62,6 +62,7 @@ const openFinanceProxy = onRequest(
 
       if (action === 'connect-bank') {
         const bankCode = normalizeBankCode(request.body?.bankCode);
+        const providerItemId = sanitizeString(request.body?.providerItemId, 140);
         if (!bankCode || !OPEN_FINANCE_BANKS[bankCode]) {
           response.status(400).json({
             error: 'bankCode is required and must be supported'
@@ -79,7 +80,8 @@ const openFinanceProxy = onRequest(
           {
             appId,
             bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode]
+            bankName: OPEN_FINANCE_BANKS[bankCode],
+            providerItemId
           },
           {
             userId
@@ -88,7 +90,7 @@ const openFinanceProxy = onRequest(
 
         const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
         const providerConnectionId = sanitizeString(
-          upstreamConnection.id || upstreamConnection.connectionId || bankCode,
+          upstreamConnection.id || upstreamConnection.connectionId || providerItemId || bankCode,
           140
         ) || bankCode;
         const connectionStatus = sanitizeString(upstreamConnection.status || 'pending', 40) || 'pending';
