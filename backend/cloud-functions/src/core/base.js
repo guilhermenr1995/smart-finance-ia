@@ -42,6 +42,9 @@ const OPEN_FINANCE_REAL_PROVIDERS = new Set(['pluggy', 'belvo']);
 const OPEN_FINANCE_PROVIDER = String(process.env.OPEN_FINANCE_PROVIDER || 'pluggy').trim().toLowerCase();
 const OPEN_FINANCE_UPSTREAM_URL = String(process.env.OPEN_FINANCE_UPSTREAM_URL || '').trim();
 const OPEN_FINANCE_UPSTREAM_API_KEY = String(process.env.OPEN_FINANCE_UPSTREAM_API_KEY || '').trim();
+const OPEN_FINANCE_ONLY_MEU_PLUGGY = !['false', '0', 'no', 'off'].includes(
+  String(process.env.OPEN_FINANCE_ONLY_MEU_PLUGGY || 'true').trim().toLowerCase()
+);
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -259,6 +262,7 @@ module.exports = {
   OPEN_FINANCE_PROVIDER,
   OPEN_FINANCE_UPSTREAM_URL,
   OPEN_FINANCE_UPSTREAM_API_KEY,
+  OPEN_FINANCE_ONLY_MEU_PLUGGY,
   sleep,
   setCorsHeaders,
   handlePreflightAndMethod,

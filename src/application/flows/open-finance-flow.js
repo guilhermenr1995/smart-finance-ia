@@ -3,9 +3,38 @@ function getErrorMessage(error) {
 }
 
 const MEU_PLUGGY_ITEM_STORAGE_KEY = 'smart-finance-open-finance-meu-pluggy-item-id';
+const MEU_PLUGGY_INPUT_ID = 'open-finance-meu-pluggy-item-id';
+
+function getMeuPluggyItemInput() {
+  return document.getElementById(MEU_PLUGGY_INPUT_ID);
+}
+
+function hydrateMeuPluggyItemInput() {
+  const input = getMeuPluggyItemInput();
+  if (!input) {
+    return;
+  }
+
+  const previous = String(localStorage.getItem(MEU_PLUGGY_ITEM_STORAGE_KEY) || '').trim();
+  if (!input.value.trim() && previous) {
+    input.value = previous;
+  }
+}
 
 function resolveMeuPluggyItemId() {
+  const input = getMeuPluggyItemInput();
+  const currentInputValue = String(input?.value || '').trim();
+  if (currentInputValue) {
+    localStorage.setItem(MEU_PLUGGY_ITEM_STORAGE_KEY, currentInputValue);
+    return currentInputValue;
+  }
+
   const previous = String(localStorage.getItem(MEU_PLUGGY_ITEM_STORAGE_KEY) || '').trim();
+  if (previous && input) {
+    input.value = previous;
+    return previous;
+  }
+
   const typed = window.prompt(
     'Informe o Item ID do Meu Pluggy (uuid da conexão autorizada no meu.pluggy.ai).',
     previous
@@ -21,6 +50,9 @@ function resolveMeuPluggyItemId() {
   }
 
   localStorage.setItem(MEU_PLUGGY_ITEM_STORAGE_KEY, itemId);
+  if (input) {
+    input.value = itemId;
+  }
   return itemId;
 }
 
@@ -43,6 +75,7 @@ export async function loadOpenFinanceConnections(app, options = {}) {
     return;
   }
 
+  hydrateMeuPluggyItemInput();
   const showFeedback = Boolean(options.showFeedback);
   try {
     const result = await app.openFinanceService.listConnections(app.config.appId);
@@ -64,6 +97,7 @@ export async function connectOpenFinanceBank(app, bankCode) {
     return;
   }
 
+  hydrateMeuPluggyItemInput();
   const connectOptions = {};
   if (String(bankCode || '').trim() === 'meu-pluggy') {
     const itemId = resolveMeuPluggyItemId();

@@ -89,6 +89,7 @@ const analyzeSpendingInsights = onRequest(
       }
 
       const baseReport = buildDeterministicConsultantReport(currentPeriod, previousPeriod);
+      const goalContext = request.body?.goalContext && typeof request.body.goalContext === 'object' ? request.body.goalContext : null;
       const promptPayload = {
         filters,
         deterministicBase: {
@@ -107,7 +108,8 @@ const analyzeSpendingInsights = onRequest(
           topTransactions: baseReport.topTransactions,
           outlierTransactions: baseReport.outlierTransactions,
           smartAlerts: baseReport.smartAlerts
-        }
+        },
+        goalContext
       };
 
       const result = await askGeminiForJson({
@@ -120,7 +122,10 @@ const analyzeSpendingInsights = onRequest(
           '{"overview":"...","increasedInsights":[{"category":"...","insight":"..."}],"reducedInsights":[{"category":"...","insight":"..."}],"smartAlerts":["..."]}. ' +
           'Regras: textos objetivos, simples e úteis; sem projeções futuras; destaque apenas categorias que aumentaram ou reduziram. ' +
           'Nos insights de redução, explique o provável motivo (ex.: menos idas a restaurantes, ticket médio menor, menos frequência). ' +
-          'Sempre que possível cite as transações que mais influenciaram cada categoria usando os drivers recebidos. Dados: ' +
+          'Sempre que possível cite as transações que mais influenciaram cada categoria usando os drivers recebidos. ' +
+          'Se existir goalContext.hasGoals=true, use obrigatoriamente metas e comparação com período anterior nos textos, com frases diretas como: "em X, você está Y acima/abaixo da meta de R$... e variou Z vs período anterior". ' +
+          'No overview, cite pelo menos uma categoria com meta estourada (se houver) e uma com melhora vs período anterior (se houver). ' +
+          'No campo smartAlerts, inclua alertas de desvio de meta quando houver categorias acima da meta. Dados: ' +
           JSON.stringify(promptPayload),
         temperature: 0.25
       });
@@ -152,6 +157,7 @@ const analyzeSpendingInsights = onRequest(
           startDate: previousPeriod.startDate || '',
           endDate: previousPeriod.endDate || ''
         },
+        goalContext,
         insights,
         model: result.model || geminiModel,
         generatedAt,

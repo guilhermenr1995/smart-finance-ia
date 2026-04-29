@@ -1,5 +1,6 @@
 import { buildPreviousEquivalentPeriod } from '../../../utils/date-utils.js';
 import { getDisplayCategory } from '../../../utils/transaction-utils.js';
+import { buildGoalTargetsByCategory, GOAL_SCOPE_ALL, normalizeGoalScope } from '../../../utils/goal-utils.js';
 import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
 export async function syncCategoriesWithAi(app) {
@@ -166,6 +167,76 @@ export function buildConsultantPeriodSnapshot(app, periodDates, summary) {
   };
 }
 
+function mapFilterAccountTypeToGoalScope(accountType) {
+  const safeAccountType = String(accountType || '').trim();
+  if (!safeAccountType || safeAccountType.toLowerCase() === 'all') {
+    return GOAL_SCOPE_ALL;
+  }
+  return normalizeGoalScope(safeAccountType);
+}
+
+function buildConsultantGoalContext(app, currentPeriodSnapshot, previousPeriodSnapshot) {
+  const accountScope = mapFilterAccountTypeToGoalScope(app.state.filters.accountType);
+  const activeGoals = (app.state.monthlyGoals || []).filter(
+    (goal) => goal?.active !== false && normalizeGoalScope(goal?.accountScope) === accountScope
+  );
+
+  const currentTargetsByCategory = buildGoalTargetsByCategory(
+    activeGoals,
+    currentPeriodSnapshot.startDate,
+    currentPeriodSnapshot.endDate
+  );
+  const currentTotalsByCategory = {};
+  (currentPeriodSnapshot.categoryBreakdown || []).forEach((item) => {
+    const category = String(item?.category || '').trim();
+    if (!category) {
+      return;
+    }
+    currentTotalsByCategory[category] = Number(item?.total || 0);
+  });
+
+  const previousTotalsByCategory = {};
+  (previousPeriodSnapshot.categoryBreakdown || []).forEach((item) => {
+    const category = String(item?.category || '').trim();
+    if (!category) {
+      return;
+    }
+    previousTotalsByCategory[category] = Number(item?.total || 0);
+  });
+
+  const categoriesWithGoals = Object.keys(currentTargetsByCategory);
+  const goalPerformance = categoriesWithGoals
+    .map((category) => {
+      const target = Number(currentTargetsByCategory[category] || 0);
+      const currentSpent = Number(currentTotalsByCategory[category] || 0);
+      const previousSpent = Number(previousTotalsByCategory[category] || 0);
+      const deltaToTarget = Number((currentSpent - target).toFixed(2));
+      const targetUsagePercent = target > 0 ? Number(((currentSpent / target) * 100).toFixed(1)) : 0;
+      const monthOverMonthDelta = Number((currentSpent - previousSpent).toFixed(2));
+      const monthOverMonthPercent =
+        previousSpent > 0 ? Number((((currentSpent - previousSpent) / previousSpent) * 100).toFixed(1)) : currentSpent > 0 ? 100 : 0;
+
+      return {
+        category,
+        targetValue: Number(target.toFixed(2)),
+        currentSpent: Number(currentSpent.toFixed(2)),
+        previousSpent: Number(previousSpent.toFixed(2)),
+        deltaToTarget,
+        targetUsagePercent,
+        monthOverMonthDelta,
+        monthOverMonthPercent,
+        status: deltaToTarget > 0.01 ? 'above_target' : deltaToTarget < -0.01 ? 'below_target' : 'on_target'
+      };
+    })
+    .sort((left, right) => Math.abs(right.deltaToTarget) - Math.abs(left.deltaToTarget));
+
+  return {
+    accountScope,
+    hasGoals: goalPerformance.length > 0,
+    goalPerformance
+  };
+}
+
 export function buildConsultantInsightKey(filters) {
   const payload = JSON.stringify({
     startDate: filters.startDate,
@@ -231,6 +302,7 @@ export async function runAiConsultant(app) {
     ),
     previousPeriod: buildConsultantPeriodSnapshot(app, { startDate: previousStartDate, endDate: previousEndDate }, previousSummary)
   };
+  payload.goalContext = buildConsultantGoalContext(app, payload.currentPeriod, payload.previousPeriod);
 
   app.dashboardView.setBusy(true);
   app.overlayView.show('Consultor IA: analisando o comportamento de gastos...');

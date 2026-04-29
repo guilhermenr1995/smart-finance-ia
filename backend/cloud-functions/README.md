@@ -91,6 +91,7 @@ backend/cloud-functions/
    - `OPEN_FINANCE_ALLOW_FALLBACK=true` (opcional; padrão `true`)
    - `OPEN_FINANCE_PLUGGY_DIRECT_MODE=auto` (opções: `auto`, `on`, `off`)
    - `OPEN_FINANCE_PLUGGY_CLIENT_ID=...` e `OPEN_FINANCE_PLUGGY_CLIENT_SECRET=...` (para modo direto Pluggy/Meu Pluggy)
+   - `OPEN_FINANCE_ONLY_MEU_PLUGGY=true` (recomendado para operação exclusiva com `meu.pluggy.ai/connections`)
    - `OPEN_FINANCE_PLUGGY_ITEM_IDS=...` (opcional; use quando houver um único Item ID fixo)
 
 ## Checklist de produção — Open Finance

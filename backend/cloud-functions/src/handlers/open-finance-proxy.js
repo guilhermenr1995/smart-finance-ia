@@ -4,7 +4,8 @@ const {
   handlePreflightAndMethod,
   authenticateRequest,
   OPEN_FINANCE_BANKS,
-  OPEN_FINANCE_PROVIDER
+  OPEN_FINANCE_PROVIDER,
+  OPEN_FINANCE_ONLY_MEU_PLUGGY
 } = require('../core/base');
 const {
   sanitizeString,
@@ -69,11 +70,14 @@ const openFinanceProxy = onRequest(
           });
           return;
         }
+        if (OPEN_FINANCE_ONLY_MEU_PLUGGY && bankCode !== 'meu-pluggy') {
+          response.status(400).json({
+            error: 'Somente integrações via Meu Pluggy estão habilitadas neste ambiente.'
+          });
+          return;
+        }
 
         const nowIso = new Date().toISOString();
-        const connectionRef = connectionsCollection.doc(bankCode);
-        const existingSnapshot = await connectionRef.get();
-        const createdAt = existingSnapshot.exists ? String(existingSnapshot.data()?.createdAt || nowIso) : nowIso;
 
         const upstream = await requestOpenFinanceUpstream(
           'connect-bank',
@@ -93,6 +97,14 @@ const openFinanceProxy = onRequest(
           upstreamConnection.id || upstreamConnection.connectionId || providerItemId || bankCode,
           140
         ) || bankCode;
+        const normalizedProviderItemId = sanitizeString(providerItemId || providerConnectionId, 140);
+        const connectionDocId = sanitizeString(
+          bankCode === 'meu-pluggy' ? normalizedProviderItemId || providerConnectionId : bankCode,
+          140
+        ) || bankCode;
+        const connectionRef = connectionsCollection.doc(connectionDocId);
+        const existingSnapshot = await connectionRef.get();
+        const createdAt = existingSnapshot.exists ? String(existingSnapshot.data()?.createdAt || nowIso) : nowIso;
         const connectionStatus = sanitizeString(upstreamConnection.status || 'pending', 40) || 'pending';
         const consentExpiresAt = sanitizeString(upstreamConnection.consentExpiresAt || addDaysToIso(90), 80);
 
@@ -112,6 +124,7 @@ const openFinanceProxy = onRequest(
             bankName: OPEN_FINANCE_BANKS[bankCode],
             provider: OPEN_FINANCE_PROVIDER,
             providerConnectionId,
+            providerItemId: normalizedProviderItemId,
             status: connectionStatus,
             consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
             consentExpiresAt,
@@ -126,8 +139,9 @@ const openFinanceProxy = onRequest(
 
         const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
-          connectionId: bankCode,
+          connectionId: connectionDocId,
           providerConnectionId,
+          providerItemId: normalizedProviderItemId,
           authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
           insertedCount: persisted.insertedCount,
           skippedCount: persisted.skippedCount,
@@ -166,6 +180,10 @@ const openFinanceProxy = onRequest(
         const bankCode = sanitizeString(connection.bankCode, 60);
         const bankName = sanitizeString(connection.bankName || OPEN_FINANCE_BANKS[bankCode] || bankCode, 80);
         const previousProviderConnectionId = resolveProviderConnectionId(connection);
+        const storedProviderItemId = sanitizeString(
+          connection.providerItemId || connection.providerConnectionId || connectionId,
+          140
+        );
         const shouldReconnect = !previousProviderConnectionId;
         const upstreamAction = shouldReconnect ? 'connect-bank' : 'sync-connection';
 
@@ -176,7 +194,8 @@ const openFinanceProxy = onRequest(
             ? {
                 appId,
                 bankCode,
-                bankName
+                bankName,
+                providerItemId: storedProviderItemId
               }
             : {
                 appId,
@@ -202,6 +221,7 @@ const openFinanceProxy = onRequest(
           {
             status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
             providerConnectionId,
+            providerItemId: sanitizeString(storedProviderItemId || providerConnectionId, 140),
             lastSyncAt: nowIso,
             lastSyncInserted: persisted.insertedCount,
             consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),

@@ -42,13 +42,23 @@ class DashboardViewRenderEngagementMethods {
         const status = String(connection.status || 'unknown').trim();
         const label = statusLabelMap[status] || status || 'Desconhecido';
         const syncLabel = connection.lastSyncAt ? `Última sync: ${escapeHtml(connection.lastSyncAt)}` : 'Sem sincronização';
+        const providerItemId = escapeHtml(
+          connection.providerItemId || connection.providerConnectionId || connection.id || '-'
+        );
+        const consentLink = String(connection.consentUrl || '').trim();
         return `
           <article class="border-2 border-black p-3 bg-zinc-50">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-xs font-black uppercase">${escapeHtml(connection.bankName || connection.bankCode || 'Banco')}</p>
               <span class="text-[10px] font-black uppercase px-2 py-1 border border-black bg-white">${escapeHtml(label)}</span>
             </div>
+            <p class="text-[10px] font-bold text-zinc-500 mt-2">Item ID Pluggy: <strong class="text-zinc-700">${providerItemId}</strong></p>
             <p class="text-[11px] font-bold text-zinc-600 mt-2">${syncLabel}</p>
+            ${
+              consentLink
+                ? `<a href="${escapeHtml(consentLink)}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 text-[10px] font-black uppercase underline">Abrir consentimento</a>`
+                : ''
+            }
             <div class="grid grid-cols-3 gap-2 mt-3">
               <button data-open-finance-action="sync" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Sync</button>
               <button data-open-finance-action="renew" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Renovar</button>

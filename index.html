@@ -448,12 +448,21 @@
                   Atualizar status
                 </button>
               </div>
-              <p class="dashboard-section-subtitle text-left max-w-none">Conecte seu banco para sincronizar transações automaticamente.</p>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <button data-bank-code="nubank" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Nubank</button>
-                <button data-bank-code="itau" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Itaú</button>
-                <button data-bank-code="bradesco" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Bradesco</button>
-                <button data-bank-code="banco-do-brasil" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">Conectar Banco do Brasil</button>
+              <p class="dashboard-section-subtitle text-left max-w-none">
+                Integração exclusiva com <strong>Meu Pluggy</strong>. Cole o Item ID da conexão criada em
+                <strong>meu.pluggy.ai/connections</strong> e sincronize.
+              </p>
+              <div class="grid grid-cols-1 gap-2">
+                <label for="open-finance-meu-pluggy-item-id" class="field-label">Item ID (Meu Pluggy)</label>
+                <input
+                  id="open-finance-meu-pluggy-item-id"
+                  type="text"
+                  class="input-line w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm"
+                  placeholder="Ex.: 9b5f8f8c-...."
+                />
+                <button data-bank-code="meu-pluggy" class="open-finance-connect-btn border-2 border-black px-3 py-2 text-xs font-black uppercase bg-zinc-50">
+                  Conectar Meu Pluggy
+                </button>
               </div>
               <div id="open-finance-connections" class="space-y-2">
                 <p class="text-[11px] font-bold text-zinc-500">Nenhuma conexão ativa.</p>

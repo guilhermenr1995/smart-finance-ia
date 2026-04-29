@@ -58,7 +58,21 @@ class DashboardViewRenderSummaryMethods {
       this.floatingTotalValue.innerText = formatCurrencyBRL(summary.total);
     }
     if (this.floatingTotalPrevious) {
-      this.floatingTotalPrevious.innerText = `Anterior: ${formatCurrencyBRL(previousSummary.total)}`;
+      const totalDelta = Number(summary.total || 0) - Number(previousSummary.total || 0);
+      const deltaText = totalDelta === 0
+        ? 'R$ 0,00'
+        : `${totalDelta > 0 ? '+' : '-'}${formatCurrencyBRL(Math.abs(totalDelta))}`;
+      const deltaClass = totalDelta < 0 ? 'is-good' : totalDelta > 0 ? 'is-bad' : 'is-neutral';
+      this.floatingTotalPrevious.innerHTML = `
+        <span class="floating-total-meta-item">
+          <span class="floating-total-meta-label">Período anterior</span>
+          <span class="floating-total-meta-value">${formatCurrencyBRL(previousSummary.total)}</span>
+        </span>
+        <span class="floating-total-meta-item ${deltaClass}">
+          <span class="floating-total-meta-label">Atual x anterior</span>
+          <span class="floating-total-meta-value">${deltaText}</span>
+        </span>
+      `;
     }
     if (this.ignoredValue) {
       this.ignoredValue.innerText = formatCurrencyBRL(summary.ignoredTotal);
@@ -69,7 +83,7 @@ class DashboardViewRenderSummaryMethods {
     if (this.cycleLegend) {
       this.cycleLegend.innerText = `Período: ${toBrDate(filters.startDate)} a ${toBrDate(filters.endDate)}`;
     }
-    this.renderCategoryPie(summary, filters);
+    this.renderCategoryPie(summary, previousSummary, filters);
 
     const orderedTableTransactions = sortTransactionsByDateDesc(tableTransactions);
     const paginationMeta = this.paginateTransactions(orderedTableTransactions);
@@ -93,7 +107,7 @@ class DashboardViewRenderSummaryMethods {
     this.aiPendingLabel.innerText = `${pendingAiCount} Pendentes`;
   }
 
-  renderCategoryPie(summary = {}, filters = {}) {
+  renderCategoryPie(summary = {}, previousSummary = {}, filters = {}) {
     if (
       !this.categoryPieChart ||
       !this.categoryPieLegend ||
@@ -112,6 +126,17 @@ class DashboardViewRenderSummaryMethods {
     const tooltipElement = this.categoryPieTooltip;
     const chartWrap = this.categoryPieChart.parentElement;
     const supportsHover = Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches);
+    const previousCategoryTotals = previousSummary?.categoryTotals || {};
+
+    const formatDeltaCurrency = (value) => {
+      const numericValue = Number(value || 0);
+      if (Math.abs(numericValue) < 0.005) {
+        return 'R$ 0,00';
+      }
+
+      const signal = numericValue > 0 ? '+' : '-';
+      return `${signal}${formatCurrencyBRL(Math.abs(numericValue))}`;
+    };
 
     const applyCenterValue = ({ label = 'Total', value = 0, isCategorySelected = false } = {}) => {
       this.categoryPieCenterLabel.innerText = String(label || 'Total').trim() || 'Total';
@@ -148,7 +173,9 @@ class DashboardViewRenderSummaryMethods {
 
       tooltipElement.innerHTML = `
         <p class="category-pie-tooltip-label">${escapeHtml(slice.label)}</p>
-        <p class="category-pie-tooltip-value">${formatCurrencyBRL(slice.value)}</p>
+        <p class="category-pie-tooltip-compare-line">
+          Atual: <strong>${formatCurrencyBRL(slice.value)}</strong> | Anterior: <strong>${formatCurrencyBRL(slice.previousValue)}</strong> | Diferença: <strong>${formatDeltaCurrency(slice.deltaValue)}</strong>
+        </p>
       `;
       tooltipElement.hidden = false;
       tooltipElement.classList.remove('hidden');
@@ -277,6 +304,17 @@ class DashboardViewRenderSummaryMethods {
         startAngle,
         endAngle: angleCursor
       };
+    });
+
+    slices.forEach((slice) => {
+      if (slice.synthetic) {
+        slice.previousValue = hiddenEntries.reduce((accumulator, [category]) => {
+          return accumulator + Number(previousCategoryTotals?.[category] || 0);
+        }, 0);
+      } else {
+        slice.previousValue = Number(previousCategoryTotals?.[slice.key] || 0);
+      }
+      slice.deltaValue = slice.value - slice.previousValue;
     });
 
     const gradient = slices
@@ -417,7 +455,11 @@ class DashboardViewRenderSummaryMethods {
             <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
             <span class="category-pie-legend-text">
               <strong>${escapeHtml(slice.label)}</strong>
-              <small>${slice.percent.toFixed(1)}% • ${formatCurrencyBRL(slice.value)}${!canFilter ? ' • agregado' : ''}</small>
+              <small class="category-pie-legend-main"><span>Participação: ${slice.percent.toFixed(1)}%</span></small>
+              <small class="category-pie-legend-compare category-pie-legend-compare-line">
+                <span>Atual: ${formatCurrencyBRL(slice.value)} | Anterior: ${formatCurrencyBRL(slice.previousValue)} | Diferença: ${formatDeltaCurrency(slice.deltaValue)}</span>
+              </small>
+              ${!canFilter ? '<small class="category-pie-legend-main"><span>Grupo agregado</span></small>' : ''}
             </span>
           </div>
         `;

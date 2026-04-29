@@ -22,7 +22,7 @@ window.SMART_FINANCE_CONFIG = {
   },
   openFinance: {
     proxyUrl: 'https://YOUR_OPEN_FINANCE_PROXY_URL.a.run.app',
-    supportedBanks: ['meu-pluggy', 'nubank', 'itau', 'bradesco', 'banco-do-brasil']
+    supportedBanks: ['meu-pluggy']
   },
   admin: {
     dashboardProxyUrl: 'https://YOUR_ADMIN_DASHBOARD_PROXY_URL.a.run.app',

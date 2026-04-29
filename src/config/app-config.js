@@ -21,7 +21,7 @@ const DEFAULT_CONFIG = {
   },
   openFinance: {
     proxyUrl: '',
-    supportedBanks: ['meu-pluggy', 'nubank', 'itau', 'bradesco', 'banco-do-brasil']
+    supportedBanks: ['meu-pluggy']
   },
   admin: {
     dashboardProxyUrl: '',
