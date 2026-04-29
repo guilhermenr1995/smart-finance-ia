@@ -32,6 +32,8 @@ class DashboardViewRenderEngagementMethods {
 
     const statusLabelMap = {
       active: 'Ativa',
+      syncing: 'Sincronizando',
+      pending: 'Pendente',
       expired: 'Expirada',
       error: 'Erro',
       revoked: 'Revogada'
@@ -42,6 +44,9 @@ class DashboardViewRenderEngagementMethods {
         const status = String(connection.status || 'unknown').trim();
         const label = statusLabelMap[status] || status || 'Desconhecido';
         const syncLabel = connection.lastSyncAt ? `Última sync: ${escapeHtml(connection.lastSyncAt)}` : 'Sem sincronização';
+        const webhookLabel = connection.lastWebhookAt
+          ? `Último webhook: ${escapeHtml(connection.lastWebhookEvent || 'evento')} em ${escapeHtml(connection.lastWebhookAt)}`
+          : 'Webhook ainda não recebido';
         const providerItemId = escapeHtml(
           connection.providerItemId || connection.providerConnectionId || connection.id || '-'
         );
@@ -54,6 +59,7 @@ class DashboardViewRenderEngagementMethods {
             </div>
             <p class="text-[10px] font-bold text-zinc-500 mt-2">Item ID Pluggy: <strong class="text-zinc-700">${providerItemId}</strong></p>
             <p class="text-[11px] font-bold text-zinc-600 mt-2">${syncLabel}</p>
+            <p class="text-[10px] font-bold text-zinc-500 mt-1">${webhookLabel}</p>
             ${
               consentLink
                 ? `<a href="${escapeHtml(consentLink)}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 text-[10px] font-black uppercase underline">Abrir consentimento</a>`
@@ -289,13 +295,28 @@ class DashboardViewRenderEngagementMethods {
 
     const getActiveCategories = () => (activeLegendCategory ? [activeLegendCategory] : categories);
     const getDetailByDay = (day) => (daily.details || []).find((item) => item.day === day);
-    const renderTooltipForDay = (day) => {
+    const resolveInteractionCategory = (event) => {
+      const target = event?.target;
+      if (!target || typeof target.closest !== 'function') {
+        return '';
+      }
+
+      const segment = target.closest('.ritmo-day-segment');
+      if (!segment) {
+        return '';
+      }
+
+      const category = String(segment.dataset.segmentCategory || '').trim();
+      return categories.includes(category) ? category : '';
+    };
+    const renderTooltipForDay = (day, interactionCategory = '') => {
       if (!this.ritmoDailyTooltip) {
         return;
       }
 
       const detail = getDetailByDay(day);
-      this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail, activeLegendCategory);
+      const selectedCategory = activeLegendCategory || String(interactionCategory || '').trim();
+      this.ritmoDailyTooltip.innerHTML = buildDayTooltipHtml(day, detail, selectedCategory);
     };
 
     const renderChart = () => {
@@ -319,9 +340,9 @@ class DashboardViewRenderEngagementMethods {
                 if (value <= 0) {
                   return '';
                 }
-                return `<div class="ritmo-day-segment" style="height:${Math.max(2, percent)}%;background:${colorMap.get(
+                return `<div class="ritmo-day-segment" data-segment-category="${escapeHtml(
                   category
-                )}" title="${escapeHtml(
+                )}" style="height:${Math.max(2, percent)}%;background:${colorMap.get(category)}" title="${escapeHtml(
                   `${category}: ${formatCurrencyBRL(value)}`
                 )}"></div>`;
               });
@@ -346,34 +367,34 @@ class DashboardViewRenderEngagementMethods {
       `;
 
       this.ritmoDailyChart.querySelectorAll('.ritmo-day-column').forEach((button) => {
-        button.addEventListener('mouseenter', () => {
+        button.addEventListener('mouseenter', (event) => {
           const day = String(button.dataset.day || '').trim();
           if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return;
           }
 
           this.ritmoSelectedDay = day;
-          renderTooltipForDay(day);
+          renderTooltipForDay(day, resolveInteractionCategory(event));
         });
 
-        button.addEventListener('focus', () => {
+        button.addEventListener('focus', (event) => {
           const day = String(button.dataset.day || '').trim();
           if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return;
           }
 
           this.ritmoSelectedDay = day;
-          renderTooltipForDay(day);
+          renderTooltipForDay(day, resolveInteractionCategory(event));
         });
 
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (event) => {
           const day = String(button.dataset.day || '').trim();
           if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return;
           }
 
           this.ritmoSelectedDay = day;
-          renderTooltipForDay(day);
+          renderTooltipForDay(day, resolveInteractionCategory(event));
         });
       });
 

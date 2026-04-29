@@ -206,11 +206,19 @@ export class AppState {
             id: String(item.id || '').trim(),
             bankCode: String(item.bankCode || '').trim(),
             bankName: String(item.bankName || '').trim(),
+            provider: String(item.provider || 'meu-pluggy').trim(),
+            providerConnectionId: String(item.providerConnectionId || '').trim(),
+            providerItemId: String(item.providerItemId || '').trim(),
             status: String(item.status || 'unknown').trim(),
             consentExpiresAt: String(item.consentExpiresAt || '').trim(),
+            consentUrl: String(item.consentUrl || '').trim(),
             lastSyncAt: String(item.lastSyncAt || '').trim(),
+            lastWebhookEvent: String(item.lastWebhookEvent || '').trim(),
+            lastWebhookAt: String(item.lastWebhookAt || '').trim(),
             createdAt: String(item.createdAt || '').trim(),
-            lastSyncInserted: Number(item.lastSyncInserted || 0)
+            updatedAt: String(item.updatedAt || '').trim(),
+            lastSyncInserted: Number(item.lastSyncInserted || 0),
+            errorMessage: String(item.errorMessage || '').trim()
           }))
       : [];
 

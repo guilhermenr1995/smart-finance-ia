@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
   },
   openFinance: {
     proxyUrl: '',
+    webhookUrl: '',
     supportedBanks: ['meu-pluggy']
   },
   admin: {

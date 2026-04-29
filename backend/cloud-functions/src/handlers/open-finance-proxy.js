@@ -2,24 +2,18 @@ const {
   onRequest,
   setCorsHeaders,
   handlePreflightAndMethod,
-  authenticateRequest,
-  OPEN_FINANCE_BANKS,
-  OPEN_FINANCE_PROVIDER,
-  OPEN_FINANCE_ONLY_MEU_PLUGGY
+  authenticateRequest
 } = require('../core/base');
+const { sanitizeString } = require('../core/domain-utils');
+const { assertMeuPluggyCredentials } = require('../open-finance/meu-pluggy-client');
 const {
-  sanitizeString,
-  toFiniteNumber
-} = require('../core/domain-utils');
-const {
-  getOpenFinanceConnectionsCollection,
-  listOpenFinanceConnections,
-  normalizeBankCode,
-  requestOpenFinanceUpstream,
-  addDaysToIso,
-  persistOpenFinanceTransactions,
-  resolveProviderConnectionId
-} = require('../core/external-services');
+  MEU_PLUGGY_BANK_CODE,
+  listConnections,
+  getConnectionById,
+  syncItem,
+  revokeItemConnection,
+  ensureWebhooksConfigured
+} = require('../open-finance/meu-pluggy-sync');
 
 const openFinanceProxy = onRequest(
   {
@@ -29,7 +23,6 @@ const openFinanceProxy = onRequest(
   },
   async (request, response) => {
     setCorsHeaders(request, response);
-
     if (handlePreflightAndMethod(request, response)) {
       return;
     }
@@ -40,9 +33,9 @@ const openFinanceProxy = onRequest(
     }
 
     try {
-      const action = String(request.body?.action || '').trim();
-      const appId = String(request.body?.appId || '').trim();
-      const userId = decodedToken.uid;
+      const action = sanitizeString(request.body?.action, 60);
+      const appId = sanitizeString(request.body?.appId, 120);
+      const userId = sanitizeString(decodedToken.uid, 200);
 
       if (!appId) {
         response.status(400).json({
@@ -51,108 +44,63 @@ const openFinanceProxy = onRequest(
         return;
       }
 
-      const connectionsCollection = getOpenFinanceConnectionsCollection(appId, userId);
-
       if (action === 'list-connections') {
-        const connections = await listOpenFinanceConnections(appId, userId);
+        const connections = await listConnections(appId, userId);
+        response.status(200).json({ connections });
+        return;
+      }
+
+      if (action === 'setup-webhooks') {
+        assertMeuPluggyCredentials();
+        const webhookSetup = await ensureWebhooksConfigured();
         response.status(200).json({
-          connections
+          webhookSetup
         });
         return;
       }
 
       if (action === 'connect-bank') {
-        const bankCode = normalizeBankCode(request.body?.bankCode);
+        assertMeuPluggyCredentials();
+        const bankCode = sanitizeString(request.body?.bankCode, 60).toLowerCase();
+        if (bankCode !== MEU_PLUGGY_BANK_CODE) {
+          response.status(400).json({
+            error: 'Somente banco "meu-pluggy" é suportado nesta integração.'
+          });
+          return;
+        }
+
         const providerItemId = sanitizeString(request.body?.providerItemId, 140);
-        if (!bankCode || !OPEN_FINANCE_BANKS[bankCode]) {
+        if (!providerItemId) {
           response.status(400).json({
-            error: 'bankCode is required and must be supported'
-          });
-          return;
-        }
-        if (OPEN_FINANCE_ONLY_MEU_PLUGGY && bankCode !== 'meu-pluggy') {
-          response.status(400).json({
-            error: 'Somente integrações via Meu Pluggy estão habilitadas neste ambiente.'
+            error: 'providerItemId é obrigatório para conectar via Meu Pluggy.'
           });
           return;
         }
 
-        const nowIso = new Date().toISOString();
+        const webhookUrl = sanitizeString(request.body?.webhookUrl, 700);
+        const syncResult = await syncItem(appId, userId, providerItemId, { webhookUrl });
+        const connections = await listConnections(appId, userId);
+        const webhookSetup = await ensureWebhooksConfigured().catch((_error) => ({
+          configured: false,
+          reason: 'autoconfig-error'
+        }));
 
-        const upstream = await requestOpenFinanceUpstream(
-          'connect-bank',
-          {
-            appId,
-            bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode],
-            providerItemId
-          },
-          {
-            userId
-          }
-        );
-
-        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
-        const providerConnectionId = sanitizeString(
-          upstreamConnection.id || upstreamConnection.connectionId || providerItemId || bankCode,
-          140
-        ) || bankCode;
-        const normalizedProviderItemId = sanitizeString(providerItemId || providerConnectionId, 140);
-        const connectionDocId = sanitizeString(
-          bankCode === 'meu-pluggy' ? normalizedProviderItemId || providerConnectionId : bankCode,
-          140
-        ) || bankCode;
-        const connectionRef = connectionsCollection.doc(connectionDocId);
-        const existingSnapshot = await connectionRef.get();
-        const createdAt = existingSnapshot.exists ? String(existingSnapshot.data()?.createdAt || nowIso) : nowIso;
-        const connectionStatus = sanitizeString(upstreamConnection.status || 'pending', 40) || 'pending';
-        const consentExpiresAt = sanitizeString(upstreamConnection.consentExpiresAt || addDaysToIso(90), 80);
-
-        const persisted = await persistOpenFinanceTransactions(
-          appId,
-          userId,
-          Array.isArray(upstream?.transactions) ? upstream.transactions : [],
-          {
-            bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode]
-          }
-        );
-
-        await connectionRef.set(
-          {
-            bankCode,
-            bankName: OPEN_FINANCE_BANKS[bankCode],
-            provider: OPEN_FINANCE_PROVIDER,
-            providerConnectionId,
-            providerItemId: normalizedProviderItemId,
-            status: connectionStatus,
-            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
-            consentExpiresAt,
-            lastSyncAt: nowIso,
-            lastSyncInserted: persisted.insertedCount,
-            errorMessage: '',
-            createdAt,
-            updatedAt: nowIso
-          },
-          { merge: true }
-        );
-
-        const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
-          connectionId: connectionDocId,
-          providerConnectionId,
-          providerItemId: normalizedProviderItemId,
-          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
-          insertedCount: persisted.insertedCount,
-          skippedCount: persisted.skippedCount,
-          transactions: persisted.insertedTransactions,
-          connections
+          connectionId: syncResult.connection.id,
+          providerConnectionId: syncResult.connection.providerConnectionId,
+          providerItemId: syncResult.connection.providerItemId,
+          insertedCount: syncResult.insertedCount,
+          skippedCount: syncResult.skippedCount,
+          transactions: syncResult.transactions,
+          connections,
+          webhookSetup
         });
         return;
       }
 
-      if (action === 'sync-connection') {
-        const connectionId = sanitizeString(request.body?.connectionId, 120);
+      if (action === 'sync-connection' || action === 'renew-connection') {
+        assertMeuPluggyCredentials();
+        const connectionId = sanitizeString(request.body?.connectionId, 140);
         if (!connectionId) {
           response.status(400).json({
             error: 'connectionId is required'
@@ -160,145 +108,31 @@ const openFinanceProxy = onRequest(
           return;
         }
 
-        const connectionRef = connectionsCollection.doc(connectionId);
-        const connectionSnapshot = await connectionRef.get();
-        if (!connectionSnapshot.exists) {
+        const connection = await getConnectionById(appId, userId, connectionId);
+        if (!connection) {
           response.status(404).json({
             error: 'Connection not found'
           });
           return;
         }
 
-        const connection = connectionSnapshot.data() || {};
-        if (String(connection.status || '').trim() === 'revoked') {
-          response.status(400).json({
-            error: 'Connection is revoked'
-          });
-          return;
-        }
+        const itemId = sanitizeString(connection.providerItemId || connection.providerConnectionId || connection.id, 140);
+        const webhookUrl = sanitizeString(request.body?.webhookUrl, 700);
+        const syncResult = await syncItem(appId, userId, itemId, { webhookUrl });
+        const connections = await listConnections(appId, userId);
 
-        const bankCode = sanitizeString(connection.bankCode, 60);
-        const bankName = sanitizeString(connection.bankName || OPEN_FINANCE_BANKS[bankCode] || bankCode, 80);
-        const previousProviderConnectionId = resolveProviderConnectionId(connection);
-        const storedProviderItemId = sanitizeString(
-          connection.providerItemId || connection.providerConnectionId || connectionId,
-          140
-        );
-        const shouldReconnect = !previousProviderConnectionId;
-        const upstreamAction = shouldReconnect ? 'connect-bank' : 'sync-connection';
-
-        const nowIso = new Date().toISOString();
-        const upstream = await requestOpenFinanceUpstream(
-          upstreamAction,
-          shouldReconnect
-            ? {
-                appId,
-                bankCode,
-                bankName,
-                providerItemId: storedProviderItemId
-              }
-            : {
-                appId,
-                bankCode,
-                connectionId: previousProviderConnectionId
-              },
-          {
-            userId
-          }
-        );
-
-        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
-        const providerConnectionId =
-          resolveProviderConnectionId(upstreamConnection, previousProviderConnectionId || connectionId) || connectionId;
-        const persisted = await persistOpenFinanceTransactions(
-          appId,
-          userId,
-          Array.isArray(upstream?.transactions) ? upstream.transactions : [],
-          connection
-        );
-
-        await connectionRef.set(
-          {
-            status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
-            providerConnectionId,
-            providerItemId: sanitizeString(storedProviderItemId || providerConnectionId, 140),
-            lastSyncAt: nowIso,
-            lastSyncInserted: persisted.insertedCount,
-            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
-            consentExpiresAt: sanitizeString(upstreamConnection.consentExpiresAt || connection.consentExpiresAt, 80),
-            errorMessage: '',
-            updatedAt: nowIso
-          },
-          { merge: true }
-        );
-
-        const connections = await listOpenFinanceConnections(appId, userId);
         response.status(200).json({
-          connectionId,
-          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
-          insertedCount: persisted.insertedCount,
-          skippedCount: persisted.skippedCount,
-          transactions: persisted.insertedTransactions,
-          connections
-        });
-        return;
-      }
-
-      if (action === 'renew-connection') {
-        const connectionId = sanitizeString(request.body?.connectionId, 120);
-        if (!connectionId) {
-          response.status(400).json({
-            error: 'connectionId is required'
-          });
-          return;
-        }
-
-        const connectionRef = connectionsCollection.doc(connectionId);
-        const snapshot = await connectionRef.get();
-        if (!snapshot.exists) {
-          response.status(404).json({
-            error: 'Connection not found'
-          });
-          return;
-        }
-
-        const connection = snapshot.data() || {};
-        const upstream = await requestOpenFinanceUpstream(
-          'renew-connection',
-          {
-            appId,
-            bankCode: sanitizeString(connection.bankCode, 60),
-            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
-          },
-          {
-            userId
-          }
-        );
-
-        const upstreamConnection = upstream?.connection && typeof upstream.connection === 'object' ? upstream.connection : {};
-
-        await connectionRef.set(
-          {
-            status: sanitizeString(upstreamConnection.status || 'active', 40) || 'active',
-            consentUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
-            consentExpiresAt: sanitizeString(upstreamConnection.consentExpiresAt || addDaysToIso(90), 80),
-            errorMessage: '',
-            updatedAt: new Date().toISOString()
-          },
-          { merge: true }
-        );
-
-        const connections = await listOpenFinanceConnections(appId, userId);
-        response.status(200).json({
-          connectionId,
-          authorizationUrl: sanitizeString(upstreamConnection.consentUrl || upstream.authorizationUrl, 700),
+          connectionId: syncResult.connection.id,
+          insertedCount: syncResult.insertedCount,
+          skippedCount: syncResult.skippedCount,
+          transactions: syncResult.transactions,
           connections
         });
         return;
       }
 
       if (action === 'revoke-connection') {
-        const connectionId = sanitizeString(request.body?.connectionId, 120);
+        const connectionId = sanitizeString(request.body?.connectionId, 140);
         if (!connectionId) {
           response.status(400).json({
             error: 'connectionId is required'
@@ -306,39 +140,19 @@ const openFinanceProxy = onRequest(
           return;
         }
 
-        const connectionRef = connectionsCollection.doc(connectionId);
-        const snapshot = await connectionRef.get();
-        if (!snapshot.exists) {
+        const connection = await getConnectionById(appId, userId, connectionId);
+        if (!connection) {
           response.status(404).json({
             error: 'Connection not found'
           });
           return;
         }
 
-        const connection = snapshot.data() || {};
-        await requestOpenFinanceUpstream(
-          'revoke-connection',
-          {
-            appId,
-            bankCode: sanitizeString(connection.bankCode, 60),
-            connectionId: sanitizeString(connection.providerConnectionId || connectionId, 140)
-          },
-          {
-            userId
-          }
-        );
-
-        await connectionRef.set(
-          {
-            status: 'revoked',
-            updatedAt: new Date().toISOString()
-          },
-          { merge: true }
-        );
-
-        const connections = await listOpenFinanceConnections(appId, userId);
+        const itemId = sanitizeString(connection.providerItemId || connection.providerConnectionId || connection.id, 140);
+        await revokeItemConnection(appId, userId, itemId);
+        const connections = await listConnections(appId, userId);
         response.status(200).json({
-          connectionId,
+          connectionId: itemId,
           connections
         });
         return;
@@ -350,7 +164,7 @@ const openFinanceProxy = onRequest(
     } catch (error) {
       const statusCode = Math.max(400, Math.min(599, Number(error?.statusCode || 500)));
       response.status(statusCode).json({
-        error: 'Unexpected error while handling Open Finance',
+        error: 'Unexpected error while handling Meu Pluggy Open Finance',
         details: error?.message || 'unknown error'
       });
     }

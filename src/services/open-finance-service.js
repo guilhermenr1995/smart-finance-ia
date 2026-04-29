@@ -50,15 +50,27 @@ export class OpenFinanceService {
     });
   }
 
-  async syncConnection(appId, connectionId) {
-    return this.request('sync-connection', { appId, connectionId });
+  async syncConnection(appId, connectionId, options = {}) {
+    return this.request('sync-connection', {
+      appId,
+      connectionId,
+      ...(options && typeof options === 'object' ? options : {})
+    });
   }
 
   async revokeConnection(appId, connectionId) {
     return this.request('revoke-connection', { appId, connectionId });
   }
 
-  async renewConnection(appId, connectionId) {
-    return this.request('renew-connection', { appId, connectionId });
+  async renewConnection(appId, connectionId, options = {}) {
+    return this.request('renew-connection', {
+      appId,
+      connectionId,
+      ...(options && typeof options === 'object' ? options : {})
+    });
+  }
+
+  async setupWebhooks(appId) {
+    return this.request('setup-webhooks', { appId });
   }
 }
