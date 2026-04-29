@@ -86,7 +86,7 @@ function mapPluggyItemStatus(rawStatus) {
 
 function isExpenseCandidate(transaction = {}, accountType = 'BANK') {
   const txType = String(transaction.type || '').trim().toUpperCase();
-  const amount = Number(transaction.amount);
+  const amount = resolveTransactionAmount(transaction);
   if (!Number.isFinite(amount) || Math.abs(amount) < 0.00001) {
     return false;
   }
@@ -103,6 +103,16 @@ function isExpenseCandidate(transaction = {}, accountType = 'BANK') {
   }
 
   return amount < 0;
+}
+
+function resolveTransactionAmount(transaction = {}) {
+  const amountInAccountCurrency = Number(transaction.amountInAccountCurrency);
+  if (Number.isFinite(amountInAccountCurrency) && Math.abs(amountInAccountCurrency) >= 0.00001) {
+    return amountInAccountCurrency;
+  }
+
+  const amount = Number(transaction.amount);
+  return Number.isFinite(amount) ? amount : NaN;
 }
 
 function buildTitleFromTransaction(transaction = {}, bankName = '') {
@@ -126,7 +136,7 @@ function mapPluggyTransaction(transaction = {}, account = {}, context = {}) {
 
   const date = sanitizeString(transaction.date || transaction.createdAt, 80);
   const title = buildTitleFromTransaction(transaction, context.bankName);
-  const value = Math.abs(toCurrency(transaction.amount));
+  const value = Math.abs(toCurrency(resolveTransactionAmount(transaction)));
   if (!date || !title || !Number.isFinite(value) || value <= 0) {
     return null;
   }

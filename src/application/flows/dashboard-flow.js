@@ -9,7 +9,7 @@ import {
   getMonthKeyFromDate,
   normalizeGoalScope
 } from '../../utils/goal-utils.js';
-import { matchesTransactionSearch } from '../../utils/transaction-utils.js';
+import { getDisplayCategory, matchesTransactionSearch } from '../../utils/transaction-utils.js';
 
 function buildRhythmDailyByCategory(consideredTransactions = []) {
   const grouped = new Map();
@@ -29,7 +29,7 @@ function buildRhythmDailyByCategory(consideredTransactions = []) {
     }
 
     const current = grouped.get(dateKey);
-    const category = String(transaction.category || 'Outros').trim() || 'Outros';
+    const category = String(getDisplayCategory(transaction) || 'Outros').trim() || 'Outros';
     const title = String(transaction.title || '').trim() || 'Transação sem descrição';
     const value = Number(transaction.value || 0);
     current.total += value;
@@ -199,7 +199,9 @@ export function refreshDashboard(app) {
     openFinance: app.state.openFinance,
     ritmoDoMes: {
       selectedCategory: app.state.filters.category,
-      daily: rhythmDaily
+      daily: rhythmDaily,
+      categoryTotals: summary.categoryTotals || {},
+      previousCategoryTotals: previousSummary.categoryTotals || {}
     }
   });
 }

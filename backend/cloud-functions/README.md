@@ -86,25 +86,24 @@ backend/cloud-functions/
    - `GEMINI_MODEL=gemini-2.5-flash-lite` (ou modelo disponível no seu projeto)
    - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash` (opcional, recomendado)
    - `OPEN_FINANCE_PROVIDER=pluggy` (suportados: `pluggy` ou `belvo`)
-   - `OPEN_FINANCE_UPSTREAM_URL=https://seu-backend-open-finance.example.com/open-finance`
-   - `OPEN_FINANCE_UPSTREAM_API_KEY=...` (se o upstream exigir)
-   - `OPEN_FINANCE_ALLOW_FALLBACK=true` (opcional; padrão `true`)
-   - `OPEN_FINANCE_PLUGGY_DIRECT_MODE=auto` (opções: `auto`, `on`, `off`)
-   - `OPEN_FINANCE_PLUGGY_CLIENT_ID=...` e `OPEN_FINANCE_PLUGGY_CLIENT_SECRET=...` (para modo direto Pluggy/Meu Pluggy)
+   - `OPEN_FINANCE_PLUGGY_DIRECT_MODE=on` (opções: `auto`, `on`, `off`)
+   - `OPEN_FINANCE_PLUGGY_CLIENT_ID=...` e `OPEN_FINANCE_PLUGGY_CLIENT_SECRET=...` (modo direto Pluggy/Meu Pluggy)
    - `OPEN_FINANCE_ONLY_MEU_PLUGGY=true` (recomendado para operação exclusiva com `meu.pluggy.ai/connections`)
    - `OPEN_FINANCE_PLUGGY_ITEM_IDS=...` (opcional; use quando houver um único Item ID fixo)
+   - `OPEN_FINANCE_UPSTREAM_URL=...` e `OPEN_FINANCE_UPSTREAM_API_KEY=...` (opcional; apenas se usar backend upstream em vez do modo direto)
+   - `OPEN_FINANCE_ALLOW_FALLBACK=true` (opcional; relevante para modo upstream/embedded)
 
 ## Checklist de produção — Open Finance
 
 Antes de publicar em produção, valide este checklist:
 
 1. `OPEN_FINANCE_PROVIDER` definido para um provider real suportado (`pluggy` ou `belvo`).
-2. `OPEN_FINANCE_UPSTREAM_URL` apontando para um backend agregador ativo (HTTPS) com contrato compatível.
-3. `OPEN_FINANCE_UPSTREAM_API_KEY` preenchida quando o upstream exigir autenticação por chave.
+2. Se estiver em modo upstream (indireto), `OPEN_FINANCE_UPSTREAM_URL` deve apontar para backend agregador ativo (HTTPS).
+3. Se estiver em modo upstream (indireto), `OPEN_FINANCE_UPSTREAM_API_KEY` deve ser preenchida quando o upstream exigir autenticação por chave.
 4. Deploy da função `openFinanceProxy` realizado com sucesso.
 5. `runtime-config.js` com `openFinance.proxyUrl` apontando para a URL pública da função deployada.
 6. Teste autenticado das ações `list-connections`, `connect-bank`, `sync-connection`, `renew-connection` e `revoke-connection`.
-7. Se desejar operação estritamente real (sem fallback), definir `OPEN_FINANCE_ALLOW_FALLBACK=false`.
+7. Se estiver em modo upstream e desejar operação estritamente real (sem fallback), definir `OPEN_FINANCE_ALLOW_FALLBACK=false`.
 
 Se o upstream ficar indisponível e `OPEN_FINANCE_ALLOW_FALLBACK=true`, o backend mantém o fluxo operacional via modo embedded.
 

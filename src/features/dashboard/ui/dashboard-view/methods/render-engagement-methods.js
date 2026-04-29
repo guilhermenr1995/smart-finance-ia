@@ -110,6 +110,8 @@ class DashboardViewRenderEngagementMethods {
     const daily = ritmoState?.daily || {};
     const days = Array.isArray(daily.days) ? daily.days : [];
     const series = Array.isArray(daily.series) ? daily.series : [];
+    const currentCategoryTotals = ritmoState?.categoryTotals || {};
+    const previousCategoryTotals = ritmoState?.previousCategoryTotals || {};
 
     const formatDayLabelPtBr = (day) => {
       const raw = String(day || '').trim();
@@ -125,6 +127,16 @@ class DashboardViewRenderEngagementMethods {
       const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(date);
       const formattedDate = `${String(dayOfMonth).padStart(2, '0')}/${String(month).padStart(2, '0')}/${String(year).padStart(4, '0')}`;
       return `${escapeHtml(formattedDate)} (${escapeHtml(weekday)})`;
+    };
+
+    const formatDeltaCurrency = (value) => {
+      const numericValue = Number(value || 0);
+      if (Math.abs(numericValue) < 0.005) {
+        return 'R$ 0,00';
+      }
+
+      const signal = numericValue > 0 ? '+' : '-';
+      return `${signal}${formatCurrencyBRL(Math.abs(numericValue))}`;
     };
 
     const buildDayTooltipHtml = (day, detail, activeCategory = null) => {
@@ -212,12 +224,27 @@ class DashboardViewRenderEngagementMethods {
       const categoryLabel = normalizedActiveCategory
         ? `Categoria selecionada: ${escapeHtml(selectedCategoryLabel)}`
         : 'Todas as categorias do dia';
+      const periodComparisonMarkup = normalizedActiveCategory
+        ? (() => {
+            const currentCategoryPeriodTotal = Number(currentCategoryTotals?.[normalizedActiveCategory] || 0);
+            const previousCategoryPeriodTotal = Number(previousCategoryTotals?.[normalizedActiveCategory] || 0);
+            const periodDelta = currentCategoryPeriodTotal - previousCategoryPeriodTotal;
+            return `
+              <p class="text-[10px] font-bold text-zinc-700">
+                Atual no período: <strong>${formatCurrencyBRL(currentCategoryPeriodTotal)}</strong> |
+                Anterior no período: <strong>${formatCurrencyBRL(previousCategoryPeriodTotal)}</strong> |
+                Diferença: <strong>${formatDeltaCurrency(periodDelta)}</strong>
+              </p>
+            `;
+          })()
+        : '';
 
       return `
         <div class="space-y-2 text-[10px]">
           <p class="font-black uppercase text-zinc-600">Dia ${formatDayLabelPtBr(day)}</p>
           <p class="font-black text-zinc-900">Total: ${formatCurrencyBRL(Number(detail.total || 0))}</p>
           <p class="text-[10px] font-bold text-zinc-600">${categoryLabel}</p>
+          ${periodComparisonMarkup}
           <div class="ritmo-transaction-list">
             ${
               groupedListMarkup ||
