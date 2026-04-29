@@ -5,6 +5,7 @@ const { hashPayload } = require('../open-finance/meu-pluggy-client');
 const {
   WEBHOOK_COLLECTION,
   WEBHOOK_ENABLED,
+  WEBHOOK_ALLOW_UNSIGNED,
   WEBHOOK_EVENTS_TO_MANAGE,
   parseWebhookHeaderSecret,
   queueWebhookEvent,
@@ -23,8 +24,13 @@ const openFinanceWebhook = onRequest(
       return;
     }
 
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      response.status(200).json({ ok: true });
+      return;
+    }
+
     if (request.method !== 'POST') {
-      response.status(405).json({ error: 'Method not allowed' });
+      response.status(202).json({ accepted: false, ignored: true, reason: 'method-not-supported' });
       return;
     }
 
@@ -44,7 +50,12 @@ const openFinanceWebhook = onRequest(
     const payload = request.body && typeof request.body === 'object' ? request.body : {};
     const eventName = sanitizeString(payload.event, 80);
     if (!eventName) {
-      response.status(400).json({ error: 'Webhook payload sem campo event.' });
+      response.status(202).json({
+        accepted: true,
+        ignored: true,
+        reason: 'missing-event',
+        permissiveMode: WEBHOOK_ALLOW_UNSIGNED
+      });
       return;
     }
 

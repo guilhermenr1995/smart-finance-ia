@@ -181,108 +181,123 @@
             <div class="dashboard-section-head">
               <div class="dashboard-section-title-wrap">
                 <span class="dashboard-step-badge">1</span>
-                <h3 class="dashboard-section-title">Importação e Guia Rápido</h3>
+                <h3 class="dashboard-section-title">Importação</h3>
                 <button
                   type="button"
                   class="help-tooltip"
-                  data-tooltip="Importe CSV/OFX e use o guia para localizar rapidamente a opção de exportação no seu banco."
-                  aria-label="Ajuda sobre importação e guia rápido"
+                  data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados, descarta receitas e reaproveita categorias automaticamente."
+                  aria-label="Ajuda sobre importação"
                 >
                   ?
                 </button>
               </div>
-              <p class="dashboard-section-subtitle">Escolha seu banco, exporte o arquivo e importe aqui.</p>
+              <p class="dashboard-section-subtitle">Envie os arquivos e inicie a organização do período.</p>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-5">
-              <div class="import-guide-panel bg-zinc-50 border-2 border-black p-4 space-y-4">
-                <div class="space-y-1">
-                  <p class="import-guide-title">Guia rápido de exportação</p>
-                  <p class="import-guide-caption">
-                    Selecione o banco e veja os passos em uma janela rápida, sem poluir a tela.
-                  </p>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
-                  <div>
-                    <label for="bank-guide-select" class="field-label mb-2">Banco</label>
-                    <select id="bank-guide-select" class="w-full font-black border-2 border-black bg-white py-2 px-3 text-sm">
-                      <option value="nubank">Nubank</option>
-                      <option value="itau">Itaú</option>
-                      <option value="bradesco">Bradesco</option>
-                      <option value="santander">Santander</option>
-                      <option value="banco-do-brasil">Banco do Brasil</option>
-                      <option value="caixa">Caixa</option>
-                      <option value="inter">Inter</option>
-                      <option value="outros">Outros bancos</option>
-                    </select>
-                  </div>
-                  <button
-                    id="btn-open-bank-guide"
-                    type="button"
-                    class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-yellow-300 min-h-[44px]"
-                  >
-                    Ver passos
-                  </button>
-                </div>
-                <p class="import-guide-tip">
-                  Prioridade de qualidade para importação: <strong>OFX</strong>, depois <strong>CSV</strong> e, se necessário,
-                  <strong>PDF detalhado</strong>.
-                </p>
+            <div class="space-y-3 max-w-4xl">
+              <div class="flex items-center gap-2">
+                <span class="font-black text-xs uppercase italic text-zinc-600">Importar Arquivos</span>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados, descarta receitas (valores positivos) e já reaproveita categorias anteriores automaticamente."
+                  aria-label="Ajuda sobre importação"
+                >
+                  ?
+                </button>
               </div>
-
-              <div class="space-y-3">
-                <div class="flex items-center gap-2">
-                  <span class="font-black text-xs uppercase italic text-zinc-600">Importar Arquivos</span>
+              <div class="flex flex-col gap-3">
+                <label
+                  class="dashboard-upload-card relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-xs uppercase text-center cursor-pointer"
+                >
+                  Cartão de Crédito (CSV/OFX/PDF)
+                  <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
+                </label>
+                <label
+                  class="dashboard-upload-card relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-xs uppercase text-center cursor-pointer"
+                >
+                  Conta Corrente (CSV/OFX/PDF)
+                  <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
+                </label>
+              </div>
+              <div class="bg-zinc-50 border-2 border-black p-3 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-xs font-black uppercase text-zinc-600">Conta Bancária da Importação</p>
                   <button
                     type="button"
                     class="help-tooltip"
-                    data-tooltip="Use CSV, OFX ou PDF. O app ignora duplicados, descarta receitas (valores positivos) e já reaproveita categorias anteriores automaticamente."
-                    aria-label="Ajuda sobre importação"
+                    data-tooltip="Todas as transações importadas entrarão na conta bancária selecionada abaixo."
+                    aria-label="Ajuda sobre conta bancária da importação"
                   >
                     ?
                   </button>
                 </div>
-                <div class="flex flex-col gap-3">
-                  <label
-                    class="dashboard-upload-card relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-xs uppercase text-center cursor-pointer"
-                  >
-                    Cartão de Crédito (CSV/OFX/PDF)
-                    <input id="file-credit" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
-                  </label>
-                  <label
-                    class="dashboard-upload-card relative bg-zinc-50 p-4 border-2 border-dashed border-zinc-300 hover:border-black font-black text-xs uppercase text-center cursor-pointer"
-                  >
-                    Conta Corrente (CSV/OFX/PDF)
-                    <input id="file-account" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv,.ofx,.ofc,.pdf" />
-                  </label>
-                </div>
-                <div class="bg-zinc-50 border-2 border-black p-3 space-y-2">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-black uppercase text-zinc-600">Conta Bancária da Importação</p>
-                    <button
-                      type="button"
-                      class="help-tooltip"
-                      data-tooltip="Todas as transações importadas entrarão na conta bancária selecionada abaixo."
-                      aria-label="Ajuda sobre conta bancária da importação"
-                    >
-                      ?
-                    </button>
-                  </div>
-                  <button
-                    id="import-bank-account-button"
-                    class="w-full px-3 py-2 border-2 border-black text-left font-black text-xs uppercase bg-white hover:bg-yellow-100"
-                  >
-                    Conta: <span id="import-bank-account-value">Padrão</span>
-                  </button>
-                </div>
                 <button
-                  id="btn-ai-sync"
-                  class="w-full bg-black text-yellow-300 p-4 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+                  id="import-bank-account-button"
+                  class="w-full px-3 py-2 border-2 border-black text-left font-black text-xs uppercase bg-white hover:bg-yellow-100"
                 >
-                  <span class="font-black text-sm uppercase tracking-widest">Categorizar ciclo com IA</span>
-                  <p id="label-ia-count" class="text-xs uppercase font-bold opacity-70 mt-1">0 pendentes</p>
+                  Conta: <span id="import-bank-account-value">Padrão</span>
                 </button>
               </div>
+              <button
+                id="btn-ai-sync"
+                class="w-full bg-black text-yellow-300 p-4 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98]"
+              >
+                <span class="font-black text-sm uppercase tracking-widest">Categorizar ciclo com IA</span>
+                <p id="label-ia-count" class="text-xs uppercase font-bold opacity-70 mt-1">0 pendentes</p>
+              </button>
+            </div>
+          </section>
+
+          <section id="guia-rapido-section" class="dashboard-section bg-white p-5 neo-brutalism space-y-4">
+            <div class="dashboard-section-head">
+              <div class="dashboard-section-title-wrap">
+                <span class="dashboard-step-badge">1A</span>
+                <h3 class="dashboard-section-title">Guia Rápido de Exportação</h3>
+                <button
+                  type="button"
+                  class="help-tooltip"
+                  data-tooltip="Selecione o banco e abra os passos rápidos para encontrar a exportação do extrato."
+                  aria-label="Ajuda sobre guia rápido de exportação"
+                >
+                  ?
+                </button>
+              </div>
+              <p class="dashboard-section-subtitle">Use quando precisar localizar o caminho de exportação no internet banking.</p>
+            </div>
+            <div class="import-guide-panel bg-zinc-50 border-2 border-black p-4 space-y-4 max-w-4xl">
+              <div class="space-y-1">
+                <p class="import-guide-title">Guia rápido de exportação</p>
+                <p class="import-guide-caption">
+                  Selecione o banco e veja os passos em uma janela rápida, sem poluir a tela.
+                </p>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
+                <div>
+                  <label for="bank-guide-select" class="field-label mb-2">Banco</label>
+                  <select id="bank-guide-select" class="w-full font-black border-2 border-black bg-white py-2 px-3 text-sm">
+                    <option value="nubank">Nubank</option>
+                    <option value="itau">Itaú</option>
+                    <option value="bradesco">Bradesco</option>
+                    <option value="santander">Santander</option>
+                    <option value="banco-do-brasil">Banco do Brasil</option>
+                    <option value="caixa">Caixa</option>
+                    <option value="inter">Inter</option>
+                    <option value="outros">Outros bancos</option>
+                  </select>
+                </div>
+                <button
+                  id="btn-open-bank-guide"
+                  type="button"
+                  class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-yellow-300 min-h-[44px]"
+                >
+                  Ver passos
+                </button>
+              </div>
+              <p class="import-guide-tip">
+                Prioridade de qualidade para importação: <strong>OFX</strong>, depois <strong>CSV</strong> e, se necessário,
+                <strong>PDF detalhado</strong>.
+              </p>
             </div>
           </section>
 
@@ -613,7 +628,7 @@
               </div>
             </div>
 
-            <div id="tabela-corpo" class="space-y-3"></div>
+            <div id="tabela-corpo" class="space-y-2"></div>
           </section>
         </div>
       </div>

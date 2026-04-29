@@ -174,7 +174,9 @@ class DashboardViewRenderSummaryMethods {
       tooltipElement.innerHTML = `
         <p class="category-pie-tooltip-label">${escapeHtml(slice.label)}</p>
         <p class="category-pie-tooltip-compare-line">
-          Atual: <strong>${formatCurrencyBRL(slice.value)}</strong> | Anterior: <strong>${formatCurrencyBRL(slice.previousValue)}</strong> | Diferença: <strong>${formatDeltaCurrency(slice.deltaValue)}</strong>
+          <span>Atual: <strong>${formatCurrencyBRL(slice.value)}</strong></span>
+          <span>Anterior: <strong>${formatCurrencyBRL(slice.previousValue)}</strong></span>
+          <span>Diferença: <strong>${formatDeltaCurrency(slice.deltaValue)}</strong></span>
         </p>
       `;
       tooltipElement.hidden = false;
@@ -406,6 +408,7 @@ class DashboardViewRenderSummaryMethods {
       this.categoryPieChart.onmousemove = null;
       this.categoryPieChart.onmouseleave = null;
       this.categoryPieChart.onblur = null;
+      let lastTouchAt = 0;
 
       const toggleTooltipForSlice = (slice, clientX, clientY) => {
         const activeSlice = String(tooltipElement?.dataset?.activeSlice || '').trim();
@@ -420,6 +423,10 @@ class DashboardViewRenderSummaryMethods {
       };
 
       this.categoryPieChart.onclick = (event) => {
+        if (Date.now() - lastTouchAt < 450) {
+          return;
+        }
+
         const clickedSlice = resolveSliceByPointer(event.clientX, event.clientY);
         if (!clickedSlice) {
           hideTooltip();
@@ -434,6 +441,8 @@ class DashboardViewRenderSummaryMethods {
         if (!touch) {
           return;
         }
+        event.preventDefault();
+        lastTouchAt = Date.now();
 
         const touchedSlice = resolveSliceByPointer(touch.clientX, touch.clientY);
         if (!touchedSlice) {
@@ -455,11 +464,11 @@ class DashboardViewRenderSummaryMethods {
             <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
             <span class="category-pie-legend-text">
               <strong>${escapeHtml(slice.label)}</strong>
-              <small class="category-pie-legend-main"><span>Participação: ${slice.percent.toFixed(1)}%</span></small>
-              <small class="category-pie-legend-compare category-pie-legend-compare-line">
-                <span>Atual: ${formatCurrencyBRL(slice.value)} | Anterior: ${formatCurrencyBRL(slice.previousValue)} | Diferença: ${formatDeltaCurrency(slice.deltaValue)}</span>
-              </small>
-              ${!canFilter ? '<small class="category-pie-legend-main"><span>Grupo agregado</span></small>' : ''}
+              <small class="category-pie-legend-line">Participação: ${slice.percent.toFixed(1)}%</small>
+              <small class="category-pie-legend-line">Atual: ${formatCurrencyBRL(slice.value)}</small>
+              <small class="category-pie-legend-line">Anterior: ${formatCurrencyBRL(slice.previousValue)}</small>
+              <small class="category-pie-legend-line">Diferença: ${formatDeltaCurrency(slice.deltaValue)}</small>
+              ${!canFilter ? '<small class="category-pie-legend-line category-pie-legend-muted">Grupo agregado</small>' : ''}
             </span>
           </div>
         `;

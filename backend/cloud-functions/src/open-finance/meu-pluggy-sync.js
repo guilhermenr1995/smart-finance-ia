@@ -38,6 +38,9 @@ const WEBHOOK_HEADER_NAME = String(
 const WEBHOOK_ENABLED = !['false', '0', 'no', 'off'].includes(
   String(process.env.OPEN_FINANCE_MEU_PLUGGY_WEBHOOK_ENABLED || 'true').trim().toLowerCase()
 );
+const WEBHOOK_ALLOW_UNSIGNED = ['true', '1', 'yes', 'on'].includes(
+  String(process.env.OPEN_FINANCE_MEU_PLUGGY_WEBHOOK_ALLOW_UNSIGNED || 'false').trim().toLowerCase()
+);
 const WEBHOOK_AUTOCONFIG = !['false', '0', 'no', 'off'].includes(
   String(process.env.OPEN_FINANCE_MEU_PLUGGY_WEBHOOK_AUTOCONFIG || 'false').trim().toLowerCase()
 );
@@ -100,7 +103,7 @@ function buildClientUserId(appId, userId) {
 function parseClientUserId(clientUserId) {
   const safe = String(clientUserId || '').trim();
   const parts = safe.split(':');
-  if (parts.length !== 3) {
+  if (parts.length < 3) {
     return null;
   }
   if (parts[0] !== CLIENT_USER_PREFIX) {
@@ -108,7 +111,7 @@ function parseClientUserId(clientUserId) {
   }
 
   const appId = sanitizeString(parts[1], 120);
-  const userId = sanitizeString(parts[2], 200);
+  const userId = sanitizeString(parts.slice(2).join(':'), 200);
   if (!appId || !userId) {
     return null;
   }
@@ -528,18 +531,28 @@ async function revokeItemConnection(appId, userId, itemId) {
 }
 
 function parseWebhookHeaderSecret(request) {
+  if (WEBHOOK_ALLOW_UNSIGNED) {
+    return {
+      enabled: false,
+      valid: true,
+      bypassed: true
+    };
+  }
+
   const configuredSecret = WEBHOOK_SECRET;
   if (!configuredSecret) {
     return {
       enabled: false,
-      valid: true
+      valid: true,
+      bypassed: true
     };
   }
 
   const headerValue = String(request.get(WEBHOOK_HEADER_NAME) || '').trim();
   return {
     enabled: true,
-    valid: headerValue && headerValue === configuredSecret
+    valid: headerValue && headerValue === configuredSecret,
+    bypassed: false
   };
 }
 
@@ -566,11 +579,25 @@ async function resolveConnectionOwner(payload = {}) {
     return null;
   }
 
-  const snapshot = await db
-    .collectionGroup('open_finance_conexoes')
-    .where('providerItemId', '==', itemId)
-    .limit(1)
-    .get();
+  let snapshot;
+  try {
+    snapshot = await db
+      .collectionGroup('open_finance_conexoes')
+      .where('providerItemId', '==', itemId)
+      .limit(1)
+      .get();
+  } catch (error) {
+    const message = sanitizeString(error?.message, 500);
+    const code = Number(error?.code);
+    if (code === 9 || /FAILED_PRECONDITION/i.test(message)) {
+      console.warn('Falha de pré-condição ao resolver owner por itemId; ignorando fallback de owner.', {
+        itemId,
+        message
+      });
+      return null;
+    }
+    throw error;
+  }
 
   if (snapshot.empty) {
     return null;
@@ -966,6 +993,7 @@ module.exports = {
   WEBHOOK_SECRET,
   WEBHOOK_HEADER_NAME,
   WEBHOOK_ENABLED,
+  WEBHOOK_ALLOW_UNSIGNED,
   WEBHOOK_AUTOCONFIG,
   WEBHOOK_URL,
   WEBHOOK_EVENTS_TO_MANAGE,
