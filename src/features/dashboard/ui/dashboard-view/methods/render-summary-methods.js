@@ -309,14 +309,16 @@ class DashboardViewRenderSummaryMethods {
     });
 
     slices.forEach((slice) => {
+      let previousValue = 0;
       if (slice.synthetic) {
-        slice.previousValue = hiddenEntries.reduce((accumulator, [category]) => {
+        previousValue = hiddenEntries.reduce((accumulator, [category]) => {
           return accumulator + Number(previousCategoryTotals?.[category] || 0);
         }, 0);
       } else {
-        slice.previousValue = Number(previousCategoryTotals?.[slice.key] || 0);
+        previousValue = Number(previousCategoryTotals?.[slice.key] || 0);
       }
-      slice.deltaValue = slice.value - slice.previousValue;
+      slice.previousValue = previousValue;
+      slice.deltaValue = slice.value - previousValue;
     });
 
     const gradient = slices
@@ -460,16 +462,18 @@ class DashboardViewRenderSummaryMethods {
       .map((slice) => {
         const canFilter = Boolean(slice.filterCategory);
         return `
-          <div class="category-pie-legend-item is-static">
+          <div class="category-pie-legend-item">
             <span class="category-pie-legend-dot" style="background:${slice.color}"></span>
-            <span class="category-pie-legend-text">
-              <strong>${escapeHtml(slice.label)}</strong>
-              <small class="category-pie-legend-line">Participação: ${slice.percent.toFixed(1)}%</small>
-              <small class="category-pie-legend-line">Atual: ${formatCurrencyBRL(slice.value)}</small>
-              <small class="category-pie-legend-line">Anterior: ${formatCurrencyBRL(slice.previousValue)}</small>
-              <small class="category-pie-legend-line">Diferença: ${formatDeltaCurrency(slice.deltaValue)}</small>
-              ${!canFilter ? '<small class="category-pie-legend-line category-pie-legend-muted">Grupo agregado</small>' : ''}
-            </span>
+            <div class="category-pie-legend-content">
+              <strong class="category-pie-legend-title">${escapeHtml(slice.label)}</strong>
+              <div class="category-pie-legend-value">${formatCurrencyBRL(slice.value)}</div>
+              <div class="category-pie-legend-meta">
+                <span>${slice.percent.toFixed(1)}%</span>
+                <span>vs ${formatCurrencyBRL(slice.previousValue)}</span>
+                <span class="category-pie-legend-delta ${slice.deltaValue >= 0 ? 'is-up' : 'is-down'}">${formatDeltaCurrency(slice.deltaValue)}</span>
+                ${!canFilter ? '<span class="category-pie-legend-muted">agregado</span>' : ''}
+              </div>
+            </div>
           </div>
         `;
       })
