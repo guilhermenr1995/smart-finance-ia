@@ -21,6 +21,7 @@ const {
   updateWebhook
 } = require('./meu-pluggy-client');
 const { sendOpenFinanceTransactionsPushNotification } = require('./meu-pluggy-push');
+const { deleteOpenFinanceDataForUser } = require('./open-finance-cleanup');
 
 const MEU_PLUGGY_BANK_CODE = 'meu-pluggy';
 const MEU_PLUGGY_BANK_NAME = 'Meu Pluggy';
@@ -649,6 +650,47 @@ async function getConnectionById(appId, userId, connectionId) {
   };
 }
 
+async function deleteConnectionById(appId, userId, connectionId) {
+  const safeId = sanitizeItemId(connectionId);
+  if (!safeId) {
+    const error = new Error('connectionId inválido.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const connectionRef = getConnectionsCollection(appId, userId).doc(safeId);
+  const snapshot = await connectionRef.get();
+  if (!snapshot.exists) {
+    const error = new Error('Connection not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const connectionData = snapshot.data() || {};
+  const providerItemId = sanitizeItemId(
+    connectionData.providerItemId || connectionData.providerConnectionId || connectionId
+  );
+  const allConnectionsSnapshot = await getConnectionsCollection(appId, userId).get();
+  const shouldDeleteAllOpenFinance = allConnectionsSnapshot.size <= 1;
+
+  const cleanupSummary = await deleteOpenFinanceDataForUser(appId, userId, {
+    dryRun: false,
+    deleteAllOpenFinance: shouldDeleteAllOpenFinance,
+    providerItemIds: shouldDeleteAllOpenFinance ? [] : [safeId, providerItemId]
+  });
+
+  await connectionRef.delete();
+  return {
+    connectionId: safeId,
+    deletedTransactions: Number(cleanupSummary.deletedTransactions || 0),
+    matchedOpenFinanceTransactions: Number(cleanupSummary.matchedOpenFinance || 0),
+    deletedCategories: Number(cleanupSummary.deletedCategoryDocs || 0),
+    matchedCategories: Number(cleanupSummary.matchedCategoryDocs || 0),
+    deletedCategoryNames: Array.isArray(cleanupSummary.deletedCategories) ? cleanupSummary.deletedCategories : [],
+    deleteAllOpenFinance: shouldDeleteAllOpenFinance
+  };
+}
+
 async function setWebhookStatus(appId, userId, connectionId, statusPayload = {}) {
   const safeId = sanitizeItemId(connectionId);
   if (!safeId) {
@@ -1224,6 +1266,7 @@ module.exports = {
   buildConnectionSnapshot,
   listConnections,
   getConnectionById,
+  deleteConnectionById,
   setWebhookStatus,
   syncItem,
   revokeItemConnection,

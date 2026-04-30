@@ -65,10 +65,11 @@ class DashboardViewRenderEngagementMethods {
                 ? `<a href="${escapeHtml(consentLink)}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 text-[10px] font-black uppercase underline">Abrir consentimento</a>`
                 : ''
             }
-            <div class="grid grid-cols-3 gap-2 mt-3">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
               <button data-open-finance-action="sync" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Sync</button>
               <button data-open-finance-action="renew" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Renovar</button>
               <button data-open-finance-action="revoke" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-100">Revogar</button>
+              <button data-open-finance-action="delete" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-200 text-red-900">Excluir</button>
             </div>
           </article>
         `;

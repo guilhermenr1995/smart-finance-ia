@@ -190,3 +190,38 @@ export async function revokeOpenFinanceConnection(app, connectionId) {
     app.authView.showMessage(getErrorMessage(error), 'error');
   }
 }
+
+export async function deleteOpenFinanceConnection(app, connectionId) {
+  if (!app.state.user || !app.openFinanceService) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    'Deseja excluir esta conexão Open Finance? Essa ação remove a conexão, as transações vinculadas e categorias órfãs relacionadas ao Open Finance.'
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  app.dashboardView.setBusy(true);
+  app.overlayView.show('Excluindo conexão Open Finance e limpando transações vinculadas...');
+
+  try {
+    const result = await app.openFinanceService.deleteConnection(app.config.appId, connectionId);
+    app.state.setOpenFinanceConnections(result?.connections || []);
+    await app.syncDataFromCloud({ force: true, showOverlay: false });
+    app.persistTransactionsCache();
+    app.refreshDashboard();
+    await app.syncPushNotifications();
+    const deletedTransactions = Number(result?.deletedTransactions || 0);
+    const deletedCategories = Number(result?.deletedCategories || 0);
+    const summary = `Conexão excluída. Transações removidas: ${deletedTransactions}. Categorias limpas: ${deletedCategories}.`;
+    app.overlayView.log(summary);
+    app.authView.showMessage(summary, 'success');
+    setTimeout(() => app.overlayView.hide(), 900);
+  } catch (error) {
+    app.overlayView.showError(getErrorMessage(error));
+  } finally {
+    app.dashboardView.setBusy(false);
+  }
+}

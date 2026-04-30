@@ -3,87 +3,10 @@ const {
   setCorsHeaders,
   handlePreflightAndMethod,
   authenticateRequest,
-  isAdminRequest,
-  db
+  isAdminRequest
 } = require('../core/base');
-const { sanitizeString } = require('../core/domain-utils');
+const { deleteOpenFinanceDataForUser } = require('../open-finance/open-finance-cleanup');
 const { resolveUserIdsForJourneyReset } = require('../maintenance/reset-user-journey');
-
-function isOpenFinanceTransactionRecord(data = {}) {
-  const origin = String(data.transactionOrigin || '').trim().toLowerCase();
-  if (origin === 'open-finance' || origin === 'openfinance') {
-    return true;
-  }
-
-  if (sanitizeString(data.providerTransactionId, 140)) {
-    return true;
-  }
-  if (sanitizeString(data.providerItemId, 140)) {
-    return true;
-  }
-  if (sanitizeString(data.providerAccountId, 140)) {
-    return true;
-  }
-
-  const categorySource = String(data.categorySource || '').trim().toLowerCase();
-  return categorySource.includes('open-finance') || categorySource.includes('openfinance');
-}
-
-async function deleteOpenFinanceTransactionsForUser(appId, userId, options = {}) {
-  const dryRun = Boolean(options.dryRun);
-  const batchSize = Math.max(1, Math.min(450, Number(options.batchSize || 350)));
-  const collectionRef = db.collection(`artifacts/${appId}/users/${userId}/transacoes`);
-  const snapshot = await collectionRef.get();
-
-  let scanned = 0;
-  let matchedOpenFinance = 0;
-  let deleted = 0;
-  let pendingBatchOps = 0;
-  let currentBatch = db.batch();
-
-  const commitBatch = async () => {
-    if (pendingBatchOps <= 0) {
-      return;
-    }
-    await currentBatch.commit();
-    deleted += pendingBatchOps;
-    currentBatch = db.batch();
-    pendingBatchOps = 0;
-  };
-
-  for (const doc of snapshot.docs) {
-    scanned += 1;
-    const data = doc.data() || {};
-    if (!isOpenFinanceTransactionRecord(data)) {
-      continue;
-    }
-
-    matchedOpenFinance += 1;
-    if (dryRun) {
-      continue;
-    }
-
-    currentBatch.delete(doc.ref);
-    pendingBatchOps += 1;
-    if (pendingBatchOps >= batchSize) {
-      await commitBatch();
-    }
-  }
-
-  if (!dryRun) {
-    await commitBatch();
-  } else {
-    deleted = matchedOpenFinance;
-  }
-
-  return {
-    appId,
-    userId,
-    scanned,
-    matchedOpenFinance,
-    deleted
-  };
-}
 
 const maintenanceDeleteOpenFinanceTransactions = onRequest(
   {
@@ -147,15 +70,27 @@ const maintenanceDeleteOpenFinanceTransactions = onRequest(
       let scanned = 0;
       let matchedOpenFinance = 0;
       let deleted = 0;
+      let matchedCategories = 0;
+      let deletedCategories = 0;
+      const deletedCategoryNames = new Set();
 
       for (const resolvedUserId of resolved.userIds) {
-        const summary = await deleteOpenFinanceTransactionsForUser(appId, resolvedUserId, {
-          dryRun
+        const summary = await deleteOpenFinanceDataForUser(appId, resolvedUserId, {
+          dryRun,
+          deleteAllOpenFinance: true
         });
         perUser[resolvedUserId] = summary;
         scanned += Number(summary.scanned || 0);
         matchedOpenFinance += Number(summary.matchedOpenFinance || 0);
-        deleted += Number(summary.deleted || 0);
+        deleted += Number(summary.deletedTransactions || 0);
+        matchedCategories += Number(summary.matchedCategoryDocs || 0);
+        deletedCategories += Number(summary.deletedCategoryDocs || 0);
+        (Array.isArray(summary.deletedCategories) ? summary.deletedCategories : []).forEach((category) => {
+          const safe = String(category || '').trim();
+          if (safe) {
+            deletedCategoryNames.add(safe);
+          }
+        });
       }
 
       response.status(200).json({
@@ -172,6 +107,9 @@ const maintenanceDeleteOpenFinanceTransactions = onRequest(
           scanned,
           matchedOpenFinance,
           deleted,
+          matchedCategories,
+          deletedCategories,
+          deletedCategoryNames: [...deletedCategoryNames].sort((left, right) => left.localeCompare(right, 'pt-BR')),
           perUser
         }
       });

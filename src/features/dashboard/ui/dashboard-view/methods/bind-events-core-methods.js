@@ -200,6 +200,10 @@ class DashboardViewBindEventsCoreMethods {
       }
       if (action === 'revoke') {
         handlers.onRevokeOpenFinanceConnection?.(connectionId);
+        return;
+      }
+      if (action === 'delete') {
+        handlers.onDeleteOpenFinanceConnection?.(connectionId);
       }
     });
   }

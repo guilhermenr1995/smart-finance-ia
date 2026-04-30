@@ -338,9 +338,12 @@ class AdminDashboardMaintenanceMethods {
       const summary = payload?.summary || {};
       const deleted = toNumber(summary.deleted);
       const matched = toNumber(summary.matchedOpenFinance);
+      const deletedCategories = toNumber(summary.deletedCategories);
       const message =
         deleted > 0
-          ? `Transações Open Finance removidas com sucesso: ${formatInteger(deleted)} item(ns).`
+          ? `Transações Open Finance removidas com sucesso: ${formatInteger(deleted)} item(ns). Categorias limpas: ${formatInteger(
+              deletedCategories
+            )}.`
           : `Nenhuma transação Open Finance encontrada para remoção (${formatInteger(matched)} item(ns) analisados).`;
 
       this.usersMaintenanceStatusByUserId.set(userId, {

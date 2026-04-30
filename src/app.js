@@ -50,6 +50,7 @@ import {
 } from './features/goals/flows/goal-flow.js';
 import {
   connectOpenFinanceBank,
+  deleteOpenFinanceConnection,
   loadOpenFinanceConnections,
   renewOpenFinanceConnection,
   revokeOpenFinanceConnection,
@@ -76,7 +77,6 @@ class SmartFinanceApplication {
     this.dashboardView = dependencies.dashboardView;
     this.overlayView = dependencies.overlayView;
     this.serviceWorkerRegistration = null;
-    this.startupSplash = document.getElementById('startup-splash');
 
     this.installButton = document.getElementById('btn-install-app');
   }
@@ -99,7 +99,6 @@ class SmartFinanceApplication {
     }
 
     this.refreshDashboard();
-    this.hideStartupSplash();
   }
 
   bindEvents() {
@@ -145,6 +144,7 @@ class SmartFinanceApplication {
       onSyncOpenFinanceConnection: (connectionId) => this.syncOpenFinanceConnection(connectionId),
       onRenewOpenFinanceConnection: (connectionId) => this.renewOpenFinanceConnection(connectionId),
       onRevokeOpenFinanceConnection: (connectionId) => this.revokeOpenFinanceConnection(connectionId),
+      onDeleteOpenFinanceConnection: (connectionId) => this.deleteOpenFinanceConnection(connectionId),
       onRefreshOpenFinanceConnections: () => this.loadOpenFinanceConnections({ showFeedback: true })
     });
 
@@ -289,6 +289,10 @@ class SmartFinanceApplication {
     return revokeOpenFinanceConnection(this, connectionId);
   }
 
+  async deleteOpenFinanceConnection(connectionId) {
+    return deleteOpenFinanceConnection(this, connectionId);
+  }
+
   async syncPushNotifications(options = {}) {
     if (!this.state.user || !this.pushNotificationService) {
       return {
@@ -315,22 +319,6 @@ class SmartFinanceApplication {
     return this.pushNotificationService.unregisterForUser(user, {
       reason
     });
-  }
-
-  hideStartupSplash(delayMs = 420) {
-    if (!this.startupSplash) {
-      return;
-    }
-
-    window.setTimeout(() => {
-      if (!this.startupSplash) {
-        return;
-      }
-      this.startupSplash.classList.add('is-leaving');
-      window.setTimeout(() => {
-        this.startupSplash?.classList.add('hidden');
-      }, 300);
-    }, Math.max(0, Number(delayMs) || 0));
   }
 
   normalizeError(error) {

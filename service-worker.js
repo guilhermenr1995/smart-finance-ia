@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-finance-shell-v16';
+const CACHE_NAME = 'smart-finance-shell-v17';
 const NETWORK_FIRST_DESTINATIONS = new Set(['document', 'script', 'style', 'manifest']);
 
 const APP_SHELL_FILES = [
@@ -34,8 +34,7 @@ const APP_SHELL_FILES = [
   './src/utils/transaction-utils.js',
   './assets/icons/icon-192.svg',
   './assets/icons/icon-512.svg',
-  './assets/icons/notification-badge.svg',
-  './assets/splash/splash-mark.svg'
+  './assets/icons/notification-badge.svg'
 ];
 
 self.addEventListener('install', (event) => {

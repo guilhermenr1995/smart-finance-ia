@@ -62,6 +62,10 @@ export class OpenFinanceService {
     return this.request('revoke-connection', { appId, connectionId });
   }
 
+  async deleteConnection(appId, connectionId) {
+    return this.request('delete-connection', { appId, connectionId });
+  }
+
   async renewConnection(appId, connectionId, options = {}) {
     return this.request('renew-connection', {
       appId,

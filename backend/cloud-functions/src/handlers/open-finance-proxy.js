@@ -10,6 +10,7 @@ const {
   MEU_PLUGGY_BANK_CODE,
   listConnections,
   getConnectionById,
+  deleteConnectionById,
   syncItem,
   revokeItemConnection,
   ensureWebhooksConfigured
@@ -184,6 +185,31 @@ const openFinanceProxy = onRequest(
         const connections = await listConnections(appId, userId);
         response.status(200).json({
           connectionId: itemId,
+          connections
+        });
+        return;
+      }
+
+      if (action === 'delete-connection') {
+        const connectionId = sanitizeString(request.body?.connectionId, 140);
+        if (!connectionId) {
+          response.status(400).json({
+            error: 'connectionId is required'
+          });
+          return;
+        }
+
+        const deleted = await deleteConnectionById(appId, userId, connectionId);
+        const connections = await listConnections(appId, userId);
+        response.status(200).json({
+          connectionId: deleted.connectionId,
+          deleted: true,
+          deletedTransactions: Number(deleted.deletedTransactions || 0),
+          matchedOpenFinanceTransactions: Number(deleted.matchedOpenFinanceTransactions || 0),
+          deletedCategories: Number(deleted.deletedCategories || 0),
+          matchedCategories: Number(deleted.matchedCategories || 0),
+          deletedCategoryNames: Array.isArray(deleted.deletedCategoryNames) ? deleted.deletedCategoryNames : [],
+          deleteAllOpenFinance: Boolean(deleted.deleteAllOpenFinance),
           connections
         });
         return;
