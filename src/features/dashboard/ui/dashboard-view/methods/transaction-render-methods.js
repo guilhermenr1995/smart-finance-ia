@@ -8,6 +8,7 @@ import {
   formatCompactCurrency,
   formatCurrencyBRL,
   getDisplayCategory,
+  isOpenFinanceTransaction,
   getMonthBounds,
   getMonthKeyFromDate,
   normalizeBankAccountName,
@@ -107,8 +108,7 @@ class DashboardViewTransactionRenderMethods {
         const usageLabel = transaction.active === false ? 'Ignorado' : 'Ativo';
         const usageButtonLabel = transaction.active === false ? 'Reativar' : 'Ignorar';
         const bankAccount = escapeHtml(transaction.bankAccount || DEFAULT_BANK_ACCOUNT);
-        const categorySource = String(transaction.categorySource || '').trim().toLowerCase();
-        const isOpenFinance = categorySource.includes('open-finance');
+        const isOpenFinance = isOpenFinanceTransaction(transaction);
         const originBadge = isOpenFinance
           ? '<span class="transaction-badge transaction-badge-neutral">Origem: Open Finance</span>'
           : '';

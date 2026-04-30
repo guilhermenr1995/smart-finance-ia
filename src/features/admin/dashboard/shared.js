@@ -299,6 +299,40 @@ function resolveMaintenanceResetUrl(config) {
   return '';
 }
 
+function resolveMaintenanceOpenFinanceDeleteUrl(config) {
+  const explicit = String(config?.admin?.maintenanceOpenFinanceDeleteProxyUrl || '').trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const maintenanceResetUrl = String(config?.admin?.maintenanceResetProxyUrl || '').trim();
+  if (maintenanceResetUrl) {
+    return maintenanceResetUrl.replace(/maintenanceresetuserjourney/gi, 'maintenancedeleteopenfinancetransactions');
+  }
+
+  const maintenanceUrl = String(config?.admin?.maintenanceProxyUrl || '').trim();
+  if (maintenanceUrl) {
+    return maintenanceUrl.replace(/maintenancededuplicatetransactions/gi, 'maintenancedeleteopenfinancetransactions');
+  }
+
+  const dashboardUrl = resolveAdminDashboardUrl(config);
+  if (dashboardUrl) {
+    return dashboardUrl.replace(/getadmindashboard/gi, 'maintenancedeleteopenfinancetransactions');
+  }
+
+  const consultantUrl = String(config?.ai?.consultantProxyUrl || '').trim();
+  if (consultantUrl) {
+    return consultantUrl.replace(/analyzespendinginsights/gi, 'maintenancedeleteopenfinancetransactions');
+  }
+
+  const categorizationUrl = String(config?.ai?.proxyUrl || '').trim();
+  if (categorizationUrl) {
+    return categorizationUrl.replace(/categorizetransactions/gi, 'maintenancedeleteopenfinancetransactions');
+  }
+
+  return '';
+}
+
 export {
   CHART_WINDOW_DAYS,
   DEFAULT_ADMIN_EMAILS,
@@ -319,6 +353,7 @@ export {
   renderDualDailyChart,
   resolveAdminDashboardUrl,
   resolveMaintenanceDedupUrl,
+  resolveMaintenanceOpenFinanceDeleteUrl,
   resolveMaintenanceResetUrl,
   sumSeriesByKey,
   toNumber

@@ -5,7 +5,6 @@ const {
   toCurrency,
   normalizeTransactionDateKey,
   buildTransactionHash,
-  buildTransactionDedupKey,
   toFiniteNumber
 } = require('../core/domain-utils');
 const {
@@ -21,6 +20,7 @@ const {
   createWebhook,
   updateWebhook
 } = require('./meu-pluggy-client');
+const { sendOpenFinanceTransactionsPushNotification } = require('./meu-pluggy-push');
 
 const MEU_PLUGGY_BANK_CODE = 'meu-pluggy';
 const MEU_PLUGGY_BANK_NAME = 'Meu Pluggy';
@@ -148,48 +148,161 @@ function resolveAccountType(account = {}) {
   return type === 'CREDIT' ? 'Crédito' : 'Conta';
 }
 
-function isExpenseTransaction(transaction = {}, account = {}) {
-  const accountType = resolveAccountType(account);
-  const txType = String(transaction.type || '').trim().toUpperCase();
-  const amount = resolveTransactionAmount(transaction);
+function normalizeTitleForMatching(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getTransactionTitleMatchKey(title) {
+  return normalizeTitleForMatching(title)
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function shiftDateKey(dateKey, deltaDays = 0) {
+  const isoMatch = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!isoMatch) {
+    return '';
+  }
+
+  const shift = Number.parseInt(deltaDays, 10);
+  if (Number.isNaN(shift) || shift === 0) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const parsed = new Date(`${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  parsed.setUTCDate(parsed.getUTCDate() + shift);
+  const year = String(parsed.getUTCFullYear()).padStart(4, '0');
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildImportCompatibleDedupKey(transaction = {}) {
+  const dateKey = normalizeTransactionDateKey(transaction.date);
+  const titleKey = getTransactionTitleMatchKey(transaction.title);
+  const numericValue = Math.abs(toFiniteNumber(transaction.value));
+  return `${dateKey}|${titleKey}|${numericValue.toFixed(2)}`;
+}
+
+function buildImportCompatibleDedupVariants(
+  transaction = {},
+  { includeCurrentDay = true, includePreviousDay = false, includeNextDay = false } = {}
+) {
+  const dedupKeys = [];
+  const seen = new Set();
+  const baseDateKey = normalizeTransactionDateKey(transaction.date);
+
+  const pushDateKey = (dateKey) => {
+    if (!dateKey) {
+      return;
+    }
+    const dedupKey = buildImportCompatibleDedupKey({
+      date: dateKey,
+      title: transaction.title,
+      value: transaction.value
+    });
+    if (!dedupKey || seen.has(dedupKey)) {
+      return;
+    }
+    seen.add(dedupKey);
+    dedupKeys.push(dedupKey);
+  };
+
+  if (includeCurrentDay) {
+    pushDateKey(baseDateKey);
+  }
+  if (includePreviousDay) {
+    pushDateKey(shiftDateKey(baseDateKey, -1));
+  }
+  if (includeNextDay) {
+    pushDateKey(shiftDateKey(baseDateKey, 1));
+  }
+
+  return dedupKeys;
+}
+
+function isIncomeOrIgnoredStatement(value, title) {
+  const normalizedTitle = normalizeTitleForMatching(title);
+  return value >= 0 || /\b(PAGAMENTO|RECEBIDO|DEPOSITO|ESTORNO|CREDITO)\b/.test(normalizedTitle);
+}
+
+function isIgnoredCreditEntry(value, title) {
+  const normalizedTitle = normalizeTitleForMatching(title);
+  const numericValue = Number(value);
+  const hasNeutralValue = !Number.isFinite(numericValue) || Math.abs(numericValue) < 0.00001;
+  if (hasNeutralValue) {
+    return true;
+  }
+
+  return /\b(PAGAMENTO|ESTORNO|RECEBIDO|DEPOSITO|CREDITO|CASHBACK|AJUSTE)\b/.test(normalizedTitle);
+}
+
+function detectBaseCategory(title) {
+  const normalizedTitle = normalizeTitleForMatching(title);
+  return normalizedTitle.includes('TRANSFERENCIA') || /\bTRANSFER\b/.test(normalizedTitle) || /\bPIX\b/.test(normalizedTitle)
+    ? 'Transferência'
+    : 'Outros';
+}
+
+function resolveSignedAmountForValidation(rawTransaction = {}, accountType = 'Conta') {
+  const amount = resolveTransactionAmount(rawTransaction);
   if (!Number.isFinite(amount) || Math.abs(amount) < 0.00001) {
-    return false;
+    return Number.NaN;
   }
 
   if (accountType === 'Crédito') {
-    return amount > 0;
+    return amount;
   }
 
+  const txType = String(rawTransaction.type || '').trim().toUpperCase();
   if (txType === 'DEBIT') {
-    return true;
+    return -Math.abs(amount);
   }
   if (txType === 'CREDIT') {
-    return false;
+    return Math.abs(amount);
   }
-  return amount < 0;
+  return amount;
 }
 
 function buildTransactionTitle(transaction = {}) {
-  return (
+  return String(
     sanitizeString(transaction.description, 200) ||
     sanitizeString(transaction.descriptionRaw, 200) ||
     sanitizeString(transaction.merchant?.name, 200) ||
     sanitizeString(transaction.providerCode, 200) ||
     'Transação Meu Pluggy'
-  );
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function mapTransactionToDocument(rawTransaction = {}, account = {}, context = {}) {
-  if (!isExpenseTransaction(rawTransaction, account)) {
+function mapTransactionToDocument(rawTransaction = {}, account = {}, context = {}, originalIndex = 0) {
+  const accountType = resolveAccountType(account);
+  const signedAmount = resolveSignedAmountForValidation(rawTransaction, accountType);
+  const title = buildTransactionTitle(rawTransaction);
+  const shouldIgnoreByBusinessRules =
+    accountType === 'Crédito'
+      ? isIgnoredCreditEntry(signedAmount, title)
+      : isIncomeOrIgnoredStatement(signedAmount, title);
+  if (!Number.isFinite(signedAmount) || shouldIgnoreByBusinessRules) {
     return null;
   }
 
   const rawDate = sanitizeString(rawTransaction.date || rawTransaction.createdAt, 80);
   const date = normalizeTransactionDateKey(rawDate);
-  const title = buildTransactionTitle(rawTransaction);
-  const value = Math.abs(toCurrency(resolveTransactionAmount(rawTransaction)));
+  const value = Math.abs(toCurrency(signedAmount));
 
-  if (!date || !title || !Number.isFinite(value) || value <= 0) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title || !Number.isFinite(value) || value <= 0) {
     return null;
   }
 
@@ -198,8 +311,8 @@ function mapTransactionToDocument(rawTransaction = {}, account = {}, context = {
     date,
     title,
     value,
-    category: sanitizeString(rawTransaction.category || 'Outros', 50) || 'Outros',
-    accountType: resolveAccountType(account),
+    category: detectBaseCategory(title),
+    accountType,
     bankAccount: sanitizeString(context.bankName || DEFAULT_BANK_ACCOUNT, 60) || DEFAULT_BANK_ACCOUNT,
     active: true,
     createdBy: 'import',
@@ -208,14 +321,16 @@ function mapTransactionToDocument(rawTransaction = {}, account = {}, context = {
     categoryAutoAssigned: false,
     categoryManuallyEdited: false,
     lastCategoryUpdateAt: nowIso,
+    transactionOrigin: 'open-finance',
     providerTransactionId: sanitizeString(rawTransaction.id, 140),
     providerItemId: sanitizeString(context.itemId, 140),
     providerAccountId: sanitizeString(account?.id || rawTransaction.accountId, 140),
-    providerStatus: sanitizeString(rawTransaction.status, 40)
+    providerStatus: sanitizeString(rawTransaction.status, 40),
+    originalIndex: Number.isFinite(originalIndex) ? originalIndex : 0
   };
 
   payload.hash = buildTransactionHash(payload);
-  payload.dedupKey = buildTransactionDedupKey(payload);
+  payload.dedupKey = buildImportCompatibleDedupKey(payload);
   return payload;
 }
 
@@ -227,25 +342,126 @@ function chunk(values = [], size = 10) {
   return items;
 }
 
-async function resolveExistingByField(collectionRef, fieldName, values = []) {
-  const normalizedValues = [...new Set((values || []).map((item) => sanitizeString(item, 180)).filter(Boolean))];
-  const keys = new Set();
-  if (normalizedValues.length === 0) {
-    return keys;
-  }
+function sanitizeOriginalIndex(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
 
-  const groups = chunk(normalizedValues, 10);
-  for (const group of groups) {
-    const snapshot = await collectionRef.where(fieldName, 'in', group).get();
-    snapshot.forEach((doc) => {
-      const value = sanitizeString(doc.data()?.[fieldName], 180);
-      if (value) {
-        keys.add(value);
-      }
+function sortCandidatesByDateDesc(candidates = []) {
+  return [...(Array.isArray(candidates) ? candidates : [])].sort((left, right) => {
+    const rightDate = normalizeTransactionDateKey(right?.date);
+    const leftDate = normalizeTransactionDateKey(left?.date);
+    if (rightDate !== leftDate) {
+      return rightDate.localeCompare(leftDate);
+    }
+
+    return sanitizeOriginalIndex(left?.originalIndex) - sanitizeOriginalIndex(right?.originalIndex);
+  });
+}
+
+async function buildExistingTransactionIdentity(collectionRef) {
+  const identityKeys = new Set();
+  const providerTransactionIds = new Set();
+  const snapshot = await collectionRef.get();
+
+  snapshot.forEach((doc) => {
+    const data = doc.data() || {};
+    const providerTransactionId = sanitizeString(data.providerTransactionId, 140);
+    if (providerTransactionId) {
+      providerTransactionIds.add(providerTransactionId);
+    }
+
+    const storedHash = sanitizeString(data.hash, 420);
+    if (storedHash) {
+      identityKeys.add(storedHash);
+    }
+
+    const storedDedupKey = sanitizeString(data.dedupKey, 420);
+    if (storedDedupKey) {
+      identityKeys.add(storedDedupKey);
+    }
+
+    const rebuiltHash = buildTransactionHash(data);
+    if (rebuiltHash) {
+      identityKeys.add(rebuiltHash);
+    }
+
+    const dedupVariants = buildImportCompatibleDedupVariants(data, {
+      includeCurrentDay: true,
+      includePreviousDay: true
     });
-  }
+    dedupVariants.forEach((dedupKey) => identityKeys.add(dedupKey));
+  });
 
-  return keys;
+  return {
+    identityKeys,
+    providerTransactionIds
+  };
+}
+
+function deduplicateMappedTransactions(candidates = [], existingIdentity = {}) {
+  const identityKeys = existingIdentity?.identityKeys instanceof Set ? existingIdentity.identityKeys : new Set();
+  const providerTransactionIds =
+    existingIdentity?.providerTransactionIds instanceof Set ? existingIdentity.providerTransactionIds : new Set();
+
+  const orderedCandidates = sortCandidatesByDateDesc(candidates);
+  const accepted = [];
+
+  orderedCandidates.forEach((candidate) => {
+    const providerTransactionId = sanitizeString(candidate?.providerTransactionId, 140);
+    if (providerTransactionId && providerTransactionIds.has(providerTransactionId)) {
+      return;
+    }
+
+    const hash = sanitizeString(candidate?.hash, 420);
+    const dedupVariants = buildImportCompatibleDedupVariants(candidate, {
+      includeCurrentDay: true,
+      includePreviousDay: true
+    });
+    const dedupKey = sanitizeString(candidate?.dedupKey, 420) || buildImportCompatibleDedupKey(candidate);
+    const duplicateByIdentity =
+      (hash && identityKeys.has(hash)) ||
+      (dedupKey && identityKeys.has(dedupKey)) ||
+      dedupVariants.some((variant) => identityKeys.has(variant));
+    if (duplicateByIdentity) {
+      return;
+    }
+
+    if (providerTransactionId) {
+      providerTransactionIds.add(providerTransactionId);
+    }
+    if (hash) {
+      identityKeys.add(hash);
+    }
+    if (dedupKey) {
+      identityKeys.add(dedupKey);
+    }
+    dedupVariants.forEach((variant) => identityKeys.add(variant));
+
+    accepted.push({
+      ...candidate,
+      dedupKey,
+      hash
+    });
+  });
+
+  return accepted
+    .sort((left, right) => sanitizeOriginalIndex(left?.originalIndex) - sanitizeOriginalIndex(right?.originalIndex))
+    .map((transaction) => {
+      const normalized = { ...transaction };
+      delete normalized.originalIndex;
+      return normalized;
+    });
+}
+
+function buildOpenFinanceTransactionDocId(transaction = {}) {
+  const providerTransactionId = sanitizeString(transaction.providerTransactionId, 140);
+  const dedupKey = sanitizeString(transaction.dedupKey, 420);
+  const accountType = sanitizeString(transaction.accountType, 20);
+  const discriminator = providerTransactionId
+    ? `provider:${providerTransactionId}`
+    : `dedup:${dedupKey}|${accountType}`;
+  return crypto.createHash('sha1').update(discriminator).digest('hex');
 }
 
 async function persistOpenFinanceTransactions(appId, userId, transactions = []) {
@@ -260,28 +476,8 @@ async function persistOpenFinanceTransactions(appId, userId, transactions = []) 
     };
   }
 
-  const existingDedupKeys = await resolveExistingByField(
-    collectionRef,
-    'dedupKey',
-    normalized.map((item) => item.dedupKey)
-  );
-  const existingHashes = await resolveExistingByField(
-    collectionRef,
-    'hash',
-    normalized.map((item) => item.hash)
-  );
-  const existingProviderIds = await resolveExistingByField(
-    collectionRef,
-    'providerTransactionId',
-    normalized.map((item) => item.providerTransactionId)
-  );
-
-  const toInsert = normalized.filter(
-    (item) =>
-      !existingDedupKeys.has(item.dedupKey) &&
-      !existingHashes.has(item.hash) &&
-      !(item.providerTransactionId && existingProviderIds.has(item.providerTransactionId))
-  );
+  const existingIdentity = await buildExistingTransactionIdentity(collectionRef);
+  const toInsert = deduplicateMappedTransactions(normalized, existingIdentity);
 
   if (toInsert.length === 0) {
     return {
@@ -294,8 +490,9 @@ async function persistOpenFinanceTransactions(appId, userId, transactions = []) 
   const batch = db.batch();
   const insertedTransactions = [];
   toInsert.forEach((transaction) => {
-    const docRef = collectionRef.doc();
-    batch.set(docRef, transaction);
+    const docId = buildOpenFinanceTransactionDocId(transaction);
+    const docRef = collectionRef.doc(docId);
+    batch.set(docRef, transaction, { merge: true });
     insertedTransactions.push({
       ...transaction,
       docId: docRef.id
@@ -323,7 +520,7 @@ async function collectTransactionsFromAccounts(accounts = [], options = {}) {
     }
     const accountTransactions = await listTransactionsForAccount(accountId, { from: fromDate });
     accountTransactions.forEach((transaction) => {
-      const mapped = mapTransactionToDocument(transaction, account, { itemId, bankName });
+      const mapped = mapTransactionToDocument(transaction, account, { itemId, bankName }, collected.length);
       if (mapped) {
         collected.push(mapped);
       }
@@ -668,7 +865,7 @@ async function queueWebhookEvent(payload = {}, meta = {}) {
 
 function mapTransactionBatch(rawTransactions = [], account = {}, context = {}) {
   return (rawTransactions || [])
-    .map((transaction) => mapTransactionToDocument(transaction, account, context))
+    .map((transaction, index) => mapTransactionToDocument(transaction, account, context, index))
     .filter(Boolean);
 }
 
@@ -866,6 +1063,7 @@ async function processQueuedWebhookEvent(eventDocId) {
       skippedCount: 0,
       reason: 'ignored'
     };
+    let pushNotification = null;
 
     if (eventName === 'transactions/created') {
       result = await processTransactionsCreatedEvent(data);
@@ -877,11 +1075,30 @@ async function processQueuedWebhookEvent(eventDocId) {
       result = await processItemEvent(data);
     }
 
+    if (Number(result?.insertedCount || 0) > 0) {
+      try {
+        pushNotification = await sendOpenFinanceTransactionsPushNotification({
+          appId: data.ownerAppId,
+          userId: data.ownerUserId,
+          insertedCount: Number(result.insertedCount || 0),
+          eventName
+        });
+      } catch (pushError) {
+        pushNotification = {
+          attempted: true,
+          error: sanitizeString(pushError?.message || 'push-notification-failed', 240)
+        };
+      }
+    }
+
     const finishedAt = new Date().toISOString();
     await eventRef.set(
       {
         status: 'processed',
-        result,
+        result: {
+          ...result,
+          pushNotification
+        },
         processedAt: finishedAt,
         updatedAt: finishedAt,
         retryCount: Math.max(0, Math.round(toFiniteNumber(data.retryCount)))

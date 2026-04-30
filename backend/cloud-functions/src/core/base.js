@@ -26,6 +26,7 @@ const USER_JOURNEY_RESET_COLLECTIONS = [
   'categorias',
   'contas_bancarias',
   'open_finance_conexoes',
+  'open_finance_push_subscriptions',
   'metas_mensais',
   'consultor_insights',
   'metrics_daily'

@@ -127,6 +127,40 @@ function parseSearchAmount(rawValue) {
   return Number.parseFloat(normalized);
 }
 
+function normalizeOriginKey(value) {
+  return normalizeTitleForMatching(value).replace(/\s+/g, '');
+}
+
+export function isOpenFinanceTransaction(transaction = {}) {
+  const origin = String(transaction?.transactionOrigin || '').trim().toLowerCase();
+  if (origin === 'open-finance' || origin === 'openfinance') {
+    return true;
+  }
+
+  if (String(transaction?.providerTransactionId || '').trim()) {
+    return true;
+  }
+
+  if (String(transaction?.providerItemId || '').trim()) {
+    return true;
+  }
+
+  if (String(transaction?.providerAccountId || '').trim()) {
+    return true;
+  }
+
+  const categorySource = String(transaction?.categorySource || '').trim().toLowerCase();
+  return categorySource.includes('open-finance') || categorySource.includes('openfinance');
+}
+
+export function getTransactionOriginLabel(transaction = {}) {
+  if (isOpenFinanceTransaction(transaction)) {
+    return 'Open Finance';
+  }
+
+  return String(transaction?.createdBy || '').trim().toLowerCase() === 'manual' ? 'Manual' : 'Importação';
+}
+
 export function matchesTransactionSearch(transaction, mode, term) {
   const searchTerm = String(term || '').trim();
   if (!searchTerm) {
@@ -147,6 +181,12 @@ export function matchesTransactionSearch(transaction, mode, term) {
     const normalizedCategory = normalizeTitleForMatching(transaction.category || '');
     const normalizedDisplayCategory = normalizeTitleForMatching(getDisplayCategory(transaction) || '');
     return normalizedCategory.includes(normalizedTerm) || normalizedDisplayCategory.includes(normalizedTerm);
+  }
+
+  if (mode === 'origin') {
+    const normalizedTerm = normalizeOriginKey(searchTerm);
+    const normalizedOrigin = normalizeOriginKey(getTransactionOriginLabel(transaction));
+    return normalizedOrigin.includes(normalizedTerm);
   }
 
   const normalizedTerm = normalizeTitleForMatching(searchTerm);
@@ -266,8 +306,7 @@ export class TransactionQueryService {
       const displayCategory = getDisplayCategory(transaction);
       const matchCategory = category === 'all' || displayCategory === category;
       const normalizedSource = String(source || 'all').trim().toLowerCase();
-      const normalizedCategorySource = String(transaction?.categorySource || '').trim().toLowerCase();
-      const isOpenFinanceSource = normalizedCategorySource.includes('open-finance');
+      const isOpenFinanceSource = isOpenFinanceTransaction(transaction);
       const matchSource =
         normalizedSource === 'all' ||
         (normalizedSource === 'open-finance' ? isOpenFinanceSource : true);

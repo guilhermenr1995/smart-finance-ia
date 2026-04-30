@@ -1,12 +1,12 @@
 {
   "name": "Smart Finance IA",
   "short_name": "Smart Finance",
-  "description": "Gestão financeira pessoal com importação de CSV, categorização por IA e sincronização em nuvem.",
+  "description": "Gestão financeira com Open Finance, importação de extratos e inteligência para controle diário.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#facc15",
+  "background_color": "#0f172a",
+  "theme_color": "#1d4ed8",
   "lang": "pt-BR",
   "icons": [
     {

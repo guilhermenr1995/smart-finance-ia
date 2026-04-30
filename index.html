@@ -8,16 +8,30 @@
     />
     <title>Smart Finance IA - Pro</title>
 
-    <meta name="theme-color" content="#facc15" />
+    <meta name="theme-color" content="#1d4ed8" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Smart Finance IA" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icons/icon-192.svg" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body class="font-sans text-zinc-900 bg-zinc-100 min-h-screen">
+    <div id="startup-splash" class="startup-splash" aria-hidden="true">
+      <div class="startup-splash-glow startup-splash-glow-top"></div>
+      <div class="startup-splash-glow startup-splash-glow-bottom"></div>
+      <div class="startup-splash-card">
+        <img src="./assets/splash/splash-mark.svg" alt="Marca Smart Finance IA" class="startup-splash-logo" />
+        <p class="startup-splash-title">Smart Finance IA</p>
+        <p class="startup-splash-caption">Conectando seus dados e preparando seu painel financeiro.</p>
+        <div class="startup-splash-progress">
+          <span></span>
+        </div>
+      </div>
+    </div>
+
     <section id="auth-screen" class="auth-screen min-h-screen flex items-center justify-center p-6">
       <div class="auth-bg-shape auth-bg-shape-left"></div>
       <div class="auth-bg-shape auth-bg-shape-right"></div>
@@ -512,7 +526,7 @@
                 <button
                   type="button"
                   class="help-tooltip"
-                  data-tooltip="Você pode editar categoria por item, ignorar lançamento e usar a busca por descrição, valor ou categoria."
+                  data-tooltip="Você pode editar categoria por item, ignorar lançamento e usar a busca por descrição, valor, categoria ou origem."
                   aria-label="Ajuda sobre lançamentos"
                 >
                   ?
@@ -541,7 +555,7 @@
 
             <div class="search-panel mb-1 border-2 border-black bg-zinc-50 p-4 space-y-4">
               <div class="search-panel-heading space-y-1">
-                <p class="search-panel-title">Busca inteligente por descrição, valor e categoria</p>
+                <p class="search-panel-title">Busca inteligente por descrição, valor, categoria e origem</p>
                 <p class="search-panel-subtitle">Veja o total encontrado e a representatividade sobre sua base ativa.</p>
               </div>
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
@@ -551,7 +565,7 @@
                     <button
                       type="button"
                       class="help-tooltip"
-                      data-tooltip="Descrição: texto do lançamento. Valor: número exato. Categoria: nome da categoria aplicada."
+                      data-tooltip="Descrição: texto do lançamento. Valor: número exato. Categoria: nome da categoria aplicada. Origem: Open Finance/importação/manual."
                       aria-label="Ajuda sobre modo de busca"
                     >
                       ?
@@ -564,6 +578,7 @@
                     <option value="description">Descrição</option>
                     <option value="value">Valor</option>
                     <option value="category">Categoria</option>
+                    <option value="origin">Origem</option>
                   </select>
                 </div>
                 <div class="lg:col-span-7">
@@ -793,6 +808,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
     <script type="module" src="./src/app.js"></script>
   </body>
 </html>

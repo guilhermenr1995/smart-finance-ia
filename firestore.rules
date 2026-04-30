@@ -26,10 +26,17 @@ service cloud.firestore {
           'active',
           'createdBy',
           'createdAt',
+          'updatedAt',
           'categorySource',
           'categoryAutoAssigned',
           'categoryManuallyEdited',
-          'lastCategoryUpdateAt'
+          'lastCategoryUpdateAt',
+          'transactionOrigin',
+          'providerTransactionId',
+          'providerItemId',
+          'providerAccountId',
+          'providerStatus',
+          'deletedByProvider'
         ])
         && data.hash is string
         && (!('dedupKey' in data) || (data.dedupKey is string && data.dedupKey.size() > 0 && data.dedupKey.size() <= 320))
@@ -45,10 +52,17 @@ service cloud.firestore {
         && data.accountType in ['Crédito', 'Conta']
         && (!('createdBy' in data) || data.createdBy in ['import', 'manual'])
         && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50))
         && (!('categorySource' in data) || (data.categorySource is string && data.categorySource.size() > 0 && data.categorySource.size() <= 60))
         && (!('categoryAutoAssigned' in data) || data.categoryAutoAssigned is bool)
         && (!('categoryManuallyEdited' in data) || data.categoryManuallyEdited is bool)
         && (!('lastCategoryUpdateAt' in data) || (data.lastCategoryUpdateAt is string && data.lastCategoryUpdateAt.size() <= 50))
+        && (!('transactionOrigin' in data) || data.transactionOrigin in ['import', 'manual', 'open-finance'])
+        && (!('providerTransactionId' in data) || (data.providerTransactionId is string && data.providerTransactionId.size() <= 140))
+        && (!('providerItemId' in data) || (data.providerItemId is string && data.providerItemId.size() <= 140))
+        && (!('providerAccountId' in data) || (data.providerAccountId is string && data.providerAccountId.size() <= 140))
+        && (!('providerStatus' in data) || (data.providerStatus is string && data.providerStatus.size() <= 40))
+        && (!('deletedByProvider' in data) || data.deletedByProvider is bool)
         && (!('bankAccount' in data) || (
           data.bankAccount is string
           && data.bankAccount.size() > 0

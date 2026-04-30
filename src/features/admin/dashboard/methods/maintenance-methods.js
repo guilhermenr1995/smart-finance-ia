@@ -13,6 +13,7 @@ import {
   renderDualDailyChart,
   resolveAdminDashboardUrl,
   resolveMaintenanceDedupUrl,
+  resolveMaintenanceOpenFinanceDeleteUrl,
   resolveMaintenanceResetUrl,
   toNumber
 } from '../shared.js';
@@ -21,6 +22,34 @@ import { applyClassMethods } from './register-methods.js';
 class AdminDashboardMaintenanceMethods {
   getUserById(uid) {
     return (Array.isArray(this.usersState.allUsers) ? this.usersState.allUsers : []).find((user) => user?.uid === uid) || null;
+  }
+
+  isFirebaseNetworkAuthError(error) {
+    const code = String(error?.code || '').trim().toLowerCase();
+    const message = String(error?.message || '').trim().toLowerCase();
+    return code === 'auth/network-request-failed' || message.includes('network-request-failed');
+  }
+
+  async resolveAdminAuthToken(currentUser) {
+    if (!currentUser) {
+      throw new Error('Sessão expirada. Faça login novamente para executar manutenção.');
+    }
+
+    try {
+      return await currentUser.getIdToken(true);
+    } catch (error) {
+      if (!this.isFirebaseNetworkAuthError(error)) {
+        throw error;
+      }
+
+      try {
+        return await currentUser.getIdToken();
+      } catch (_fallbackError) {
+        throw new Error(
+          'Falha de rede ao validar sua sessão administrativa. Verifique conexão/VPN e tente novamente.'
+        );
+      }
+    }
   }
 
   getMaintenanceStatus(userId) {
@@ -78,7 +107,7 @@ class AdminDashboardMaintenanceMethods {
     this.renderUsersSection();
 
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await this.resolveAdminAuthToken(currentUser);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -179,7 +208,7 @@ class AdminDashboardMaintenanceMethods {
     this.renderUsersSection();
 
     try {
-      const token = await currentUser.getIdToken(true);
+      const token = await this.resolveAdminAuthToken(currentUser);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -228,6 +257,103 @@ class AdminDashboardMaintenanceMethods {
       this.usersMaintenanceStatusByUserId.set(userId, {
         type: 'error',
         message: error?.message || 'Erro ao resetar jornada do usuário.'
+      });
+    } finally {
+      this.usersMaintenanceRunning.delete(userId);
+      this.renderUsersSection();
+    }
+  }
+
+  async onDeleteOpenFinanceTransactions(userId) {
+    if (!userId || this.usersMaintenanceRunning.has(userId)) {
+      return;
+    }
+
+    const user = this.getUserById(userId);
+    if (!user) {
+      return;
+    }
+
+    const displayName = String(user.displayName || '').trim() || String(user.email || '').trim() || userId;
+    const confirmation = window.confirm(
+      `Excluir todas as transações Open Finance do usuário ${displayName}? Essa ação remove apenas lançamentos identificados com origem Open Finance.`
+    );
+    if (!confirmation) {
+      return;
+    }
+
+    const currentUser = this.auth?.currentUser;
+    if (!currentUser) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Sessão expirada. Faça login novamente para executar manutenção.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    const endpoint = resolveMaintenanceOpenFinanceDeleteUrl(this.config);
+    if (!endpoint) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: 'Endpoint de exclusão Open Finance não configurado.'
+      });
+      this.renderUsersSection();
+      return;
+    }
+
+    this.usersMaintenanceRunning.add(userId);
+    this.usersMaintenanceStatusByUserId.set(userId, {
+      type: 'info',
+      message: 'Removendo transações Open Finance...'
+    });
+    this.renderUsersSection();
+
+    try {
+      const token = await this.resolveAdminAuthToken(currentUser);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          appId: this.config.appId,
+          userId,
+          userEmail: String(user?.email || '').trim(),
+          dryRun: false
+        })
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (_error) {
+        payload = {};
+      }
+      if (!response.ok) {
+        throw new Error(payload?.message || payload?.error || 'Falha ao excluir transações Open Finance.');
+      }
+
+      const summary = payload?.summary || {};
+      const deleted = toNumber(summary.deleted);
+      const matched = toNumber(summary.matchedOpenFinance);
+      const message =
+        deleted > 0
+          ? `Transações Open Finance removidas com sucesso: ${formatInteger(deleted)} item(ns).`
+          : `Nenhuma transação Open Finance encontrada para remoção (${formatInteger(matched)} item(ns) analisados).`;
+
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'success',
+        message
+      });
+      this.usersMaintenanceRunning.delete(userId);
+      await this.loadAdminDashboard(currentUser);
+      return;
+    } catch (error) {
+      this.usersMaintenanceStatusByUserId.set(userId, {
+        type: 'error',
+        message: error?.message || 'Erro ao excluir transações Open Finance.'
       });
     } finally {
       this.usersMaintenanceRunning.delete(userId);

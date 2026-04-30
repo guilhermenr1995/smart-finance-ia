@@ -90,7 +90,8 @@ class DashboardViewPaginationGoalsMethods {
     const modeLabelMap = {
       value: 'valor',
       category: 'categoria',
-      description: 'descrição'
+      description: 'descrição',
+      origin: 'origem'
     };
     const modeLabel = modeLabelMap[searchTotals.mode] || 'descrição';
     this.searchSummaryTitle.innerText = `Busca por ${modeLabel}: "${searchTotals.term || ''}"`;

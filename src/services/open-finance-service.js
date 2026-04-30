@@ -73,4 +73,18 @@ export class OpenFinanceService {
   async setupWebhooks(appId) {
     return this.request('setup-webhooks', { appId });
   }
+
+  async registerPushSubscription(appId, payload = {}) {
+    return this.request('register-push-subscription', {
+      appId,
+      ...(payload && typeof payload === 'object' ? payload : {})
+    });
+  }
+
+  async unregisterPushSubscription(appId, payload = {}) {
+    return this.request('unregister-push-subscription', {
+      appId,
+      ...(payload && typeof payload === 'object' ? payload : {})
+    });
+  }
 }

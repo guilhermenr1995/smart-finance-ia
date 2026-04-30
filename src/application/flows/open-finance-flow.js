@@ -68,6 +68,7 @@ export async function loadOpenFinanceConnections(app, options = {}) {
     app.state.setOpenFinanceConnections(connectionsResult?.connections || []);
     app.persistTransactionsCache();
     app.refreshDashboard();
+    await app.syncPushNotifications();
 
     if (showFeedback) {
       const webhookConfigured = Boolean(webhookSetupResult?.webhookSetup?.configured);
@@ -118,6 +119,7 @@ export async function connectOpenFinanceBank(app, bankCode) {
     }
 
     app.persistTransactionsCache();
+    await app.syncPushNotifications();
     app.overlayView.log(`Conexão Meu Pluggy salva. Novas transações: ${Number(result?.insertedCount || 0)}.`);
     app.overlayView.log('Webhook de atualização será usado quando configurado no dashboard da Pluggy.');
     setTimeout(() => app.overlayView.hide(), 900);
@@ -154,6 +156,7 @@ export async function syncOpenFinanceConnection(app, connectionId) {
     }
 
     app.persistTransactionsCache();
+    await app.syncPushNotifications();
     app.overlayView.log(`Sincronização concluída. Novas transações: ${Number(result?.insertedCount || 0)}.`);
     setTimeout(() => app.overlayView.hide(), 900);
   } catch (error) {

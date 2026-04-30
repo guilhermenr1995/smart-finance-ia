@@ -1,6 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Smart Finance IA">
-  <rect width="192" height="192" rx="28" fill="#facc15" />
-  <rect x="18" y="18" width="156" height="156" rx="20" fill="#fafafa" stroke="#000" stroke-width="8" />
-  <path d="M42 126h20V70H42zm44 0h20V54H86zm44 0h20V86h-20z" fill="#111827" />
-  <text x="96" y="160" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" font-weight="700" fill="#111827">SF</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="55%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bg)" />
+  <circle cx="152" cy="40" r="24" fill="#facc15" fill-opacity="0.24" />
+  <circle cx="40" cy="152" r="20" fill="#67e8f9" fill-opacity="0.24" />
+
+  <g filter="url(#shadow)">
+    <rect x="28" y="24" width="136" height="144" rx="30" fill="#f8fafc" stroke="#0f172a" stroke-width="6" />
+    <path d="M58 118h18V86H58zm29 0h18V70H87zm29 0h18V96h-18z" fill="#0f172a" />
+    <path d="M56 126h80" stroke="#0f172a" stroke-width="6" stroke-linecap="round" />
+    <path d="M60 78l16-10 14 8 22-14 20 10" fill="none" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="132" cy="62" r="14" fill="url(#coin)" stroke="#854d0e" stroke-width="3" />
+    <path d="M128 62h8m-4-4v8" stroke="#7c2d12" stroke-width="2.8" stroke-linecap="round" />
+  </g>
+
+  <rect x="54" y="142" width="84" height="20" rx="10" fill="#0f172a" />
+  <text x="96" y="156" text-anchor="middle" font-size="12" font-family="'Space Grotesk', Arial, sans-serif" font-weight="800" fill="#f8fafc" letter-spacing="1.2">SMART</text>
 </svg>

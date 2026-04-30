@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-finance-shell-v15';
+const CACHE_NAME = 'smart-finance-shell-v16';
 const NETWORK_FIRST_DESTINATIONS = new Set(['document', 'script', 'style', 'manifest']);
 
 const APP_SHELL_FILES = [
@@ -22,6 +22,7 @@ const APP_SHELL_FILES = [
   './src/services/ai-consultant-service.js',
   './src/services/csv-import-service.js',
   './src/services/firebase-service.js',
+  './src/services/push-notification-service.js',
   './src/services/pwa-service.js',
   './src/services/transaction-repository.js',
   './src/ui/auth-view.js',
@@ -32,7 +33,9 @@ const APP_SHELL_FILES = [
   './src/utils/format-utils.js',
   './src/utils/transaction-utils.js',
   './assets/icons/icon-192.svg',
-  './assets/icons/icon-512.svg'
+  './assets/icons/icon-512.svg',
+  './assets/icons/notification-badge.svg',
+  './assets/splash/splash-mark.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -81,6 +84,28 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(cacheFirst(event.request));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification?.close();
+  const targetUrl = './index.html';
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientsList) => {
+        for (const client of clientsList) {
+          if ('focus' in client) {
+            return client.focus();
+          }
+        }
+
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
+        return null;
+      })
+  );
 });
 
 function shouldUseNetworkFirst(request) {

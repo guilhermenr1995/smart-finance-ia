@@ -8,6 +8,7 @@ import { OpenFinanceService } from './services/open-finance-service.js';
 import { CategoryMemoryService } from './services/category-memory-service.js';
 import { LocalCacheService } from './services/local-cache-service.js';
 import { PwaService } from './services/pwa-service.js';
+import { PushNotificationService } from './services/push-notification-service.js';
 import { CsvImportService } from './features/transactions/services/csv-import/csv-import-service.js';
 import { TransactionRepository } from './features/transactions/services/transaction-repository/transaction-repository.js';
 import { AuthView } from './ui/auth-view.js';
@@ -70,9 +71,12 @@ class SmartFinanceApplication {
     this.categoryMemoryService = dependencies.categoryMemoryService;
     this.localCacheService = dependencies.localCacheService;
     this.pwaService = dependencies.pwaService;
+    this.pushNotificationService = dependencies.pushNotificationService;
     this.authView = dependencies.authView;
     this.dashboardView = dependencies.dashboardView;
     this.overlayView = dependencies.overlayView;
+    this.serviceWorkerRegistration = null;
+    this.startupSplash = document.getElementById('startup-splash');
 
     this.installButton = document.getElementById('btn-install-app');
   }
@@ -81,7 +85,7 @@ class SmartFinanceApplication {
     this.dashboardView.setInitialFilters(this.state.filters, this.state.search);
     this.bindEvents();
 
-    await this.pwaService.registerServiceWorker();
+    this.serviceWorkerRegistration = await this.pwaService.registerServiceWorker();
     this.pwaService.setupInstallPrompt();
 
     this.authService.subscribe((user) => {
@@ -95,6 +99,7 @@ class SmartFinanceApplication {
     }
 
     this.refreshDashboard();
+    this.hideStartupSplash();
   }
 
   bindEvents() {
@@ -284,6 +289,50 @@ class SmartFinanceApplication {
     return revokeOpenFinanceConnection(this, connectionId);
   }
 
+  async syncPushNotifications(options = {}) {
+    if (!this.state.user || !this.pushNotificationService) {
+      return {
+        synced: false,
+        reason: 'missing-user-or-service'
+      };
+    }
+
+    return this.pushNotificationService.syncForUser(this.state.user, {
+      hasOpenFinanceConnections: (this.state.openFinance?.connections || []).length > 0,
+      serviceWorkerRegistration: this.serviceWorkerRegistration,
+      ...(options || {})
+    });
+  }
+
+  async unregisterPushNotifications(user, reason = 'user-sign-out') {
+    if (!this.pushNotificationService || !user) {
+      return {
+        unregistered: false,
+        reason: 'missing-user-or-service'
+      };
+    }
+
+    return this.pushNotificationService.unregisterForUser(user, {
+      reason
+    });
+  }
+
+  hideStartupSplash(delayMs = 420) {
+    if (!this.startupSplash) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (!this.startupSplash) {
+        return;
+      }
+      this.startupSplash.classList.add('is-leaving');
+      window.setTimeout(() => {
+        this.startupSplash?.classList.add('hidden');
+      }, 300);
+    }, Math.max(0, Number(delayMs) || 0));
+  }
+
   normalizeError(error) {
     if (typeof error?.details === 'string' && error.details.trim()) {
       return error.details;
@@ -312,6 +361,17 @@ function bootstrap() {
     message.dataset.type = 'error';
     return;
   }
+
+  const openFinanceService = new OpenFinanceService({
+    ...config.openFinance,
+    getAuthToken: async () => {
+      const user = firebaseContext.auth.currentUser;
+      if (!user) {
+        return '';
+      }
+      return user.getIdToken();
+    }
+  });
 
   const dependencies = {
     config,
@@ -346,18 +406,16 @@ function bootstrap() {
         return user.getIdToken();
       }
     }),
-    openFinanceService: new OpenFinanceService({
-      ...config.openFinance,
-      getAuthToken: async () => {
-        const user = firebaseContext.auth.currentUser;
-        if (!user) {
-          return '';
-        }
-        return user.getIdToken();
-      }
-    }),
+    openFinanceService,
     queryService: new TransactionQueryService(),
     pwaService: new PwaService({ onInstallAvailabilityChanged: updateInstallButtonVisibility }),
+    pushNotificationService: new PushNotificationService({
+      appId: config.appId,
+      firebase: firebaseContext.firebase,
+      openFinanceService,
+      enabled: config.push?.enabled !== false,
+      vapidKey: config.push?.vapidKey || ''
+    }),
     authView: new AuthView(),
     dashboardView: new DashboardView(),
     overlayView: new OverlayView()

@@ -2,7 +2,11 @@ import { CATEGORIES } from '../../../../constants/categories.js';
 import { toBrDate } from '../../../../utils/date-utils.js';
 import { getMonthBounds, getMonthKeyFromDate } from '../../../../utils/goal-utils.js';
 import { escapeHtml, formatCompactCurrency, formatCurrencyBRL } from '../../../../utils/format-utils.js';
-import { getDisplayCategory, sortTransactionsByDateDesc } from '../../../../utils/transaction-utils.js';
+import {
+  getDisplayCategory,
+  isOpenFinanceTransaction,
+  sortTransactionsByDateDesc
+} from '../../../../utils/transaction-utils.js';
 
 export {
   CATEGORIES,
@@ -13,6 +17,7 @@ export {
   formatCompactCurrency,
   formatCurrencyBRL,
   getDisplayCategory,
+  isOpenFinanceTransaction,
   sortTransactionsByDateDesc
 };
 

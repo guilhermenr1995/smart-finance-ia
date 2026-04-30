@@ -24,6 +24,10 @@ const DEFAULT_CONFIG = {
     webhookUrl: '',
     supportedBanks: ['meu-pluggy']
   },
+  push: {
+    enabled: true,
+    vapidKey: ''
+  },
   admin: {
     dashboardProxyUrl: '',
     maintenanceProxyUrl: '',
@@ -80,6 +84,10 @@ export function loadAppConfig() {
       supportedBanks: Array.isArray(runtimeConfig.openFinance?.supportedBanks)
         ? runtimeConfig.openFinance.supportedBanks
         : DEFAULT_CONFIG.openFinance.supportedBanks
+    },
+    push: {
+      ...DEFAULT_CONFIG.push,
+      ...(runtimeConfig.push || {})
     },
     admin: {
       ...DEFAULT_CONFIG.admin,

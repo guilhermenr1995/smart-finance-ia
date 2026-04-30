@@ -7,7 +7,7 @@ export class PwaService {
 
   async registerServiceWorker() {
     if (!('serviceWorker' in navigator)) {
-      return;
+      return null;
     }
 
     try {
@@ -39,8 +39,10 @@ export class PwaService {
         this.hasReloadedForNewWorker = true;
         window.location.reload();
       });
+      return registration;
     } catch (error) {
       console.error('Service worker registration failed:', error);
+      return null;
     }
   }
 

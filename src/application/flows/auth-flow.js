@@ -56,6 +56,13 @@ export async function handleAuthState(app, user) {
 
   const shouldSyncCloud = !app.localCacheService.isFresh(cached.lastSyncedAt);
   await app.syncDataFromCloud({ force: shouldSyncCloud, showOverlay: shouldSyncCloud });
+
+  try {
+    await app.syncPushNotifications();
+  } catch (pushError) {
+    console.warn('Falha ao sincronizar push notifications:', pushError);
+  }
+
   app.authView.setBusy(false);
 }
 
@@ -141,6 +148,15 @@ export async function handleLogout(app) {
   await runAuthOperation(
     app,
     async () => {
+      const currentUser = app.state.user;
+      if (currentUser) {
+        try {
+          await app.unregisterPushNotifications(currentUser, 'user-sign-out');
+        } catch (pushError) {
+          console.warn('Falha ao remover assinatura push no logout:', pushError);
+        }
+      }
+
       await app.authService.signOut();
     },
     {

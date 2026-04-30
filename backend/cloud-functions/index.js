@@ -8,6 +8,9 @@ const { analyzeSpendingInsights } = require('./src/handlers/analyze-spending-ins
 const { getAdminDashboard } = require('./src/handlers/get-admin-dashboard');
 const { maintenanceDeduplicateTransactions } = require('./src/handlers/maintenance-deduplicate-transactions');
 const { maintenanceResetUserJourney } = require('./src/handlers/maintenance-reset-user-journey');
+const {
+  maintenanceDeleteOpenFinanceTransactions
+} = require('./src/handlers/maintenance-delete-open-finance-transactions');
 
 exports.openFinanceProxy = openFinanceProxy;
 exports.openFinanceWebhook = openFinanceWebhook;
@@ -17,3 +20,4 @@ exports.analyzeSpendingInsights = analyzeSpendingInsights;
 exports.getAdminDashboard = getAdminDashboard;
 exports.maintenanceDeduplicateTransactions = maintenanceDeduplicateTransactions;
 exports.maintenanceResetUserJourney = maintenanceResetUserJourney;
+exports.maintenanceDeleteOpenFinanceTransactions = maintenanceDeleteOpenFinanceTransactions;

@@ -318,6 +318,15 @@ class AdminDashboardUserListMethods {
                   </button>
                   <button
                     type="button"
+                    class="admin-user-maintenance-btn ${isMaintenanceRunning ? 'is-loading' : ''}"
+                    data-admin-action="delete-open-finance"
+                    data-user-id="${user.uid}"
+                    ${isMaintenanceRunning ? 'disabled' : ''}
+                  >
+                    ${isMaintenanceRunning ? 'Processando...' : 'Excluir Open Finance'}
+                  </button>
+                  <button
+                    type="button"
                     class="admin-user-maintenance-btn admin-user-maintenance-btn-danger ${
                       isMaintenanceRunning ? 'is-loading' : ''
                     }"

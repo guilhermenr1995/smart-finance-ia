@@ -151,6 +151,11 @@ class AdminDashboardLifecycleMethods {
 
       if (action === 'reset-user') {
         void this.onResetUserJourney(userId);
+        return;
+      }
+
+      if (action === 'delete-open-finance') {
+        void this.onDeleteOpenFinanceTransactions(userId);
       }
     });
   }

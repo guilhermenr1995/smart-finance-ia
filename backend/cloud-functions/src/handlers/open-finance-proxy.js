@@ -14,6 +14,10 @@ const {
   revokeItemConnection,
   ensureWebhooksConfigured
 } = require('../open-finance/meu-pluggy-sync');
+const {
+  registerOpenFinancePushSubscription,
+  unregisterOpenFinancePushSubscription
+} = require('../open-finance/meu-pluggy-push');
 
 const openFinanceProxy = onRequest(
   {
@@ -55,6 +59,33 @@ const openFinanceProxy = onRequest(
         const webhookSetup = await ensureWebhooksConfigured();
         response.status(200).json({
           webhookSetup
+        });
+        return;
+      }
+
+      if (action === 'register-push-subscription') {
+        const subscription = await registerOpenFinancePushSubscription(appId, userId, {
+          token: sanitizeString(request.body?.token, 4096),
+          platform: sanitizeString(request.body?.platform, 40),
+          userAgent: sanitizeString(request.body?.userAgent, 320),
+          language: sanitizeString(request.body?.language, 24),
+          timezone: sanitizeString(request.body?.timezone, 60)
+        });
+        response.status(200).json({
+          registered: true,
+          subscription
+        });
+        return;
+      }
+
+      if (action === 'unregister-push-subscription') {
+        const result = await unregisterOpenFinancePushSubscription(appId, userId, {
+          token: sanitizeString(request.body?.token, 4096),
+          reason: sanitizeString(request.body?.reason, 200)
+        });
+        response.status(200).json({
+          registered: false,
+          ...result
         });
         return;
       }
