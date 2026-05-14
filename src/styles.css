@@ -6,6 +6,11 @@
   box-sizing: border-box;
 }
 
+/* Guarantees visibility toggles used by JS even if utility CSS fails to load. */
+.hidden {
+  display: none !important;
+}
+
 html {
   max-width: 100%;
   overflow-x: hidden;

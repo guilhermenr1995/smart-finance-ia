@@ -66,9 +66,15 @@ export class AuthView {
     const isAuthenticated = Boolean(user);
     const normalizedEmail = String(user?.email || '').trim().toLowerCase();
     const isAdmin = this.allowedAdminEmails.has(normalizedEmail);
+    const showAuthScreen = !isAuthenticated;
+    const showAppScreen = isAuthenticated;
 
-    this.authScreen.classList.toggle('hidden', isAuthenticated);
-    this.appScreen.classList.toggle('hidden', !isAuthenticated);
+    this.authScreen.classList.toggle('hidden', !showAuthScreen);
+    this.appScreen.classList.toggle('hidden', !showAppScreen);
+    this.authScreen.style.display = showAuthScreen ? '' : 'none';
+    this.appScreen.style.display = showAppScreen ? '' : 'none';
+    this.authScreen.setAttribute('aria-hidden', String(!showAuthScreen));
+    this.appScreen.setAttribute('aria-hidden', String(!showAppScreen));
     this.logoutButton.classList.toggle('hidden', !isAuthenticated);
     if (this.adminPanelButton) {
       this.adminPanelButton.classList.toggle('hidden', !isAuthenticated || !isAdmin);

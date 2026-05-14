@@ -82,6 +82,9 @@ class SmartFinanceApplication {
   }
 
   async init() {
+    // Defensive first paint for mobile: guarantee only auth shell is visible
+    // until the first auth state callback arrives.
+    this.authView.setAuthenticated(null);
     this.dashboardView.setInitialFilters(this.state.filters, this.state.search);
     this.bindEvents();
 
