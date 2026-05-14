@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-finance-shell-v17';
+const CACHE_NAME = 'smart-finance-shell-v18';
 const NETWORK_FIRST_DESTINATIONS = new Set(['document', 'script', 'style', 'manifest']);
 
 const APP_SHELL_FILES = [

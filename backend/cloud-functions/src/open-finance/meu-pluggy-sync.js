@@ -59,6 +59,31 @@ const WEBHOOK_EVENTS_TO_MANAGE = [
   'item/deleted'
 ];
 
+const DEDUP_TITLE_STOPWORDS = new Set([
+  'COMPRA',
+  'DEBITO',
+  'CREDITO',
+  'CARTAO',
+  'PARCELA',
+  'PARCELAS',
+  'PARC',
+  'PAGAMENTO',
+  'PAGTO',
+  'LANCAMENTO',
+  'LANC',
+  'TRANSACAO',
+  'TRANS',
+  'DEB',
+  'CRED',
+  'AUT',
+  'AUTORIZACAO',
+  'AUTORIZ',
+  'VIA',
+  'ELO',
+  'VISA',
+  'MASTERCARD'
+]);
+
 function mapItemStatus(itemStatus) {
   const normalized = String(itemStatus || '').trim().toUpperCase();
   if (!normalized) {
@@ -165,6 +190,68 @@ function getTransactionTitleMatchKey(title) {
     .trim();
 }
 
+function tokenizeTitleForDedup(title) {
+  const base = normalizeTitleForMatching(title)
+    .replace(/\bPARCELA(?:S)?\b/g, ' ')
+    .replace(/\bPARC\b/g, ' ')
+    .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ')
+    .replace(/\b\d{1,2}\s*X\b/g, ' ')
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!base) {
+    return [];
+  }
+
+  return base
+    .split(' ')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => {
+      if (DEDUP_TITLE_STOPWORDS.has(token)) {
+        return false;
+      }
+      if (/^\d{1,2}$/.test(token)) {
+        return false;
+      }
+      if (/^\d{4,}$/.test(token)) {
+        return false;
+      }
+      return token.length > 1;
+    });
+}
+
+function buildFlexibleTitleDedupKey(title) {
+  const tokens = tokenizeTitleForDedup(title);
+  return tokens.join(' ').trim();
+}
+
+function buildFlexibleSortedTitleDedupKey(title) {
+  const tokens = tokenizeTitleForDedup(title);
+  const uniqueSorted = [...new Set(tokens)].sort((left, right) => left.localeCompare(right, 'pt-BR'));
+  return uniqueSorted.join(' ').trim();
+}
+
+function getTransactionTitleDedupKeys(title) {
+  const strict = getTransactionTitleMatchKey(title);
+  const flexible = buildFlexibleTitleDedupKey(title);
+  const flexibleSorted = buildFlexibleSortedTitleDedupKey(title);
+
+  const keys = [];
+  if (strict) {
+    keys.push(strict);
+  }
+  if (flexible && flexible.length >= 4) {
+    keys.push(flexible);
+  }
+  if (flexibleSorted && flexibleSorted.length >= 4) {
+    keys.push(flexibleSorted);
+  }
+
+  return [...new Set(keys)];
+}
+
 function shiftDateKey(dateKey, deltaDays = 0) {
   const isoMatch = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!isoMatch) {
@@ -188,9 +275,9 @@ function shiftDateKey(dateKey, deltaDays = 0) {
   return `${year}-${month}-${day}`;
 }
 
-function buildImportCompatibleDedupKey(transaction = {}) {
+function buildImportCompatibleDedupKey(transaction = {}, explicitTitleKey = '') {
   const dateKey = normalizeTransactionDateKey(transaction.date);
-  const titleKey = getTransactionTitleMatchKey(transaction.title);
+  const titleKey = sanitizeString(explicitTitleKey, 600) || getTransactionTitleMatchKey(transaction.title);
   const numericValue = Math.abs(toFiniteNumber(transaction.value));
   return `${dateKey}|${titleKey}|${numericValue.toFixed(2)}`;
 }
@@ -202,21 +289,28 @@ function buildImportCompatibleDedupVariants(
   const dedupKeys = [];
   const seen = new Set();
   const baseDateKey = normalizeTransactionDateKey(transaction.date);
+  const titleKeys = getTransactionTitleDedupKeys(transaction.title);
 
   const pushDateKey = (dateKey) => {
     if (!dateKey) {
       return;
     }
-    const dedupKey = buildImportCompatibleDedupKey({
-      date: dateKey,
-      title: transaction.title,
-      value: transaction.value
+
+    titleKeys.forEach((titleKey) => {
+      const dedupKey = buildImportCompatibleDedupKey(
+        {
+          date: dateKey,
+          title: transaction.title,
+          value: transaction.value
+        },
+        titleKey
+      );
+      if (!dedupKey || seen.has(dedupKey)) {
+        return;
+      }
+      seen.add(dedupKey);
+      dedupKeys.push(dedupKey);
     });
-    if (!dedupKey || seen.has(dedupKey)) {
-      return;
-    }
-    seen.add(dedupKey);
-    dedupKeys.push(dedupKey);
   };
 
   if (includeCurrentDay) {

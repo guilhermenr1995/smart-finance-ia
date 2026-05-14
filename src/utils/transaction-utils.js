@@ -1,5 +1,30 @@
 import { parseDateFlexible } from './date-utils.js';
 
+const DEDUP_TITLE_STOPWORDS = new Set([
+  'COMPRA',
+  'DEBITO',
+  'CREDITO',
+  'CARTAO',
+  'PARCELA',
+  'PARCELAS',
+  'PARC',
+  'PAGAMENTO',
+  'PAGTO',
+  'LANCAMENTO',
+  'LANC',
+  'TRANSACAO',
+  'TRANS',
+  'DEB',
+  'CRED',
+  'AUT',
+  'AUTORIZACAO',
+  'AUTORIZ',
+  'VIA',
+  'ELO',
+  'VISA',
+  'MASTERCARD'
+]);
+
 export function normalizeTitleForMatching(value) {
   return String(value || '')
     .normalize('NFD')
@@ -65,22 +90,22 @@ export function generateTransactionDedupKeyVariants(
 ) {
   const dedupKeys = [];
   const seen = new Set();
+  const titleKeys = getTransactionTitleDedupKeys(transaction?.title);
+  const numericValue = Math.abs(Number(transaction?.value || 0));
+  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
 
   const pushDateKey = (dateKey) => {
     if (!dateKey) {
       return;
     }
 
-    const dedupKey = generateTransactionDedupKey({
-      date: dateKey,
-      title: transaction?.title,
-      value: transaction?.value
+    titleKeys.forEach((titleKey) => {
+      const dedupKey = `${dateKey}|${titleKey}|${valueKey}`;
+      if (!seen.has(dedupKey)) {
+        seen.add(dedupKey);
+        dedupKeys.push(dedupKey);
+      }
     });
-
-    if (!seen.has(dedupKey)) {
-      seen.add(dedupKey);
-      dedupKeys.push(dedupKey);
-    }
   };
 
   const baseDateKey = normalizeTransactionDateKey(transaction?.date);
@@ -203,6 +228,68 @@ export function getTransactionTitleMatchKey(title) {
     .replace(/[^A-Z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function tokenizeTitleForDedup(title) {
+  const base = normalizeTitleForMatching(title)
+    .replace(/\bPARCELA(?:S)?\b/g, ' ')
+    .replace(/\bPARC\b/g, ' ')
+    .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ')
+    .replace(/\b\d{1,2}\s*X\b/g, ' ')
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!base) {
+    return [];
+  }
+
+  return base
+    .split(' ')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => {
+      if (DEDUP_TITLE_STOPWORDS.has(token)) {
+        return false;
+      }
+      if (/^\d{1,2}$/.test(token)) {
+        return false;
+      }
+      if (/^\d{4,}$/.test(token)) {
+        return false;
+      }
+      return token.length > 1;
+    });
+}
+
+function buildFlexibleTitleDedupKey(title) {
+  const tokens = tokenizeTitleForDedup(title);
+  return tokens.join(' ').trim();
+}
+
+function buildFlexibleSortedTitleDedupKey(title) {
+  const tokens = tokenizeTitleForDedup(title);
+  const uniqueSorted = [...new Set(tokens)].sort((left, right) => left.localeCompare(right, 'pt-BR'));
+  return uniqueSorted.join(' ').trim();
+}
+
+function getTransactionTitleDedupKeys(title) {
+  const strict = getTransactionTitleMatchKey(title);
+  const flexible = buildFlexibleTitleDedupKey(title);
+  const flexibleSorted = buildFlexibleSortedTitleDedupKey(title);
+
+  const keys = [];
+  if (strict) {
+    keys.push(strict);
+  }
+  if (flexible && flexible.length >= 4) {
+    keys.push(flexible);
+  }
+  if (flexibleSorted && flexibleSorted.length >= 4) {
+    keys.push(flexibleSorted);
+  }
+
+  return [...new Set(keys)];
 }
 
 export function generateTransactionHash({ date, title, value, accountType }) {

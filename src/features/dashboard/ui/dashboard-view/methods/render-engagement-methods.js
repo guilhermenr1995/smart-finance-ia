@@ -69,7 +69,7 @@ class DashboardViewRenderEngagementMethods {
               <button data-open-finance-action="sync" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Sync</button>
               <button data-open-finance-action="renew" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-white">Renovar</button>
               <button data-open-finance-action="revoke" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-100">Revogar</button>
-              <button data-open-finance-action="delete" data-connection-id="${escapeHtml(connection.id)}" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-200 text-red-900">Excluir</button>
+              <button data-open-finance-action="delete" data-connection-id="${escapeHtml(connection.id)}" title="Excluir conexão Open Finance e limpar dados vinculados" class="border-2 border-black px-2 py-1 text-[10px] font-black uppercase bg-red-600 text-white">Excluir conexão</button>
             </div>
           </article>
         `;
