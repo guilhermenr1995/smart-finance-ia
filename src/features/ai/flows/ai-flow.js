@@ -142,10 +142,86 @@ function mapAiFinanceQuestionReasonToMessage(reasonCode) {
     INVALID_QUESTION: 'Pergunta inválida. Tente novamente com uma frase objetiva.',
     NO_DATA: 'Não há transações ativas no filtro atual para responder.',
     TOO_MANY_TRANSACTIONS: `Refine os filtros: o recorte atual excede ${AI_FINANCE_MAX_TRANSACTIONS} transações ativas.`,
+    DAILY_LIMIT_REACHED: 'Você atingiu o limite diário de 10 perguntas para a IA. Tente novamente amanhã.',
     AI_UNAVAILABLE: 'A IA está indisponível no momento. Tente novamente em instantes.'
   };
 
   return messages[reasonCode] || 'Pergunta bloqueada pelos guardrails de segurança.';
+}
+
+function normalizeMerchantNameForUi(title) {
+  return String(title || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\bPARCELA(?:S)?\b/g, ' ')
+    .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ')
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(' ')
+    .trim();
+}
+
+function toUiPercent(value, total) {
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+  return Number(((value / total) * 100).toFixed(2));
+}
+
+function buildUiSession3GroupedContext(summary = {}) {
+  const considered = Array.isArray(summary?.considered)
+    ? summary.considered.filter((transaction) => Number(transaction?.value || 0) > 0)
+    : [];
+
+  const total = Number(considered.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0).toFixed(2));
+  const categoryMap = new Map();
+  const merchantMap = new Map();
+
+  considered.forEach((transaction) => {
+    const category = String(getDisplayCategory(transaction) || transaction?.category || 'Outros').trim() || 'Outros';
+    const value = Number(transaction?.value || 0);
+    const merchant = normalizeMerchantNameForUi(transaction?.title) || 'SEM IDENTIFICACAO';
+
+    if (!categoryMap.has(category)) {
+      categoryMap.set(category, { total: 0, count: 0 });
+    }
+    const categoryData = categoryMap.get(category);
+    categoryData.total += value;
+    categoryData.count += 1;
+
+    if (!merchantMap.has(merchant)) {
+      merchantMap.set(merchant, { total: 0, count: 0 });
+    }
+    const merchantData = merchantMap.get(merchant);
+    merchantData.total += value;
+    merchantData.count += 1;
+  });
+
+  return {
+    categoryMix: [...categoryMap.entries()]
+      .map(([category, item]) => ({
+        category,
+        total: Number(item.total.toFixed(2)),
+        transactions: Number(item.count || 0),
+        sharePercent: toUiPercent(item.total, total)
+      }))
+      .sort((left, right) => right.total - left.total)
+      .slice(0, 18),
+    merchantRanking: [...merchantMap.entries()]
+      .map(([merchant, item]) => ({
+        merchant,
+        total: Number(item.total.toFixed(2)),
+        transactions: Number(item.count || 0),
+        sharePercent: toUiPercent(item.total, total)
+      }))
+      .sort((left, right) => right.total - left.total)
+      .slice(0, 18)
+  };
 }
 
 export async function syncCategoriesWithAi(app) {
@@ -455,7 +531,8 @@ export async function askAiFinanceQuestion(app, payload = {}) {
         category: app.state.filters.category,
         source: app.state.filters.source || 'all'
       },
-      question: validation.question
+      question: validation.question,
+      uiSession3Context: buildUiSession3GroupedContext(visibleSummary)
     });
 
     app.state.setAiFinanceQuestionResult({

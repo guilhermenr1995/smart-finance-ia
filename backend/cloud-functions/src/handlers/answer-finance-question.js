@@ -3,6 +3,8 @@ const {
   setCorsHeaders,
   handlePreflightAndMethod,
   authenticateRequest,
+  FieldValue,
+  getDateKeyInTimezone,
   db
 } = require('../core/base');
 const { askGeminiForJson } = require('../core/external-services');
@@ -11,6 +13,8 @@ const { toCurrency } = require('../core/domain-utils');
 const QUESTION_MIN_LENGTH = 8;
 const QUESTION_MAX_LENGTH = 320;
 const MAX_TRANSACTIONS_FOR_QA = 500;
+const FINANCE_QUESTION_DAILY_LIMIT = 10;
+const MAX_TRANSACTIONS_PROMPT = 320;
 const FINANCE_KEYWORDS = [
   'gasto',
   'gastos',
@@ -186,7 +190,15 @@ function normalizeTitleForMatching(value) {
     .trim();
 }
 
+function isTransferTransactionTitle(title) {
+  return normalizeTitleForMatching(title).startsWith('TRANSFERENCIA');
+}
+
 function getInstallmentInfo(title) {
+  if (isTransferTransactionTitle(title)) {
+    return null;
+  }
+
   const rawTitle = String(title || '');
   const contextualMatch = rawTitle.match(/\bPARCELA(?:S)?\s*(\d{1,2})\s*\/\s*(\d{1,2})\b/i);
   const suffixMatch = rawTitle.match(/(?:^|[\s\-])(\d{1,2})\s*\/\s*(\d{1,2})\s*$/);
@@ -316,13 +328,185 @@ function buildDatasetMeta(transactions = []) {
 function buildTransactionsPayload(transactions = []) {
   return transactions.map((transaction) => ({
     date: normalizeString(transaction.date, 30),
-    title: normalizeString(transaction.title, 140),
+    title: normalizeString(transaction.title, 110),
     category: getDisplayCategory(transaction),
     value: toCurrency(transaction.value),
     accountType: normalizeString(transaction.accountType, 20) || 'Conta',
     source: isOpenFinanceTransaction(transaction) ? 'open-finance' : 'importacao',
     merchant: normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO'
   }));
+}
+
+function toPercent(value, total) {
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+  return Number(((value / total) * 100).toFixed(2));
+}
+
+function toIsoDayKey(value) {
+  const parsed = parseDateFlexible(value);
+  if (!parsed) {
+    return '';
+  }
+
+  const year = String(parsed.getFullYear()).padStart(4, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildSession3CategoryMix(transactions = []) {
+  const grouped = new Map();
+  const total = transactions.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0);
+
+  transactions.forEach((transaction) => {
+    const category = getDisplayCategory(transaction);
+    if (!grouped.has(category)) {
+      grouped.set(category, {
+        total: 0,
+        count: 0
+      });
+    }
+
+    const current = grouped.get(category);
+    current.total += Number(transaction.value || 0);
+    current.count += 1;
+  });
+
+  return [...grouped.entries()]
+    .map(([category, info]) => ({
+      category,
+      total: toCurrency(info.total),
+      transactions: Number(info.count || 0),
+      ticketAverage: toCurrency(info.total / Math.max(1, Number(info.count || 0))),
+      sharePercent: toPercent(Number(info.total || 0), total)
+    }))
+    .sort((left, right) => right.total - left.total)
+    .slice(0, 24);
+}
+
+function buildSession3MerchantRanking(transactions = []) {
+  const grouped = new Map();
+  const total = transactions.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0);
+
+  transactions.forEach((transaction) => {
+    const merchant = normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO';
+    if (!grouped.has(merchant)) {
+      grouped.set(merchant, {
+        total: 0,
+        count: 0,
+        categories: {}
+      });
+    }
+
+    const current = grouped.get(merchant);
+    const category = getDisplayCategory(transaction);
+    const value = Number(transaction.value || 0);
+    current.total += value;
+    current.count += 1;
+    current.categories[category] = Number(current.categories[category] || 0) + value;
+  });
+
+  return [...grouped.entries()]
+    .map(([merchant, info]) => {
+      const topCategory = Object.entries(info.categories || {})
+        .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0))[0]?.[0] || 'Outros';
+
+      return {
+        merchant,
+        total: toCurrency(info.total),
+        transactions: Number(info.count || 0),
+        ticketAverage: toCurrency(info.total / Math.max(1, Number(info.count || 0))),
+        sharePercent: toPercent(Number(info.total || 0), total),
+        topCategory
+      };
+    })
+    .sort((left, right) => right.total - left.total)
+    .slice(0, 24);
+}
+
+function buildSession3DailyRhythm(transactions = []) {
+  const grouped = new Map();
+
+  transactions.forEach((transaction) => {
+    const day = toIsoDayKey(transaction.date);
+    if (!day) {
+      return;
+    }
+
+    if (!grouped.has(day)) {
+      grouped.set(day, {
+        total: 0,
+        count: 0,
+        categories: {}
+      });
+    }
+
+    const current = grouped.get(day);
+    const category = getDisplayCategory(transaction);
+    const value = Number(transaction.value || 0);
+    current.total += value;
+    current.count += 1;
+    current.categories[category] = Number(current.categories[category] || 0) + value;
+  });
+
+  return [...grouped.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .slice(-62)
+    .map(([day, info]) => ({
+      day,
+      total: toCurrency(info.total),
+      transactions: Number(info.count || 0),
+      topCategories: Object.entries(info.categories || {})
+        .map(([category, total]) => ({
+          category,
+          total: toCurrency(total)
+        }))
+        .sort((left, right) => right.total - left.total)
+        .slice(0, 3)
+    }));
+}
+
+function buildSession3GroupedContext(transactions = []) {
+  return {
+    categoryMix: buildSession3CategoryMix(transactions),
+    merchantRanking: buildSession3MerchantRanking(transactions),
+    dailyRhythm: buildSession3DailyRhythm(transactions),
+    topTransactions: [...transactions]
+      .sort((left, right) => Number(right.value || 0) - Number(left.value || 0))
+      .slice(0, 28)
+      .map((transaction) => ({
+        date: normalizeString(transaction.date, 30),
+        title: normalizeString(transaction.title, 110),
+        category: getDisplayCategory(transaction),
+        value: toCurrency(transaction.value),
+        merchant: normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO'
+      }))
+  };
+}
+
+function normalizeUiSession3Context(rawContext = {}) {
+  const normalizeGrouped = (items = [], keyName) => {
+    if (!Array.isArray(items)) {
+      return [];
+    }
+
+    return items
+      .map((item) => ({
+        [keyName]: normalizeString(item?.[keyName], 90),
+        total: toCurrency(Number(item?.total || 0)),
+        transactions: Math.max(0, Number(item?.transactions || 0)),
+        sharePercent: Number(Number(item?.sharePercent || 0).toFixed(2))
+      }))
+      .filter((item) => Boolean(item[keyName]))
+      .slice(0, 18);
+  };
+
+  return {
+    categoryMix: normalizeGrouped(rawContext?.categoryMix || [], 'category'),
+    merchantRanking: normalizeGrouped(rawContext?.merchantRanking || [], 'merchant')
+  };
 }
 
 function normalizeEvidence(items = []) {
@@ -354,6 +538,50 @@ function buildBlockedResponse(reasonCode, datasetMeta) {
     evidence: [],
     datasetMeta: datasetMeta || { count: 0, total: 0 }
   };
+}
+
+async function reserveFinanceQuestionUsage(userId, appId) {
+  const dateKey = getDateKeyInTimezone();
+  const usageRef = db.collection('ai_finance_question_usage').doc(`${userId}_${dateKey}`);
+
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(usageRef);
+    const usedCount = Number(snapshot.data()?.count || 0);
+
+    if (usedCount >= FINANCE_QUESTION_DAILY_LIMIT) {
+      const limitError = new Error('Daily finance question limit reached');
+      limitError.code = 'DAILY_LIMIT_REACHED';
+      limitError.usage = {
+        limit: FINANCE_QUESTION_DAILY_LIMIT,
+        used: usedCount,
+        remaining: 0,
+        dateKey
+      };
+      throw limitError;
+    }
+
+    const nextCount = usedCount + 1;
+    const payload = {
+      userId,
+      appId: appId || null,
+      dateKey,
+      count: nextCount,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    if (!snapshot.exists) {
+      payload.createdAt = FieldValue.serverTimestamp();
+    }
+
+    transaction.set(usageRef, payload, { merge: true });
+
+    return {
+      limit: FINANCE_QUESTION_DAILY_LIMIT,
+      used: nextCount,
+      remaining: Math.max(0, FINANCE_QUESTION_DAILY_LIMIT - nextCount),
+      dateKey
+    };
+  });
 }
 
 const answerFinanceQuestion = onRequest(
@@ -419,6 +647,20 @@ const answerFinanceQuestion = onRequest(
         return;
       }
 
+      let usage = null;
+      try {
+        usage = await reserveFinanceQuestionUsage(decodedToken.uid, appId);
+      } catch (error) {
+        if (error?.code === 'DAILY_LIMIT_REACHED') {
+          response.status(200).json({
+            ...buildBlockedResponse('DAILY_LIMIT_REACHED', datasetMeta),
+            usage: error?.usage || null
+          });
+          return;
+        }
+        throw error;
+      }
+
       const payload = {
         question: questionValidation.question,
         filters: {
@@ -429,7 +671,9 @@ const answerFinanceQuestion = onRequest(
           source: filters.source
         },
         datasetMeta,
-        transactions: buildTransactionsPayload(filteredTransactions)
+        session3Grouped: buildSession3GroupedContext(filteredTransactions),
+        uiSession3Context: normalizeUiSession3Context(request.body?.uiSession3Context || {}),
+        transactions: buildTransactionsPayload(filteredTransactions).slice(0, MAX_TRANSACTIONS_PROMPT)
       };
 
       const result = await askGeminiForJson({
@@ -442,19 +686,26 @@ const answerFinanceQuestion = onRequest(
           '{"blocked":boolean,"reasonCode":"OUT_OF_SCOPE|CANNOT_ANSWER_FROM_DATA|","answer":"string","evidence":["string"]}. ' +
           'Regras: se a pergunta estiver fora do contexto financeiro pessoal do dataset, blocked=true e reasonCode="OUT_OF_SCOPE". ' +
           'Se faltarem dados para responder com confiança, blocked=true e reasonCode="CANNOT_ANSWER_FROM_DATA". ' +
-          'Quando blocked=false, answer deve ser objetiva (máx. 2 frases) e evidence deve ter até 5 evidências curtas com números/categorias do dataset. ' +
+          'Use prioritariamente o agrupamento de categorias do campo session3Grouped (mesma lógica da sessão 3 da tela). ' +
+          'uiSession3Context pode ser usado apenas como referência de apresentação visual (nunca como fonte factual principal). ' +
+          'Quando blocked=false, answer deve ser objetiva, assertiva e clara em 2 a 4 frases curtas, sempre com números concretos (contagem, total, percentual, ticket médio ou ranking quando aplicável). ' +
+          'Se a pergunta envolver "mais impactou" ou "mais frequente", inclua top 3 itens quando houver base. ' +
+          'evidence deve ter de 3 a 5 itens curtos, cada item com ao menos um número real do dataset. ' +
           `Dados: ${JSON.stringify(payload)}`,
-        temperature: 0.15
+        temperature: 0.08
       });
 
       if (!result.ok) {
-        response.status(200).json(buildBlockedResponse('AI_UNAVAILABLE', datasetMeta));
+        response.status(200).json({
+          ...buildBlockedResponse('AI_UNAVAILABLE', datasetMeta),
+          usage
+        });
         return;
       }
 
       const blocked = Boolean(result.data?.blocked);
       const reasonCode = normalizeString(result.data?.reasonCode, 80);
-      const answer = normalizeString(result.data?.answer, 420);
+      const answer = normalizeString(result.data?.answer, 900);
       const evidence = normalizeEvidence(result.data?.evidence || []);
 
       if (blocked) {
@@ -463,13 +714,17 @@ const answerFinanceQuestion = onRequest(
           reasonCode: reasonCode || 'CANNOT_ANSWER_FROM_DATA',
           answer: '',
           evidence: [],
-          datasetMeta
+          datasetMeta,
+          usage
         });
         return;
       }
 
       if (!answer) {
-        response.status(200).json(buildBlockedResponse('CANNOT_ANSWER_FROM_DATA', datasetMeta));
+        response.status(200).json({
+          ...buildBlockedResponse('CANNOT_ANSWER_FROM_DATA', datasetMeta),
+          usage
+        });
         return;
       }
 
@@ -478,7 +733,8 @@ const answerFinanceQuestion = onRequest(
         reasonCode: '',
         answer,
         evidence,
-        datasetMeta
+        datasetMeta,
+        usage
       });
     } catch (error) {
       response.status(500).json({

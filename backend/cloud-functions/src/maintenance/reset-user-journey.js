@@ -190,74 +190,80 @@ async function resetUserJourneyData(appId, userId, options = {}) {
     totalDocsDeleted += Number(appSummary.totalDocsDeleted || 0);
   }
 
-  const consultantUsageByFieldQuery = db.collection('ai_consultant_usage').where('userId', '==', userId);
-  const consultantUsageByFieldSnapshot = await consultantUsageByFieldQuery.get();
-  const consultantUsageByFieldMatched = consultantUsageByFieldSnapshot.size;
-  const consultantUsageByFieldDeleted = Boolean(options.dryRun)
-    ? consultantUsageByFieldMatched
-    : consultantUsageByFieldMatched > 0
-    ? await deleteQueryDocuments(consultantUsageByFieldQuery)
-    : 0;
+  const cleanupUsageCollectionByUser = async (collectionName) => {
+    const byFieldQuery = db.collection(collectionName).where('userId', '==', userId);
+    const byFieldSnapshot = await byFieldQuery.get();
+    const byFieldMatched = byFieldSnapshot.size;
+    const byFieldDeleted = Boolean(options.dryRun)
+      ? byFieldMatched
+      : byFieldMatched > 0
+      ? await deleteQueryDocuments(byFieldQuery)
+      : 0;
 
-  let consultantUsageByDocIdMatched = 0;
-  let consultantUsageByDocIdDeleted = 0;
-  try {
-    const docIdPrefix = `${sanitizeString(userId, 200)}_`;
-    const consultantUsageByDocIdQuery = db
-      .collection('ai_consultant_usage')
-      .where(FieldPath.documentId(), '>=', docIdPrefix)
-      .where(FieldPath.documentId(), '<', `${docIdPrefix}\uf8ff`);
-    const consultantUsageByDocIdSnapshot = await consultantUsageByDocIdQuery.get();
-    consultantUsageByDocIdMatched = consultantUsageByDocIdSnapshot.docs.filter(
-      (doc) => !consultantUsageByFieldSnapshot.docs.some((existingDoc) => existingDoc.id === doc.id)
-    ).length;
+    let byDocIdMatched = 0;
+    let byDocIdDeleted = 0;
+    try {
+      const docIdPrefix = `${sanitizeString(userId, 200)}_`;
+      const byDocIdQuery = db
+        .collection(collectionName)
+        .where(FieldPath.documentId(), '>=', docIdPrefix)
+        .where(FieldPath.documentId(), '<', `${docIdPrefix}\uf8ff`);
+      const byDocIdSnapshot = await byDocIdQuery.get();
+      byDocIdMatched = byDocIdSnapshot.docs.filter(
+        (doc) => !byFieldSnapshot.docs.some((existingDoc) => existingDoc.id === doc.id)
+      ).length;
 
-    if (!Boolean(options.dryRun) && consultantUsageByDocIdMatched > 0) {
-      const docIdsAlreadyHandled = new Set(consultantUsageByFieldSnapshot.docs.map((doc) => doc.id));
-      const extraDocRefs = consultantUsageByDocIdSnapshot.docs
-        .filter((doc) => !docIdsAlreadyHandled.has(doc.id))
-        .map((doc) => doc.ref);
+      if (!Boolean(options.dryRun) && byDocIdMatched > 0) {
+        const docIdsAlreadyHandled = new Set(byFieldSnapshot.docs.map((doc) => doc.id));
+        const extraDocRefs = byDocIdSnapshot.docs
+          .filter((doc) => !docIdsAlreadyHandled.has(doc.id))
+          .map((doc) => doc.ref);
 
-      const chunkSize = 400;
-      for (let index = 0; index < extraDocRefs.length; index += chunkSize) {
-        const chunk = extraDocRefs.slice(index, index + chunkSize);
-        const batch = db.batch();
-        chunk.forEach((ref) => batch.delete(ref));
-        await batch.commit();
+        const chunkSize = 400;
+        for (let index = 0; index < extraDocRefs.length; index += chunkSize) {
+          const chunk = extraDocRefs.slice(index, index + chunkSize);
+          const batch = db.batch();
+          chunk.forEach((ref) => batch.delete(ref));
+          await batch.commit();
+        }
+
+        byDocIdDeleted = extraDocRefs.length;
+      } else if (Boolean(options.dryRun)) {
+        byDocIdDeleted = byDocIdMatched;
       }
-
-      consultantUsageByDocIdDeleted = extraDocRefs.length;
-    } else if (Boolean(options.dryRun)) {
-      consultantUsageByDocIdDeleted = consultantUsageByDocIdMatched;
+    } catch (error) {
+      console.warn(`Unable to cleanup ${collectionName} by document id prefix:`, error?.message || error);
     }
-  } catch (error) {
-    console.warn('Unable to cleanup ai_consultant_usage by document id prefix:', error?.message || error);
-  }
+
+    return {
+      matched: byFieldMatched + byDocIdMatched,
+      deleted: byFieldDeleted + byDocIdDeleted,
+      byField: {
+        matched: byFieldMatched,
+        deleted: byFieldDeleted
+      },
+      byDocIdPrefix: {
+        matched: byDocIdMatched,
+        deleted: byDocIdDeleted
+      }
+    };
+  };
+
+  const consultantUsage = await cleanupUsageCollectionByUser('ai_consultant_usage');
+  const financeQuestionUsage = await cleanupUsageCollectionByUser('ai_finance_question_usage');
 
   const legacySummary = await resetLegacyUserJourneyData(userId, options);
 
-  const consultantUsageMatched = consultantUsageByFieldMatched + consultantUsageByDocIdMatched;
-  const consultantUsageDeleted = consultantUsageByFieldDeleted + consultantUsageByDocIdDeleted;
-  totalDocsMatched += consultantUsageMatched + Number(legacySummary.totalDocsMatched || 0);
-  totalDocsDeleted += consultantUsageDeleted + Number(legacySummary.totalDocsDeleted || 0);
+  totalDocsMatched += consultantUsage.matched + financeQuestionUsage.matched + Number(legacySummary.totalDocsMatched || 0);
+  totalDocsDeleted += consultantUsage.deleted + financeQuestionUsage.deleted + Number(legacySummary.totalDocsDeleted || 0);
 
   return {
     userId,
     dryRun: Boolean(options.dryRun),
     targetAppIds,
     perApp,
-    consultantUsage: {
-      matched: consultantUsageMatched,
-      deleted: consultantUsageDeleted,
-      byField: {
-        matched: consultantUsageByFieldMatched,
-        deleted: consultantUsageByFieldDeleted
-      },
-      byDocIdPrefix: {
-        matched: consultantUsageByDocIdMatched,
-        deleted: consultantUsageByDocIdDeleted
-      }
-    },
+    consultantUsage,
+    financeQuestionUsage,
     legacy: legacySummary,
     totalDocsMatched,
     totalDocsDeleted

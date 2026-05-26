@@ -65,6 +65,7 @@ class DashboardViewAiMethods {
       OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças neste período filtrado.',
       NO_DATA: 'Não há transações ativas no filtro atual para responder.',
       TOO_MANY_TRANSACTIONS: 'Muitos dados no filtro atual. Refine período/categoria para continuar.',
+      DAILY_LIMIT_REACHED: 'Você atingiu o limite diário de 10 perguntas para a IA. Tente novamente amanhã.',
       CANNOT_ANSWER_FROM_DATA: 'Não foi possível concluir com segurança usando apenas os dados filtrados.',
       AI_UNAVAILABLE: 'A IA está indisponível no momento. Tente novamente em instantes.',
       INVALID_FILTERS: 'Filtros inválidos para esta consulta. Ajuste o período e tente de novo.',
@@ -142,7 +143,7 @@ class DashboardViewAiMethods {
     this.aiFinanceQuestionContent.innerHTML = `
       <div class="bg-zinc-50 border-2 border-black p-3 space-y-3">
         <p class="text-[10px] font-black uppercase text-zinc-500">Resposta objetiva</p>
-        <p class="text-sm font-bold text-zinc-800">${escapeHtml(answer || 'Sem resposta disponível.')}</p>
+        <p class="text-sm font-bold text-zinc-800 whitespace-pre-line">${escapeHtml(answer || 'Sem resposta disponível.')}</p>
         ${evidenceRows ? `<div class="space-y-1">${evidenceRows}</div>` : ''}
         <p class="text-[10px] font-bold text-zinc-600">${escapeHtml(baseLabel)}</p>
       </div>
