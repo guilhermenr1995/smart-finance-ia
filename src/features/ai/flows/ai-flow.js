@@ -3,6 +3,151 @@ import { getDisplayCategory } from '../../../utils/transaction-utils.js';
 import { buildGoalTargetsByCategory, GOAL_SCOPE_ALL, normalizeGoalScope } from '../../../utils/goal-utils.js';
 import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
+const AI_FINANCE_QUESTION_MIN_LENGTH = 8;
+const AI_FINANCE_QUESTION_MAX_LENGTH = 320;
+const AI_FINANCE_MAX_TRANSACTIONS = 500;
+const AI_FINANCE_DOMAIN_KEYWORDS = [
+  'gasto',
+  'gastos',
+  'despesa',
+  'despesas',
+  'compra',
+  'compras',
+  'transacao',
+  'transacoes',
+  'lancamento',
+  'lancamentos',
+  'categoria',
+  'categorias',
+  'restaurante',
+  'restaurantes',
+  'estabelecimento',
+  'loja',
+  'mercado',
+  'mercadolivre',
+  'abaste',
+  'abasteci',
+  'combustivel',
+  'frequencia',
+  'recorrente',
+  'recorrencia',
+  'uber',
+  'ifood',
+  'fatura',
+  'cartao',
+  'credito',
+  'debito',
+  'conta',
+  'contas',
+  'dinheiro',
+  'finance',
+  'orcamento',
+  'meta',
+  'metas',
+  'periodo',
+  'mes',
+  'ticket',
+  'pix',
+  'impacto',
+  'total',
+  'ranking'
+];
+
+const AI_FINANCE_MALICIOUS_PATTERNS = [
+  /ignore\s+(all|any|the)\s+(previous|prior)\s+instructions/i,
+  /system\s+prompt/i,
+  /developer\s+mode/i,
+  /jailbreak/i,
+  /\b(prompt\s*injection|injection)\b/i,
+  /<script\b/i,
+  /\b(select|insert|update|delete|drop)\s+.*\b(from|table)\b/i,
+  /\b(rm\s+-rf|sudo|chmod|curl\s+http|wget\s+http)\b/i
+];
+
+function normalizeQuestion(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasFinanceKeyword(question) {
+  const normalized = String(question || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return AI_FINANCE_DOMAIN_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+function hasMaliciousPattern(question) {
+  return AI_FINANCE_MALICIOUS_PATTERNS.some((pattern) => pattern.test(question));
+}
+
+function validateAiFinanceQuestion(question) {
+  const normalizedQuestion = normalizeQuestion(question);
+
+  if (!normalizedQuestion) {
+    return {
+      ok: false,
+      reasonCode: 'INVALID_QUESTION',
+      question: ''
+    };
+  }
+
+  if (normalizedQuestion.length < AI_FINANCE_QUESTION_MIN_LENGTH) {
+    return {
+      ok: false,
+      reasonCode: 'QUESTION_TOO_SHORT',
+      question: normalizedQuestion
+    };
+  }
+
+  if (normalizedQuestion.length > AI_FINANCE_QUESTION_MAX_LENGTH) {
+    return {
+      ok: false,
+      reasonCode: 'QUESTION_TOO_LONG',
+      question: normalizedQuestion
+    };
+  }
+
+  if (hasMaliciousPattern(normalizedQuestion)) {
+    return {
+      ok: false,
+      reasonCode: 'QUESTION_MALICIOUS',
+      question: normalizedQuestion
+    };
+  }
+
+  if (!hasFinanceKeyword(normalizedQuestion)) {
+    return {
+      ok: false,
+      reasonCode: 'QUESTION_OUT_OF_SCOPE',
+      question: normalizedQuestion
+    };
+  }
+
+  return {
+    ok: true,
+    reasonCode: '',
+    question: normalizedQuestion
+  };
+}
+
+function mapAiFinanceQuestionReasonToMessage(reasonCode) {
+  const messages = {
+    QUESTION_TOO_SHORT: 'Sua pergunta está curta demais. Explique melhor o que deseja analisar.',
+    QUESTION_TOO_LONG: 'Sua pergunta está longa demais. Reduza para até 320 caracteres.',
+    QUESTION_MALICIOUS: 'Pergunta bloqueada por segurança. Reformule no contexto financeiro.',
+    QUESTION_OUT_OF_SCOPE: 'Pergunte apenas sobre suas finanças no período filtrado.',
+    INVALID_QUESTION: 'Pergunta inválida. Tente novamente com uma frase objetiva.',
+    NO_DATA: 'Não há transações ativas no filtro atual para responder.',
+    TOO_MANY_TRANSACTIONS: `Refine os filtros: o recorte atual excede ${AI_FINANCE_MAX_TRANSACTIONS} transações ativas.`,
+    AI_UNAVAILABLE: 'A IA está indisponível no momento. Tente novamente em instantes.'
+  };
+
+  return messages[reasonCode] || 'Pergunta bloqueada pelos guardrails de segurança.';
+}
+
 export async function syncCategoriesWithAi(app) {
   if (!app.state.user) {
     app.authView.showMessage('Faça login para usar a IA.', 'error');
@@ -248,6 +393,106 @@ export function buildConsultantInsightKey(filters) {
     .replace(/=+$/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
+}
+
+export async function askAiFinanceQuestion(app, payload = {}) {
+  if (!app.state.user) {
+    app.authView.showMessage('Faça login para perguntar para a IA.', 'error');
+    return;
+  }
+
+  const rawQuestion = String(payload?.question || '');
+  const validation = validateAiFinanceQuestion(rawQuestion);
+  const visibleTransactions = app.getVisibleTransactions();
+  const visibleSummary = app.queryService.buildSummary(visibleTransactions);
+  const filteredActiveCount = Array.isArray(visibleSummary?.considered) ? visibleSummary.considered.length : 0;
+  const filteredActiveTotal = Number(visibleSummary?.total || 0);
+  const activeDatasetMeta = {
+    count: filteredActiveCount,
+    total: Number(filteredActiveTotal.toFixed(2))
+  };
+
+  const blockedByClientReasonCode =
+    !validation.ok
+      ? validation.reasonCode
+      : filteredActiveCount === 0
+        ? 'NO_DATA'
+        : filteredActiveCount > AI_FINANCE_MAX_TRANSACTIONS
+          ? 'TOO_MANY_TRANSACTIONS'
+          : '';
+
+  if (blockedByClientReasonCode) {
+    app.state.setAiFinanceQuestionResult({
+      question: validation.question || normalizeQuestion(rawQuestion),
+      blocked: true,
+      reasonCode: blockedByClientReasonCode,
+      answer: '',
+      evidence: [],
+      datasetMeta: activeDatasetMeta,
+      filters: {
+        startDate: app.state.filters.startDate,
+        endDate: app.state.filters.endDate,
+        accountType: app.state.filters.accountType,
+        category: app.state.filters.category,
+        source: app.state.filters.source || 'all'
+      }
+    });
+    app.refreshDashboard();
+    app.authView.showMessage(mapAiFinanceQuestionReasonToMessage(blockedByClientReasonCode), 'error');
+    return;
+  }
+
+  app.dashboardView.setBusy(true);
+  app.overlayView.show('Pergunta livre: consultando sua base filtrada...');
+
+  try {
+    const result = await app.aiConsultantService.answerFinanceQuestion({
+      appId: app.config.appId,
+      filters: {
+        startDate: app.state.filters.startDate,
+        endDate: app.state.filters.endDate,
+        accountType: app.state.filters.accountType,
+        category: app.state.filters.category,
+        source: app.state.filters.source || 'all'
+      },
+      question: validation.question
+    });
+
+    app.state.setAiFinanceQuestionResult({
+      question: validation.question,
+      blocked: Boolean(result?.blocked),
+      reasonCode: String(result?.reasonCode || '').trim(),
+      answer: String(result?.answer || '').trim(),
+      evidence: Array.isArray(result?.evidence) ? result.evidence : [],
+      datasetMeta:
+        result?.datasetMeta && typeof result.datasetMeta === 'object'
+          ? result.datasetMeta
+          : activeDatasetMeta,
+      filters: {
+        startDate: app.state.filters.startDate,
+        endDate: app.state.filters.endDate,
+        accountType: app.state.filters.accountType,
+        category: app.state.filters.category,
+        source: app.state.filters.source || 'all'
+      }
+    });
+
+    app.refreshDashboard();
+    if (result?.blocked) {
+      const reasonCode = String(result?.reasonCode || '').trim();
+      app.overlayView.log('Pergunta bloqueada pelos guardrails da IA.');
+      if (reasonCode) {
+        app.overlayView.log(`Motivo: ${reasonCode}`);
+      }
+    } else {
+      app.overlayView.log('Resposta da pergunta livre gerada com sucesso.');
+    }
+    setTimeout(() => app.overlayView.hide(), 900);
+  } catch (error) {
+    app.overlayView.showError(app.normalizeError(error));
+  } finally {
+    app.dashboardView.setBusy(false);
+  }
 }
 
 export async function runAiConsultant(app) {

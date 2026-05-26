@@ -193,6 +193,9 @@ class DashboardViewInteractionMethods {
     if (this.accountFileInput) this.accountFileInput.disabled = isBusy;
     if (this.aiButton) this.aiButton.disabled = isBusy;
     if (this.aiConsultantButton) this.aiConsultantButton.disabled = isBusy;
+    if (this.aiFinanceQuestionButton) this.aiFinanceQuestionButton.disabled = isBusy;
+    if (this.aiFinanceQuestionSubmitButton) this.aiFinanceQuestionSubmitButton.disabled = isBusy;
+    if (this.aiFinanceQuestionInput) this.aiFinanceQuestionInput.disabled = isBusy;
     if (this.importBankAccountButton) this.importBankAccountButton.disabled = isBusy;
     if (this.openBankGuideButton) this.openBankGuideButton.disabled = isBusy;
     if (this.openFinanceRefreshButton) this.openFinanceRefreshButton.disabled = isBusy;
@@ -217,6 +220,12 @@ class DashboardViewInteractionMethods {
       this.paginationNextButton.disabled = isBusy || this.pagination.page >= this.pagination.totalPages;
     }
     this.aiConsultantButton.disabled = isBusy;
+    if (this.aiFinanceQuestionButton) {
+      this.aiFinanceQuestionButton.disabled = isBusy;
+    }
+    if (this.aiFinanceQuestionSubmitButton) {
+      this.aiFinanceQuestionSubmitButton.disabled = isBusy;
+    }
   }
 
   setAccountFilterButton(accountType) {

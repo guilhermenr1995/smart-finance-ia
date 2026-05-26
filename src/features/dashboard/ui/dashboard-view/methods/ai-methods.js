@@ -55,6 +55,100 @@ class DashboardViewAiMethods {
     `;
   }
 
+  resolveAiFinanceBlockReason(reasonCode = '') {
+    const map = {
+      QUESTION_TOO_SHORT: 'Pergunta muito curta. Descreva melhor o que você quer analisar.',
+      QUESTION_TOO_LONG: 'Pergunta muito longa. Resuma para até 320 caracteres.',
+      QUESTION_MALICIOUS: 'Pergunta bloqueada por padrão suspeito. Reformule no contexto financeiro.',
+      QUESTION_OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças neste período filtrado.',
+      MALICIOUS_CONTENT: 'Pergunta bloqueada por padrão suspeito. Reformule no contexto financeiro.',
+      OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças neste período filtrado.',
+      NO_DATA: 'Não há transações ativas no filtro atual para responder.',
+      TOO_MANY_TRANSACTIONS: 'Muitos dados no filtro atual. Refine período/categoria para continuar.',
+      CANNOT_ANSWER_FROM_DATA: 'Não foi possível concluir com segurança usando apenas os dados filtrados.',
+      AI_UNAVAILABLE: 'A IA está indisponível no momento. Tente novamente em instantes.',
+      INVALID_FILTERS: 'Filtros inválidos para esta consulta. Ajuste o período e tente de novo.',
+      INVALID_QUESTION: 'Pergunta inválida. Reescreva de forma objetiva sobre seus gastos.'
+    };
+
+    return map[reasonCode] || 'Pergunta bloqueada pelos guardrails de segurança.';
+  }
+
+  isSameAiFinanceFilter(baseFilters = {}, responseFilters = {}) {
+    return (
+      String(baseFilters.startDate || '') === String(responseFilters.startDate || '') &&
+      String(baseFilters.endDate || '') === String(responseFilters.endDate || '') &&
+      String(baseFilters.accountType || 'all') === String(responseFilters.accountType || 'all') &&
+      String(baseFilters.category || 'all') === String(responseFilters.category || 'all') &&
+      String(baseFilters.source || 'all') === String(responseFilters.source || 'all')
+    );
+  }
+
+  renderAiFinanceQuestion(aiFinanceQuestionState = {}, filters = {}) {
+    if (
+      !this.aiFinanceQuestionStatusLabel ||
+      !this.aiFinanceQuestionPlaceholder ||
+      !this.aiFinanceQuestionContent
+    ) {
+      return;
+    }
+
+    const hasQuestion = String(aiFinanceQuestionState?.question || '').trim().length > 0;
+    const isSameFilter = this.isSameAiFinanceFilter(filters, aiFinanceQuestionState?.filters || {});
+    const shouldShowResult = hasQuestion && isSameFilter;
+    const blocked = Boolean(aiFinanceQuestionState?.blocked);
+    const answer = String(aiFinanceQuestionState?.answer || '').trim();
+    const evidence = Array.isArray(aiFinanceQuestionState?.evidence) ? aiFinanceQuestionState.evidence : [];
+    const datasetMeta = aiFinanceQuestionState?.datasetMeta || null;
+    const reasonCode = String(aiFinanceQuestionState?.reasonCode || '').trim();
+
+    if (this.aiFinanceQuestionButton) {
+      this.aiFinanceQuestionButton.disabled = this.isBusy;
+    }
+
+    if (!shouldShowResult) {
+      this.aiFinanceQuestionStatusLabel.innerText = 'Aguardando pergunta';
+      this.aiFinanceQuestionPlaceholder.classList.remove('hidden');
+      this.aiFinanceQuestionContent.classList.add('hidden');
+      this.aiFinanceQuestionContent.innerHTML = '';
+      return;
+    }
+
+    this.aiFinanceQuestionPlaceholder.classList.add('hidden');
+    this.aiFinanceQuestionContent.classList.remove('hidden');
+
+    if (blocked) {
+      this.aiFinanceQuestionStatusLabel.innerText = 'Pergunta bloqueada';
+      this.aiFinanceQuestionContent.innerHTML = `
+        <div class="bg-red-50 border-2 border-black p-3 space-y-2">
+          <p class="text-[10px] font-black uppercase text-red-700">Guardrail de segurança</p>
+          <p class="text-sm font-bold text-zinc-800">${escapeHtml(this.resolveAiFinanceBlockReason(reasonCode))}</p>
+          ${datasetMeta ? `<p class="text-[10px] font-bold text-zinc-600">Base filtrada: ${Number(datasetMeta.count || 0)} transação(ões) ativas.</p>` : ''}
+        </div>
+      `;
+      return;
+    }
+
+    this.aiFinanceQuestionStatusLabel.innerText = 'Resposta disponível';
+    const evidenceRows = evidence
+      .slice(0, 5)
+      .map((item) => `<p class="text-[11px] font-bold text-zinc-700">- ${escapeHtml(String(item || ''))}</p>`)
+      .join('');
+
+    const baseLabel = datasetMeta
+      ? `${Number(datasetMeta.count || 0)} transação(ões) ativas • total ${formatCurrencyBRL(Number(datasetMeta.total || 0))}`
+      : 'Base filtrada ativa';
+
+    this.aiFinanceQuestionContent.innerHTML = `
+      <div class="bg-zinc-50 border-2 border-black p-3 space-y-3">
+        <p class="text-[10px] font-black uppercase text-zinc-500">Resposta objetiva</p>
+        <p class="text-sm font-bold text-zinc-800">${escapeHtml(answer || 'Sem resposta disponível.')}</p>
+        ${evidenceRows ? `<div class="space-y-1">${evidenceRows}</div>` : ''}
+        <p class="text-[10px] font-bold text-zinc-600">${escapeHtml(baseLabel)}</p>
+      </div>
+    `;
+  }
+
   renderIndicatorsBlock(indicators = {}) {
     if (!indicators || typeof indicators !== 'object' || Object.keys(indicators).length === 0) {
       return '';

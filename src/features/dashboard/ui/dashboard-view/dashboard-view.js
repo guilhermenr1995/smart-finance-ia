@@ -48,6 +48,13 @@ export class DashboardView {
     this.aiConsultantStatusLabel = document.getElementById('ai-consultant-status');
     this.aiConsultantPlaceholder = document.getElementById('ai-consultant-placeholder');
     this.aiConsultantContent = document.getElementById('ai-consultant-content');
+    this.aiFinanceQuestionButton = document.getElementById('btn-ai-finance-question');
+    this.aiFinanceQuestionForm = document.getElementById('ai-finance-question-form');
+    this.aiFinanceQuestionInput = document.getElementById('ai-finance-question-input');
+    this.aiFinanceQuestionSubmitButton = document.getElementById('btn-ai-finance-question-submit');
+    this.aiFinanceQuestionStatusLabel = document.getElementById('ai-finance-question-status');
+    this.aiFinanceQuestionPlaceholder = document.getElementById('ai-finance-question-placeholder');
+    this.aiFinanceQuestionContent = document.getElementById('ai-finance-question-content');
     this.openFinanceRefreshButton = document.getElementById('btn-open-finance-refresh');
     this.openFinanceConnectionsContainer = document.getElementById('open-finance-connections');
     this.openFinanceConnectButtons = Array.from(document.querySelectorAll('.open-finance-connect-btn'));

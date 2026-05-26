@@ -24,7 +24,8 @@ Este backend expõe proxies HTTP para IA e para Open Finance.
 
 4. `categorizeTransactions`
 5. `analyzeSpendingInsights`
-6. `getAdminDashboard`
+6. `answerFinanceQuestion`
+7. `getAdminDashboard`
 
 ## Persistência Open Finance
 

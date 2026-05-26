@@ -28,6 +28,16 @@ export class AppState {
       },
       historyByKey: {}
     };
+    this.aiFinanceQuestion = {
+      question: '',
+      answer: '',
+      blocked: false,
+      reasonCode: '',
+      evidence: [],
+      datasetMeta: null,
+      filters: null,
+      updatedAt: ''
+    };
     this.openFinance = {
       connections: [],
       lastSyncedAt: ''
@@ -194,6 +204,32 @@ export class AppState {
     this.aiConsultant = {
       ...this.aiConsultant,
       historyByKey
+    };
+  }
+
+  setAiFinanceQuestionResult(result = {}) {
+    this.aiFinanceQuestion = {
+      question: String(result.question || '').trim(),
+      answer: String(result.answer || '').trim(),
+      blocked: Boolean(result.blocked),
+      reasonCode: String(result.reasonCode || '').trim(),
+      evidence: Array.isArray(result.evidence) ? result.evidence : [],
+      datasetMeta: result.datasetMeta && typeof result.datasetMeta === 'object' ? result.datasetMeta : null,
+      filters: result.filters && typeof result.filters === 'object' ? { ...result.filters } : null,
+      updatedAt: String(result.updatedAt || new Date().toISOString()).trim()
+    };
+  }
+
+  clearAiFinanceQuestionResult() {
+    this.aiFinanceQuestion = {
+      question: '',
+      answer: '',
+      blocked: false,
+      reasonCode: '',
+      evidence: [],
+      datasetMeta: null,
+      filters: null,
+      updatedAt: ''
     };
   }
 

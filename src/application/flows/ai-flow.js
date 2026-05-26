@@ -1,4 +1,5 @@
 export {
+  askAiFinanceQuestion,
   buildConsultantInsightKey,
   buildConsultantPeriodSnapshot,
   runAiConsultant,

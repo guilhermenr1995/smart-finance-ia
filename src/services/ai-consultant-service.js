@@ -1,6 +1,7 @@
 export class AiConsultantService {
   constructor(config = {}) {
     this.consultantProxyUrl = config.consultantProxyUrl || '';
+    this.financeQuestionProxyUrl = config.financeQuestionProxyUrl || '';
     this.categorizationProxyUrl = config.proxyUrl || '';
     this.getAuthToken = config.getAuthToken || null;
     this.maxRetries = config.maxRetries || 2;
@@ -14,6 +15,23 @@ export class AiConsultantService {
 
     if (this.categorizationProxyUrl) {
       return this.categorizationProxyUrl.replace(/categorizetransactions/gi, 'analyzespendinginsights');
+    }
+
+    return '';
+  }
+
+  resolveFinanceQuestionProxyUrl() {
+    if (this.financeQuestionProxyUrl) {
+      return this.financeQuestionProxyUrl;
+    }
+
+    const consultantUrl = this.resolveProxyUrl();
+    if (consultantUrl) {
+      return consultantUrl.replace(/analyzespendinginsights/gi, 'answerfinancequestion');
+    }
+
+    if (this.categorizationProxyUrl) {
+      return this.categorizationProxyUrl.replace(/categorizetransactions/gi, 'answerfinancequestion');
     }
 
     return '';
@@ -45,6 +63,36 @@ export class AiConsultantService {
       usage: data.usage || null,
       storedInsight: data.storedInsight || null,
       warning: data.warning || null
+    };
+  }
+
+  async answerFinanceQuestion(payload) {
+    const url = this.resolveFinanceQuestionProxyUrl();
+    if (!url) {
+      throw new Error('Finance question endpoint is not configured. Set SMART_FINANCE_CONFIG.ai.financeQuestionProxyUrl.');
+    }
+
+    const authToken = this.getAuthToken ? await this.getAuthToken() : '';
+    const response = await this.fetchWithRetry(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (typeof data?.blocked !== 'boolean') {
+      throw new Error('Invalid finance question response format.');
+    }
+
+    return {
+      blocked: Boolean(data.blocked),
+      reasonCode: String(data.reasonCode || '').trim(),
+      answer: String(data.answer || '').trim(),
+      evidence: Array.isArray(data.evidence) ? data.evidence : [],
+      datasetMeta: data.datasetMeta && typeof data.datasetMeta === 'object' ? data.datasetMeta : null
     };
   }
 

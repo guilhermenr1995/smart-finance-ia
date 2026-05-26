@@ -166,6 +166,19 @@ class DashboardViewBindEventsCoreMethods {
       handlers.onAiConsultant();
     });
 
+    this.aiFinanceQuestionButton?.addEventListener('click', () => {
+      handlers.onAiFinanceQuestion?.({
+        question: this.aiFinanceQuestionInput?.value || ''
+      });
+    });
+
+    this.aiFinanceQuestionForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      handlers.onAiFinanceQuestion?.({
+        question: this.aiFinanceQuestionInput?.value || ''
+      });
+    });
+
     this.openFinanceRefreshButton?.addEventListener('click', () => {
       handlers.onRefreshOpenFinanceConnections?.();
     });

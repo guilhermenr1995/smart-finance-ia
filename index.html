@@ -453,6 +453,64 @@
             </div>
           </section>
 
+          <section id="pergunte-financas-ia-section" class="dashboard-section">
+            <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+              <button
+                id="btn-ai-finance-question"
+                class="bg-white text-zinc-900 p-5 neo-brutalism flex flex-col justify-center items-center active:scale-[0.98] h-fit lg:self-start border-2 border-black"
+                type="button"
+              >
+                <span class="font-black text-sm uppercase tracking-widest text-center">Pergunte sobre suas finanças para a IA</span>
+                <p class="text-xs uppercase font-bold opacity-70 mt-2">Baseado no filtro atual</p>
+              </button>
+
+              <div class="bg-white p-5 neo-brutalism space-y-4">
+                <div class="dashboard-section-head">
+                  <div class="dashboard-section-title-wrap">
+                    <span class="dashboard-step-badge">5A</span>
+                    <h3 class="dashboard-section-title">Pergunta Livre de Finanças</h3>
+                    <button
+                      type="button"
+                      class="help-tooltip"
+                      data-tooltip="A IA responde apenas com base nas transações ativas do filtro atual e bloqueia perguntas fora do contexto financeiro pessoal."
+                      aria-label="Ajuda sobre pergunta livre de finanças"
+                    >
+                      ?
+                    </button>
+                  </div>
+                  <span id="ai-finance-question-status" class="text-xs font-black uppercase text-zinc-500">Aguardando pergunta</span>
+                </div>
+
+                <form id="ai-finance-question-form" class="space-y-3">
+                  <label for="ai-finance-question-input" class="text-[10px] font-black uppercase text-zinc-500">
+                    Sua pergunta (sobre o período filtrado)
+                  </label>
+                  <textarea
+                    id="ai-finance-question-input"
+                    rows="4"
+                    maxlength="320"
+                    class="w-full font-black border-2 border-black outline-none bg-white p-3 text-sm resize-y"
+                    placeholder="Ex.: Quantas vezes eu abasteci o carro neste período?"
+                  ></textarea>
+                  <div class="flex justify-end">
+                    <button
+                      id="btn-ai-finance-question-submit"
+                      type="submit"
+                      class="px-4 py-2 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300"
+                    >
+                      Perguntar para IA
+                    </button>
+                  </div>
+                </form>
+
+                <p id="ai-finance-question-placeholder" class="text-sm font-bold text-zinc-600">
+                  Faça perguntas objetivas sobre seus gastos neste recorte. A IA responde apenas com seus dados filtrados.
+                </p>
+                <div id="ai-finance-question-content" class="hidden space-y-3"></div>
+              </div>
+            </div>
+          </section>
+
           <section class="dashboard-section" id="open-finance-section">
             <div class="open-finance-panel bg-white p-5 neo-brutalism space-y-4">
               <div class="dashboard-section-head">

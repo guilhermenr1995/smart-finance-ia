@@ -188,6 +188,7 @@ export function refreshDashboard(app) {
       ...app.state.aiConsultant,
       report: activeInsight?.insights || null
     },
+    aiFinanceQuestion: app.state.aiFinanceQuestion,
     goals: {
       referenceMonthKey,
       referenceMonthLabel: `${referenceMonth.label} · ${activeGoalScopeLabel}`,

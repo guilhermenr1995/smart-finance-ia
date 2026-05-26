@@ -11,6 +11,7 @@ const DEFAULT_CONFIG = {
   ai: {
     proxyUrl: '',
     consultantProxyUrl: '',
+    financeQuestionProxyUrl: '',
     allowDirectRequest: false,
     directApiKey: '',
     model: 'gemini-2.5-flash',

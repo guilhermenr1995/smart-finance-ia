@@ -12,6 +12,7 @@ window.SMART_FINANCE_CONFIG = {
   ai: {
     proxyUrl: 'https://YOUR_PROXY_URL.a.run.app',
     consultantProxyUrl: 'https://YOUR_CONSULTANT_PROXY_URL.a.run.app',
+    financeQuestionProxyUrl: 'https://YOUR_FINANCE_QUESTION_PROXY_URL.a.run.app',
     allowDirectRequest: false,
     directApiKey: '',
     model: 'gemini-2.5-flash-lite',

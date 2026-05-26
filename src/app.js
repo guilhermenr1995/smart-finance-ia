@@ -37,6 +37,7 @@ import {
   updateTransactionDescription
 } from './features/transactions/flows/transaction-flow.js';
 import {
+  askAiFinanceQuestion,
   syncCategoriesWithAi,
   buildConsultantPeriodSnapshot,
   buildConsultantInsightKey,
@@ -116,6 +117,7 @@ class SmartFinanceApplication {
     this.dashboardView.bindEvents({
       onFiltersChange: (partialFilters) => {
         this.state.updateFilters(partialFilters);
+        this.state.clearAiFinanceQuestionResult();
         this.dashboardView.resetPagination();
         this.refreshDashboard();
       },
@@ -130,6 +132,7 @@ class SmartFinanceApplication {
       onImportFile: (file, accountType, bankAccountName) => this.importCsv(file, accountType, bankAccountName),
       onAiCategorization: () => this.syncCategoriesWithAi(),
       onAiConsultant: () => this.runAiConsultant(),
+      onAiFinanceQuestion: (payload) => this.askAiFinanceQuestion(payload),
       onToggleActive: ({ docId, currentState }) => this.toggleActive(docId, currentState),
       onCategoryUpdate: ({ docId, category }) => this.updateCategory(docId, category),
       onCreateCategory: ({ docId, categoryName }) => this.createAndAssignCategory(docId, categoryName),
@@ -254,6 +257,10 @@ class SmartFinanceApplication {
 
   async runAiConsultant() {
     return runAiConsultant(this);
+  }
+
+  async askAiFinanceQuestion(payload = {}) {
+    return askAiFinanceQuestion(this, payload);
   }
 
   async saveMonthlyGoal(payload) {

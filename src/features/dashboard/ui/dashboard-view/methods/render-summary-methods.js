@@ -29,9 +29,10 @@ class DashboardViewRenderSummaryMethods {
     categories,
     bankAccounts,
     aiConsultant,
-    goals
-    ,openFinance
-    ,ritmoDoMes
+    aiFinanceQuestion,
+    goals,
+    openFinance,
+    ritmoDoMes
   }) {
     this.setAvailableCategories(categories);
     this.setAvailableBankAccounts(bankAccounts);
@@ -94,6 +95,7 @@ class DashboardViewRenderSummaryMethods {
     this.renderTransactionsPagination(paginationMeta);
     this.renderSearchTotals(searchTotals);
     this.renderAiConsultant(aiConsultant);
+    this.renderAiFinanceQuestion(aiFinanceQuestion, filters);
     this.renderOpenFinance(openFinance);
     this.renderRitmoDoMes(ritmoDoMes);
 

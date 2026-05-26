@@ -23,6 +23,7 @@ export async function handleAuthState(app, user) {
     app.state.setAiConsultantReport(null);
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
     app.state.setAiConsultantHistory([]);
+    app.state.clearAiFinanceQuestionResult();
     app.state.setOpenFinanceConnections([]);
     app.refreshDashboard();
     app.authView.setBusy(false);

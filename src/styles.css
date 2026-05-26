@@ -300,6 +300,7 @@ select.edit-mode {
 
 #mix-section .dashboard-accordion-content > .grid,
 #consultor-ia-section .dashboard-accordion-content > .grid,
+#pergunte-financas-ia-section .dashboard-accordion-content > .grid,
 #open-finance-section .dashboard-accordion-content > .open-finance-panel {
   width: 100%;
 }
