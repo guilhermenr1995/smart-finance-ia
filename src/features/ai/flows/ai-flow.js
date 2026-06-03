@@ -3,7 +3,7 @@ import { getDisplayCategory } from '../../../utils/transaction-utils.js';
 import { buildGoalTargetsByCategory, GOAL_SCOPE_ALL, normalizeGoalScope } from '../../../utils/goal-utils.js';
 import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
-const AI_FINANCE_QUESTION_MIN_LENGTH = 8;
+const AI_FINANCE_QUESTION_MIN_LENGTH = 4;
 const AI_FINANCE_QUESTION_MAX_LENGTH = 320;
 const AI_FINANCE_MAX_TRANSACTIONS = 500;
 const AI_FINANCE_DOMAIN_KEYWORDS = [
@@ -135,7 +135,7 @@ function validateAiFinanceQuestion(question) {
 
 function mapAiFinanceQuestionReasonToMessage(reasonCode) {
   const messages = {
-    QUESTION_TOO_SHORT: 'Sua pergunta está curta demais. Explique melhor o que deseja analisar.',
+    QUESTION_TOO_SHORT: `Sua pergunta está curta demais. Escreva pelo menos ${AI_FINANCE_QUESTION_MIN_LENGTH} caracteres.`,
     QUESTION_TOO_LONG: 'Sua pergunta está longa demais. Reduza para até 320 caracteres.',
     QUESTION_MALICIOUS: 'Pergunta bloqueada por segurança. Reformule no contexto financeiro.',
     QUESTION_OUT_OF_SCOPE: 'Pergunte apenas sobre suas finanças no período filtrado.',
@@ -481,6 +481,16 @@ export async function askAiFinanceQuestion(app, payload = {}) {
   const validation = validateAiFinanceQuestion(rawQuestion);
   const visibleTransactions = app.getVisibleTransactions();
   const visibleSummary = app.queryService.buildSummary(visibleTransactions);
+  const previousPeriod = buildPreviousEquivalentPeriod(app.state.filters.startDate, app.state.filters.endDate);
+  const previousStartDate = previousPeriod.startDate;
+  const previousEndDate = previousPeriod.endDate;
+  const previousBounds = {
+    ...app.state.getFilterBoundaries(),
+    cycleStart: new Date(`${previousStartDate}T00:00:00`),
+    cycleEnd: new Date(`${previousEndDate}T23:59:59`)
+  };
+  const previousVisibleTransactions = app.queryService.getVisibleTransactions(app.state.transactions, previousBounds);
+  const previousSummary = app.queryService.buildSummary(previousVisibleTransactions);
   const filteredActiveCount = Array.isArray(visibleSummary?.considered) ? visibleSummary.considered.length : 0;
   const filteredActiveTotal = Number(visibleSummary?.total || 0);
   const activeDatasetMeta = {
@@ -532,7 +542,12 @@ export async function askAiFinanceQuestion(app, payload = {}) {
         source: app.state.filters.source || 'all'
       },
       question: validation.question,
-      uiSession3Context: buildUiSession3GroupedContext(visibleSummary)
+      uiSession3Context: buildUiSession3GroupedContext(visibleSummary),
+      uiPreviousSession3Context: buildUiSession3GroupedContext(previousSummary),
+      previousPeriod: {
+        startDate: previousStartDate,
+        endDate: previousEndDate
+      }
     });
 
     app.state.setAiFinanceQuestionResult({
