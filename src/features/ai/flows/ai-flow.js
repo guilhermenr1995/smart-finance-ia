@@ -4,11 +4,16 @@ import { buildGoalTargetsByCategory, GOAL_SCOPE_ALL, normalizeGoalScope } from '
 import { buildDeterministicInsights } from './ai-flow-helpers.js';
 
 const AI_FINANCE_QUESTION_MIN_LENGTH = 4;
-const AI_FINANCE_QUESTION_MAX_LENGTH = 320;
+const AI_FINANCE_QUESTION_MAX_LENGTH = 500;
 const AI_FINANCE_MAX_TRANSACTIONS = 500;
 const AI_FINANCE_DOMAIN_KEYWORDS = [
   'gasto',
   'gastos',
+  'gastar',
+  'pagamento',
+  'pagamentos',
+  'boleto',
+  'boletos',
   'despesa',
   'despesas',
   'compra',
@@ -31,26 +36,65 @@ const AI_FINANCE_DOMAIN_KEYWORDS = [
   'frequencia',
   'recorrente',
   'recorrencia',
+  'parcela',
+  'parcelas',
   'uber',
   'ifood',
   'fatura',
+  'faturas',
+  'saldo',
   'cartao',
   'credito',
   'debito',
   'conta',
   'contas',
   'dinheiro',
+  'consumo',
+  'consumos',
+  'consumir',
   'finance',
   'orcamento',
+  'orcamentos',
   'meta',
   'metas',
+  'planejamento',
   'periodo',
   'mes',
+  'mensal',
+  'fechamento',
+  'vencimento',
   'ticket',
   'pix',
   'impacto',
   'total',
   'ranking'
+];
+
+const AI_FINANCE_PROJECTION_KEYWORDS = [
+  'projec',
+  'projet',
+  'previs',
+  'previst',
+  'prever',
+  'estim',
+  'simul',
+  'futuro',
+  'futura',
+  'futuros',
+  'futuras',
+  'mesmo padrao',
+  'mantendo o mesmo',
+  'mantiver o mesmo',
+  'valor final',
+  'saldo final',
+  'fim do mes',
+  'ate o fim do mes',
+  'final do mes',
+  'quanto vou',
+  'quanto sera',
+  'quanto ficara',
+  'vai ficar',
+  'vai dar'
 ];
 
 const AI_FINANCE_MALICIOUS_PATTERNS = [
@@ -76,7 +120,19 @@ function hasFinanceKeyword(question) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
-  return AI_FINANCE_DOMAIN_KEYWORDS.some((keyword) => normalized.includes(keyword));
+  return (
+    AI_FINANCE_DOMAIN_KEYWORDS.some((keyword) => normalized.includes(keyword)) ||
+    AI_FINANCE_PROJECTION_KEYWORDS.some((keyword) => normalized.includes(keyword))
+  );
+}
+
+function hasProjectionKeyword(question) {
+  const normalized = String(question || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return AI_FINANCE_PROJECTION_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
 function hasMaliciousPattern(question) {
@@ -85,12 +141,14 @@ function hasMaliciousPattern(question) {
 
 function validateAiFinanceQuestion(question) {
   const normalizedQuestion = normalizeQuestion(question);
+  const intent = hasProjectionKeyword(normalizedQuestion) ? 'projection' : 'general';
 
   if (!normalizedQuestion) {
     return {
       ok: false,
       reasonCode: 'INVALID_QUESTION',
-      question: ''
+      question: '',
+      intent
     };
   }
 
@@ -98,7 +156,8 @@ function validateAiFinanceQuestion(question) {
     return {
       ok: false,
       reasonCode: 'QUESTION_TOO_SHORT',
-      question: normalizedQuestion
+      question: normalizedQuestion,
+      intent
     };
   }
 
@@ -106,7 +165,8 @@ function validateAiFinanceQuestion(question) {
     return {
       ok: false,
       reasonCode: 'QUESTION_TOO_LONG',
-      question: normalizedQuestion
+      question: normalizedQuestion,
+      intent
     };
   }
 
@@ -114,7 +174,8 @@ function validateAiFinanceQuestion(question) {
     return {
       ok: false,
       reasonCode: 'QUESTION_MALICIOUS',
-      question: normalizedQuestion
+      question: normalizedQuestion,
+      intent
     };
   }
 
@@ -122,23 +183,25 @@ function validateAiFinanceQuestion(question) {
     return {
       ok: false,
       reasonCode: 'QUESTION_OUT_OF_SCOPE',
-      question: normalizedQuestion
+      question: normalizedQuestion,
+      intent
     };
   }
 
   return {
     ok: true,
     reasonCode: '',
-    question: normalizedQuestion
+    question: normalizedQuestion,
+    intent
   };
 }
 
 function mapAiFinanceQuestionReasonToMessage(reasonCode) {
   const messages = {
     QUESTION_TOO_SHORT: `Sua pergunta está curta demais. Escreva pelo menos ${AI_FINANCE_QUESTION_MIN_LENGTH} caracteres.`,
-    QUESTION_TOO_LONG: 'Sua pergunta está longa demais. Reduza para até 320 caracteres.',
+    QUESTION_TOO_LONG: 'Sua pergunta está longa demais. Reduza para até 500 caracteres.',
     QUESTION_MALICIOUS: 'Pergunta bloqueada por segurança. Reformule no contexto financeiro.',
-    QUESTION_OUT_OF_SCOPE: 'Pergunte apenas sobre suas finanças no período filtrado.',
+    QUESTION_OUT_OF_SCOPE: 'Pergunte sobre suas finanças, projeções ou comportamento no período filtrado.',
     INVALID_QUESTION: 'Pergunta inválida. Tente novamente com uma frase objetiva.',
     NO_DATA: 'Não há transações ativas no filtro atual para responder.',
     TOO_MANY_TRANSACTIONS: `Refine os filtros: o recorte atual excede ${AI_FINANCE_MAX_TRANSACTIONS} transações ativas.`,
@@ -175,7 +238,7 @@ function toUiPercent(value, total) {
 
 function buildUiSession3GroupedContext(summary = {}) {
   const considered = Array.isArray(summary?.considered)
-    ? summary.considered.filter((transaction) => Number(transaction?.value || 0) > 0)
+    ? summary.considered.filter((transaction) => Number.isFinite(Number(transaction?.value || 0)))
     : [];
 
   const total = Number(considered.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0).toFixed(2));
@@ -342,7 +405,7 @@ export async function syncCategoriesWithAi(app) {
 
 export function buildConsultantPeriodSnapshot(app, periodDates, summary) {
   const consideredTransactions = (Array.isArray(summary?.considered) ? summary.considered : []).filter(
-    (transaction) => Number(transaction?.value || 0) > 0
+    (transaction) => Number.isFinite(Number(transaction?.value || 0))
   ).map((transaction) => ({
     ...transaction,
     category: String(getDisplayCategory(transaction) || transaction.category || 'Sem categoria').trim() || 'Sem categoria'
@@ -534,6 +597,7 @@ export async function askAiFinanceQuestion(app, payload = {}) {
   try {
     const result = await app.aiConsultantService.answerFinanceQuestion({
       appId: app.config.appId,
+      questionIntent: validation.intent,
       filters: {
         startDate: app.state.filters.startDate,
         endDate: app.state.filters.endDate,

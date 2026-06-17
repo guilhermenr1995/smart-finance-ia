@@ -87,6 +87,9 @@ class DashboardViewModalMethods {
     this.renderTransactionCreateBankAccountOptions();
     this.transactionCreateTitleInput.value = '';
     this.transactionCreateValueInput.value = '';
+    if (this.transactionCreateTransactionInput) {
+      this.transactionCreateTransactionInput.checked = true;
+    }
     this.transactionCreateAccountTypeSelect.value = 'Crédito';
     this.transactionCreateCategorySelect.value = this.availableCategories.includes('Outros')
       ? 'Outros'

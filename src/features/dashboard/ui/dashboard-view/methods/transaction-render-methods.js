@@ -63,9 +63,9 @@ class DashboardViewTransactionRenderMethods {
       const previousValue = previousSummary.categoryTotals[category] || 0;
       const targetValue = Number(goalTargetsByCategory?.[category] || 0);
 
-      const currentWidth = (currentValue / maxValue) * 100;
-      const previousWidth = (previousValue / maxValue) * 100;
-      const targetWidth = (targetValue / maxValue) * 100;
+      const currentWidth = Math.max(0, (currentValue / maxValue) * 100);
+      const previousWidth = Math.max(0, (previousValue / maxValue) * 100);
+      const targetWidth = Math.max(0, (targetValue / maxValue) * 100);
       const targetMarker = targetValue > 0 ? `<div class="mix-goal-marker" style="left: ${targetWidth}%"></div>` : '';
 
       return `
@@ -109,8 +109,12 @@ class DashboardViewTransactionRenderMethods {
         const usageButtonLabel = transaction.active === false ? 'Reativar' : 'Ignorar';
         const bankAccount = escapeHtml(transaction.bankAccount || DEFAULT_BANK_ACCOUNT);
         const isOpenFinance = isOpenFinanceTransaction(transaction);
+        const isDiscount = String(transaction.entryType || '').trim().toLowerCase() === 'discount';
         const originBadge = isOpenFinance
           ? '<span class="transaction-badge transaction-badge-neutral">Origem: Open Finance</span>'
+          : '';
+        const discountBadge = isDiscount
+          ? '<span class="transaction-badge transaction-badge-neutral">Desconto</span>'
           : '';
 
         return `
@@ -135,6 +139,7 @@ class DashboardViewTransactionRenderMethods {
               <div class="transaction-badges">
                 <span class="transaction-badge">${usageLabel}</span>
                 <span class="transaction-badge transaction-badge-bank">Conta: ${bankAccount}</span>
+                ${discountBadge}
                 ${originBadge}
                 ${
                   installmentOverride

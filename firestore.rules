@@ -23,6 +23,7 @@ service cloud.firestore {
           'category',
           'accountType',
           'bankAccount',
+          'entryType',
           'active',
           'createdBy',
           'createdAt',
@@ -45,11 +46,17 @@ service cloud.firestore {
         && data.title.size() > 0
         && data.title.size() <= 200
         && data.value is number
-        && data.value >= 0
+        && data.value != 0
+        && (
+          (!('entryType' in data) && data.value > 0)
+          || (data.entryType == 'transaction' && data.value > 0)
+          || (data.entryType == 'discount' && data.value < 0)
+        )
         && data.category is string
         && data.category.size() > 0
         && data.category.size() <= 50
         && data.accountType in ['Crédito', 'Conta']
+        && (!('entryType' in data) || data.entryType in ['transaction', 'discount'])
         && (!('createdBy' in data) || data.createdBy in ['import', 'manual'])
         && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
         && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50))

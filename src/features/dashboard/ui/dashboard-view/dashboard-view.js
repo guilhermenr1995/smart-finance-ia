@@ -117,6 +117,9 @@ export class DashboardView {
     this.transactionCreateBankAccountSelect = document.getElementById('transaction-create-bank-account');
     this.transactionCreateValueInput = document.getElementById('transaction-create-value');
     this.transactionCreateAccountTypeSelect = document.getElementById('transaction-create-account-type');
+    this.transactionCreateTypeInputs = Array.from(document.querySelectorAll('input[name="transaction-create-type"]'));
+    this.transactionCreateTransactionInput = document.getElementById('transaction-create-type-transaction');
+    this.transactionCreateDiscountInput = document.getElementById('transaction-create-type-discount');
     this.titleEditorModal = document.getElementById('title-editor-modal');
     this.titleEditorForm = document.getElementById('title-editor-form');
     this.titleEditorCloseButton = document.getElementById('title-editor-close');

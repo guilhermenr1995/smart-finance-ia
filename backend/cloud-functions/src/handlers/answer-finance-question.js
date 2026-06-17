@@ -8,10 +8,10 @@ const {
   db
 } = require('../core/base');
 const { askGeminiForJson } = require('../core/external-services');
-const { toCurrency } = require('../core/domain-utils');
+const { toCurrency, getTransactionNetValue, normalizeTransactionEntryType } = require('../core/domain-utils');
 
 const QUESTION_MIN_LENGTH = 4;
-const QUESTION_MAX_LENGTH = 320;
+const QUESTION_MAX_LENGTH = 500;
 const MAX_TRANSACTIONS_FOR_QA = 500;
 const FINANCE_QUESTION_DAILY_LIMIT = 10;
 const MAX_TRANSACTIONS_PROMPT = 320;
@@ -19,6 +19,11 @@ const ANSWER_MAX_LENGTH = 1800;
 const FINANCE_KEYWORDS = [
   'gasto',
   'gastos',
+  'gastar',
+  'pagamento',
+  'pagamentos',
+  'boleto',
+  'boletos',
   'despesa',
   'despesas',
   'compra',
@@ -41,24 +46,63 @@ const FINANCE_KEYWORDS = [
   'frequencia',
   'recorrente',
   'recorrencia',
+  'parcela',
+  'parcelas',
   'ifood',
   'uber',
   'fatura',
+  'faturas',
+  'saldo',
   'cartao',
   'credito',
   'debito',
   'conta',
   'dinheiro',
+  'consumo',
+  'consumos',
+  'consumir',
   'finance',
   'orcamento',
+  'orcamentos',
   'meta',
   'periodo',
   'mes',
+  'mensal',
+  'planejamento',
+  'fechamento',
+  'vencimento',
   'ticket',
   'pix',
   'impacto',
   'total',
   'ranking'
+];
+
+const PROJECTION_KEYWORDS = [
+  'projec',
+  'projet',
+  'previs',
+  'previst',
+  'prever',
+  'estim',
+  'simul',
+  'futuro',
+  'futura',
+  'futuros',
+  'futuras',
+  'mesmo padrao',
+  'mantendo o mesmo',
+  'mantiver o mesmo',
+  'valor final',
+  'saldo final',
+  'fim do mes',
+  'ate o fim do mes',
+  'final do mes',
+  'quanto vou',
+  'quanto sera',
+  'quanto ficara',
+  'vai ficar',
+  'vai dar'
 ];
 
 const MALICIOUS_PATTERNS = [
@@ -156,7 +200,12 @@ function normalizeForSearch(value) {
 
 function hasFinanceKeyword(question) {
   const normalized = normalizeForSearch(question);
-  return FINANCE_KEYWORDS.some((keyword) => normalized.includes(keyword));
+  return FINANCE_KEYWORDS.some((keyword) => normalized.includes(keyword)) || hasProjectionKeyword(normalized);
+}
+
+function hasProjectionKeyword(question) {
+  const normalized = normalizeForSearch(question);
+  return PROJECTION_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
 function hasMaliciousPattern(question) {
@@ -165,24 +214,25 @@ function hasMaliciousPattern(question) {
 
 function validateQuestion(rawQuestion) {
   const question = normalizeQuestion(rawQuestion);
+  const intent = hasProjectionKeyword(question) ? 'projection' : 'general';
 
   if (!question) {
-    return { ok: false, reasonCode: 'INVALID_QUESTION', question: '' };
+    return { ok: false, reasonCode: 'INVALID_QUESTION', question: '', intent };
   }
   if (question.length < QUESTION_MIN_LENGTH) {
-    return { ok: false, reasonCode: 'QUESTION_TOO_SHORT', question };
+    return { ok: false, reasonCode: 'QUESTION_TOO_SHORT', question, intent };
   }
   if (question.length > QUESTION_MAX_LENGTH) {
-    return { ok: false, reasonCode: 'QUESTION_TOO_LONG', question };
+    return { ok: false, reasonCode: 'QUESTION_TOO_LONG', question, intent };
   }
   if (hasMaliciousPattern(question)) {
-    return { ok: false, reasonCode: 'MALICIOUS_CONTENT', question };
+    return { ok: false, reasonCode: 'MALICIOUS_CONTENT', question, intent };
   }
   if (!hasFinanceKeyword(question)) {
-    return { ok: false, reasonCode: 'OUT_OF_SCOPE', question };
+    return { ok: false, reasonCode: 'OUT_OF_SCOPE', question, intent };
   }
 
-  return { ok: true, reasonCode: '', question };
+  return { ok: true, reasonCode: '', question, intent };
 }
 
 function parseDateFlexible(value) {
@@ -457,14 +507,20 @@ function normalizeMerchantName(title) {
 }
 
 function toSafeTransaction(docId, data = {}) {
+  const entryType = normalizeTransactionEntryType(data.entryType);
   return {
     docId: normalizeString(docId, 120),
     date: normalizeString(data.date, 30),
     title: normalizeString(data.title, 220),
     category: normalizeString(data.category, 80) || 'Outros',
     accountType: normalizeString(data.accountType, 20),
-    value: Number(data.value || 0),
+    value: toCurrency(getTransactionNetValue({
+      value: data.value,
+      entryType
+    })),
+    entryType,
     active: data.active !== false,
+    createdBy: normalizeString(data.createdBy, 20) || 'import',
     transactionOrigin: normalizeString(data.transactionOrigin, 40),
     providerTransactionId: normalizeString(data.providerTransactionId, 160),
     providerItemId: normalizeString(data.providerItemId, 160),
@@ -483,8 +539,8 @@ function filterTransactions(transactions = [], filters) {
       return false;
     }
 
-    const value = Number(transaction.value || 0);
-    if (!Number.isFinite(value) || value <= 0) {
+    const value = getTransactionNetValue(transaction);
+    if (!Number.isFinite(value) || Math.abs(value) <= 0.00001) {
       return false;
     }
 
@@ -515,7 +571,7 @@ function buildDatasetMeta(transactions = []) {
     count: transactions.length,
     total: toCurrency(
       transactions.reduce((sum, transaction) => {
-        return sum + Number(transaction?.value || 0);
+        return sum + getTransactionNetValue(transaction);
       }, 0)
     )
   };
@@ -537,9 +593,14 @@ function buildTransactionsPayload(transactions = []) {
     date: normalizeString(transaction.date, 30),
     title: normalizeString(transaction.title, 110),
     category: getDisplayCategory(transaction),
-    value: toCurrency(transaction.value),
+    value: toCurrency(getTransactionNetValue(transaction)),
+    entryType: normalizeTransactionEntryType(transaction.entryType),
     accountType: normalizeString(transaction.accountType, 20) || 'Conta',
-    source: isOpenFinanceTransaction(transaction) ? 'open-finance' : 'importacao',
+    source: String(transaction?.createdBy || '').trim().toLowerCase() === 'manual'
+      ? 'manual'
+      : isOpenFinanceTransaction(transaction)
+        ? 'open-finance'
+        : 'importacao',
     merchant: normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO'
   }));
 }
@@ -565,7 +626,7 @@ function toIsoDayKey(value) {
 
 function buildSession3CategoryMix(transactions = []) {
   const grouped = new Map();
-  const total = transactions.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0);
+  const total = transactions.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
 
   transactions.forEach((transaction) => {
     const category = getDisplayCategory(transaction);
@@ -577,7 +638,7 @@ function buildSession3CategoryMix(transactions = []) {
     }
 
     const current = grouped.get(category);
-    current.total += Number(transaction.value || 0);
+    current.total += getTransactionNetValue(transaction);
     current.count += 1;
   });
 
@@ -595,7 +656,7 @@ function buildSession3CategoryMix(transactions = []) {
 
 function buildSession3MerchantRanking(transactions = []) {
   const grouped = new Map();
-  const total = transactions.reduce((sum, transaction) => sum + Number(transaction?.value || 0), 0);
+  const total = transactions.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
 
   transactions.forEach((transaction) => {
     const merchant = normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO';
@@ -609,7 +670,7 @@ function buildSession3MerchantRanking(transactions = []) {
 
     const current = grouped.get(merchant);
     const category = getDisplayCategory(transaction);
-    const value = Number(transaction.value || 0);
+    const value = getTransactionNetValue(transaction);
     current.total += value;
     current.count += 1;
     current.categories[category] = Number(current.categories[category] || 0) + value;
@@ -652,7 +713,7 @@ function buildSession3DailyRhythm(transactions = []) {
 
     const current = grouped.get(day);
     const category = getDisplayCategory(transaction);
-    const value = Number(transaction.value || 0);
+    const value = getTransactionNetValue(transaction);
     current.total += value;
     current.count += 1;
     current.categories[category] = Number(current.categories[category] || 0) + value;
@@ -681,13 +742,14 @@ function buildSession3GroupedContext(transactions = []) {
     merchantRanking: buildSession3MerchantRanking(transactions),
     dailyRhythm: buildSession3DailyRhythm(transactions),
     topTransactions: [...transactions]
-      .sort((left, right) => Number(right.value || 0) - Number(left.value || 0))
+      .sort((left, right) => getTransactionNetValue(right) - getTransactionNetValue(left))
       .slice(0, 28)
       .map((transaction) => ({
         date: normalizeString(transaction.date, 30),
         title: normalizeString(transaction.title, 110),
         category: getDisplayCategory(transaction),
-        value: toCurrency(transaction.value),
+        value: toCurrency(getTransactionNetValue(transaction)),
+        entryType: normalizeTransactionEntryType(transaction.entryType),
         merchant: normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO'
       }))
   };
@@ -867,7 +929,7 @@ function buildIndexedTransactions(transactions = [], periodLabel = 'Atual') {
   return (transactions || []).map((transaction, index) => {
     const category = getDisplayCategory(transaction);
     const merchant = normalizeMerchantName(transaction.title) || 'SEM IDENTIFICACAO';
-    const value = toCurrency(Number(transaction?.value || 0));
+    const value = toCurrency(getTransactionNetValue(transaction));
     const stablePart = normalizeString(transaction?.docId, 120) || `${normalizeString(transaction?.date, 30)}_${index}`;
     return {
       id: `${periodLabel}_${stablePart}_${index}`,
@@ -1005,7 +1067,7 @@ function matchEvidenceReference(indexedTransactions = [], reference = null) {
         score += 1;
       }
     }
-    if (Number.isFinite(referenceValue) && Math.abs(Number(item.value || 0) - referenceValue) <= 0.02) {
+    if (Number.isFinite(referenceValue) && Math.abs(Math.abs(Number(item.value || 0)) - referenceValue) <= 0.02) {
       score += 4;
     }
 
@@ -1030,7 +1092,10 @@ function selectTransactionsByTokens(indexedTransactions = [], tokens = []) {
       return { item, score };
     })
     .filter((row) => row.score > 0)
-    .sort((left, right) => right.score - left.score || Number(right.item?.value || 0) - Number(left.item?.value || 0))
+    .sort(
+      (left, right) =>
+        right.score - left.score || Math.abs(Number(right.item?.value || 0)) - Math.abs(Number(left.item?.value || 0))
+    )
     .slice(0, 120)
     .map((row) => row.item);
 }
@@ -1187,17 +1252,17 @@ function buildTransactionReference(transaction = {}, periodLabel = 'Atual') {
   const date = normalizeString(transaction?.date, 30) || 'sem data';
   const merchant = normalizeString(transaction?.merchant || transaction?.title, 90) || 'sem descricao';
   const category = normalizeString(transaction?.category, 80) || 'Outros';
-  const valueLabel = toCurrencyLabel(Number(transaction?.value || 0));
+  const valueLabel = toCurrencyLabel(getTransactionNetValue(transaction));
   return normalizeString(`${periodLabel}: ${date} • ${merchant} • ${category} • ${valueLabel}`, 180);
 }
 
 function buildFallbackEvidence(currentTransactions = [], previousTransactions = [], currentMeta = {}, previousMeta = {}) {
   const currentSorted = [...(currentTransactions || [])]
-    .filter((item) => Number(item?.value || 0) > 0)
-    .sort((left, right) => Number(right?.value || 0) - Number(left?.value || 0));
+    .filter((item) => Number.isFinite(getTransactionNetValue(item)))
+    .sort((left, right) => Math.abs(getTransactionNetValue(right)) - Math.abs(getTransactionNetValue(left)));
   const previousSorted = [...(previousTransactions || [])]
-    .filter((item) => Number(item?.value || 0) > 0)
-    .sort((left, right) => Number(right?.value || 0) - Number(left?.value || 0));
+    .filter((item) => Number.isFinite(getTransactionNetValue(item)))
+    .sort((left, right) => Math.abs(getTransactionNetValue(right)) - Math.abs(getTransactionNetValue(left)));
 
   const references = [
     `Atual: ${Math.max(0, Number(currentMeta?.count || 0))} transação(ões) • ${toCurrencyLabel(Number(currentMeta?.total || 0))}`
@@ -1223,6 +1288,190 @@ function buildFallbackEvidence(currentTransactions = [], previousTransactions = 
   }
 
   return normalizeEvidence(references);
+}
+
+function calculateQuantile(sortedValues, percentile) {
+  if (!Array.isArray(sortedValues) || sortedValues.length === 0) {
+    return 0;
+  }
+
+  const index = (sortedValues.length - 1) * percentile;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) {
+    return sortedValues[lower];
+  }
+
+  const weight = index - lower;
+  return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+}
+
+function formatProjectionDateLabel(value) {
+  const date = parseDateFlexible(value);
+  if (!date) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+}
+
+function extractProjectionTargetDate(question, fallbackEndDate) {
+  const safeQuestion = String(question || '');
+  const endDate = parseDateFlexible(fallbackEndDate);
+  const currentMonthEnd = endDate ? new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0, 12, 0, 0, 0) : null;
+  const defaultTarget = currentMonthEnd || endDate || new Date();
+  const questionMatches = [...safeQuestion.matchAll(/\b(\d{1,2})\s*[\/.-]\s*(\d{1,2})(?:\s*[\/.-]\s*(\d{2,4}))?\b/g)];
+
+  let bestFutureDate = null;
+  for (const match of questionMatches) {
+    const day = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const rawYear = match[3] ? Number.parseInt(match[3], 10) : null;
+    const year = rawYear === null ? (endDate ? endDate.getFullYear() : new Date().getFullYear()) : rawYear < 100 ? 2000 + rawYear : rawYear;
+    const candidate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    if (Number.isNaN(candidate.getTime())) {
+      continue;
+    }
+
+    if (endDate && candidate <= endDate) {
+      continue;
+    }
+
+    if (!bestFutureDate || candidate < bestFutureDate) {
+      bestFutureDate = candidate;
+    }
+  }
+
+  const normalizedQuestion = normalizeForSearch(safeQuestion);
+  if (bestFutureDate) {
+    return bestFutureDate;
+  }
+
+  if (normalizedQuestion.includes('fim do mes') || normalizedQuestion.includes('final do mes')) {
+    return defaultTarget;
+  }
+
+  return defaultTarget;
+}
+
+function buildProjectionContext({
+  question,
+  questionIntent,
+  transactions = [],
+  startDate,
+  endDate,
+  datasetMeta = {}
+} = {}) {
+  const projectionRequested = questionIntent === 'projection' || hasProjectionKeyword(question);
+  if (!projectionRequested) {
+    return {
+      projectionRequested: false
+    };
+  }
+
+  const periodStart = parseDateFlexible(startDate);
+  const periodEnd = parseDateFlexible(endDate);
+  if (!periodStart || !periodEnd || periodStart > periodEnd) {
+    return {
+      projectionRequested: true,
+      valid: false
+    };
+  }
+
+  const targetDate = extractProjectionTargetDate(question, periodEnd);
+  const horizonDate = targetDate && targetDate > periodEnd ? targetDate : new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 0, 12, 0, 0, 0);
+  const daysRemaining = Math.max(0, Math.round((horizonDate.getTime() - periodEnd.getTime()) / 86400000));
+  const periodDays = Math.max(1, Math.round((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1);
+  const currentTotal = toCurrency(Number(datasetMeta?.total || 0));
+  const considered = Array.isArray(transactions)
+    ? transactions.filter((transaction) => Number.isFinite(Number(getTransactionNetValue(transaction))))
+    : [];
+  const positiveTransactions = considered.filter((transaction) => Number(getTransactionNetValue(transaction)) > 0);
+  const installmentTransactions = positiveTransactions.filter((transaction) => normalizeString(transaction?.category, 80) === 'Parcelas');
+  const consumptionTransactions = positiveTransactions.filter(
+    (transaction) => normalizeString(transaction?.category, 80) !== 'Parcelas'
+  );
+
+  const installmentTotal = toCurrency(
+    installmentTransactions.reduce((sum, transaction) => sum + Number(getTransactionNetValue(transaction)), 0)
+  );
+  const consumptionTotal = toCurrency(
+    consumptionTransactions.reduce((sum, transaction) => sum + Number(getTransactionNetValue(transaction)), 0)
+  );
+
+  const consumptionValues = consumptionTransactions
+    .map((transaction) => Number(getTransactionNetValue(transaction)))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right);
+
+  let outlierThreshold = 0;
+  let outlierTransactions = [];
+  let nonOutlierTransactions = consumptionTransactions;
+
+  if (consumptionValues.length >= 4) {
+    const q1 = calculateQuantile(consumptionValues, 0.25);
+    const q3 = calculateQuantile(consumptionValues, 0.75);
+    const iqr = q3 - q1;
+    outlierThreshold = toCurrency(q3 + iqr * 1.5);
+    outlierTransactions = consumptionTransactions.filter((transaction) => Number(getTransactionNetValue(transaction)) > outlierThreshold);
+    nonOutlierTransactions = consumptionTransactions.filter(
+      (transaction) => Number(getTransactionNetValue(transaction)) <= outlierThreshold
+    );
+  }
+
+  const outlierTotal = toCurrency(
+    outlierTransactions.reduce((sum, transaction) => sum + Number(getTransactionNetValue(transaction)), 0)
+  );
+  const regularTotal = toCurrency(
+    nonOutlierTransactions.reduce((sum, transaction) => sum + Number(getTransactionNetValue(transaction)), 0)
+  );
+  const outlierWeight = 0.25;
+  const rawDailyAverage = toCurrency(consumptionTotal / Math.max(periodDays, 1));
+  const weightedDailyAverage = toCurrency((regularTotal + outlierTotal * outlierWeight) / Math.max(periodDays, 1));
+  const projectedConsumptionAdditional = toCurrency(weightedDailyAverage * daysRemaining);
+  const installmentDailyAverage = toCurrency(installmentTotal / Math.max(periodDays, 1));
+  const projectedInstallmentAdditional = toCurrency(installmentDailyAverage * daysRemaining);
+  const projectedAdditionalEndOfMonth = toCurrency(projectedConsumptionAdditional + projectedInstallmentAdditional);
+  const projectedEndOfMonth = toCurrency(currentTotal + projectedAdditionalEndOfMonth);
+
+  return {
+    projectionRequested: true,
+    valid: true,
+    targetDate: toIsoInputDate(targetDate),
+    targetLabel: formatProjectionDateLabel(targetDate),
+    periodDays,
+    daysRemaining,
+    currentTotal,
+    consumptionTotal,
+    installmentTotal,
+    rawDailyAverage,
+    weightedDailyAverage,
+    outlierThreshold,
+    outlierCount: outlierTransactions.length,
+    outlierWeight,
+    projectedConsumptionAdditional,
+    projectedInstallmentAdditional,
+    projectedAdditionalEndOfMonth,
+    projectedEndOfMonth,
+    outlierTransactions: outlierTransactions
+      .sort((left, right) => Number(getTransactionNetValue(right)) - Number(getTransactionNetValue(left)))
+      .slice(0, 8)
+      .map((transaction) => ({
+        date: normalizeString(transaction?.date, 30),
+        title: normalizeString(transaction?.title, 120),
+        category: normalizeString(transaction?.category, 80) || 'Outros',
+        value: toCurrency(getTransactionNetValue(transaction))
+      })),
+    referenceTransactions: [...positiveTransactions]
+      .sort((left, right) => Number(getTransactionNetValue(right)) - Number(getTransactionNetValue(left)))
+      .slice(0, 8)
+      .map((transaction) => ({
+        date: normalizeString(transaction?.date, 30),
+        title: normalizeString(transaction?.title, 120),
+        category: normalizeString(transaction?.category, 80) || 'Outros',
+        value: toCurrency(getTransactionNetValue(transaction))
+      }))
+  };
 }
 
 function isComparisonQuestion(question) {
@@ -1354,11 +1603,101 @@ function buildFallbackReferences(fallbackEvidence = []) {
   return normalizeLongText(references.map((item) => `- ${item}`).join('\n'), 720);
 }
 
-function extractTipContent(rawText, datasetMeta, session3Grouped) {
+function buildProjectionFallbackReferences(projectionContext = {}, fallbackEvidence = []) {
+  const references = [];
+
+  if (Array.isArray(fallbackEvidence) && fallbackEvidence.length > 0) {
+    references.push(...fallbackEvidence.slice(0, 2).map((item) => normalizeString(item, 180)).filter(Boolean));
+  }
+
+  if (Array.isArray(projectionContext?.outlierTransactions)) {
+    projectionContext.outlierTransactions.slice(0, 3).forEach((transaction) => {
+      const date = normalizeString(transaction?.date, 30) || 'sem data';
+      const title = normalizeString(transaction?.title, 120) || 'sem descrição';
+      const value = toCurrencyLabel(Number(transaction?.value || 0));
+      references.push(`- ${date} • ${title} • ${value}`);
+    });
+  }
+
+  if (Array.isArray(projectionContext?.referenceTransactions)) {
+    projectionContext.referenceTransactions.slice(0, 2).forEach((transaction) => {
+      const date = normalizeString(transaction?.date, 30) || 'sem data';
+      const title = normalizeString(transaction?.title, 120) || 'sem descrição';
+      const value = toCurrencyLabel(Number(transaction?.value || 0));
+      references.push(`- ${date} • ${title} • ${value}`);
+    });
+  }
+
+  if (references.length === 0) {
+    return 'Sem referências adicionais disponíveis no recorte atual.';
+  }
+
+  return normalizeLongText([...new Set(references)].slice(0, 6).join('\n'), 720);
+}
+
+function buildProjectionFallbackSummary(datasetMeta = {}, projectionContext = {}) {
+  if (!projectionContext?.projectionRequested || !projectionContext?.valid) {
+    return buildFallbackSummary(datasetMeta);
+  }
+
+  const targetLabel = projectionContext.targetLabel || 'o fim do período';
+  return normalizeString(
+    `Com base no período filtrado, a projeção para ${targetLabel} é de ${toCurrencyLabel(Number(
+      projectionContext.projectedEndOfMonth || datasetMeta?.total || 0
+    ))}. Usei uma média ponderada de ${toCurrencyLabel(Number(
+      projectionContext.weightedDailyAverage || 0
+    ))}/dia e reduzi o peso das transações fora do padrão para evitar distorção.`,
+    720
+  );
+}
+
+function buildProjectionFallbackChanges(projectionContext = {}) {
+  if (!projectionContext?.projectionRequested || !projectionContext?.valid) {
+    return 'Não houve variação relevante entre os períodos no recorte atual.';
+  }
+
+  const outlierCount = Math.max(0, Number(projectionContext?.outlierCount || 0));
+  const rawDailyAverage = toCurrencyLabel(Number(projectionContext?.rawDailyAverage || 0));
+  const weightedDailyAverage = toCurrencyLabel(Number(projectionContext?.weightedDailyAverage || 0));
+  const projectedConsumptionAdditional = toCurrencyLabel(Number(projectionContext?.projectedConsumptionAdditional || 0));
+  const projectedInstallmentAdditional = toCurrencyLabel(Number(projectionContext?.projectedInstallmentAdditional || 0));
+  const lines = [];
+
+  lines.push(
+    outlierCount > 0
+      ? `- ${outlierCount} transação(ões) fora do padrão receberam peso menor na projeção para não puxar a média para cima.`
+      : '- Não foram encontrados outliers relevantes no período filtrado.'
+  );
+  lines.push(`- Média bruta diária: ${rawDailyAverage} | média ponderada: ${weightedDailyAverage}.`);
+  if (Number(projectionContext?.projectedInstallmentAdditional || 0) > 0) {
+    lines.push(`- Parcela estimada até o horizonte: ${projectedInstallmentAdditional}.`);
+  }
+  lines.push(`- Consumo adicional projetado até o horizonte: ${projectedConsumptionAdditional}.`);
+
+  return normalizeLongText(lines.join('\n'), 720);
+}
+
+function buildProjectionFallbackTip(projectionContext = {}) {
+  if (!projectionContext?.projectionRequested || !projectionContext?.valid) {
+    return 'Dica prática: escolha a maior despesa do período e crie um limite 10% menor para o próximo ciclo.';
+  }
+
+  return normalizeString(
+    `Dica prática: acompanhe a diferença entre a média bruta e a média ponderada para validar a projeção de ${projectionContext.targetLabel || 'fim do período'}.`,
+    360
+  );
+}
+
+function extractTipContent(rawText, datasetMeta, session3Grouped, options = {}) {
   const tipSection = extractStructuredSection(rawText, 'Dica pr(?:á|a)tica');
   const tipInline = normalizeString(String(rawText || '').match(/dica\s*pr(?:á|a)tica\s*:\s*([^\n]+)/i)?.[1], 360);
+  const projectionContext = options?.projectionContext || {};
+  const isProjectionQuestion = Boolean(projectionContext?.projectionRequested && projectionContext?.valid);
   const fallbackTip = normalizeString(
-    buildPracticalTip(datasetMeta, session3Grouped).replace(/^Dica\s*pr(?:á|a)tica\s*:\s*/i, ''),
+    (isProjectionQuestion ? buildProjectionFallbackTip(projectionContext) : buildPracticalTip(datasetMeta, session3Grouped)).replace(
+      /^Dica\s*pr(?:á|a)tica\s*:\s*/i,
+      ''
+    ),
     360
   );
   return tipSection || tipInline || fallbackTip;
@@ -1366,21 +1705,49 @@ function extractTipContent(rawText, datasetMeta, session3Grouped) {
 
 function ensureStructuredAnswer(answer, options = {}) {
   const normalized = normalizeLongText(answer, ANSWER_MAX_LENGTH);
-  if (!normalized) {
-    return '';
-  }
-
   const datasetMeta = options?.datasetMeta || {};
   const session3Grouped = options?.session3Grouped || {};
   const comparisonContext = options?.comparisonContext || {};
   const fallbackEvidence = Array.isArray(options?.fallbackEvidence) ? options.fallbackEvidence : [];
+  const projectionContext = options?.projectionContext || {};
+  const questionIntent = String(options?.questionIntent || '').trim();
+  const isProjectionQuestion = questionIntent === 'projection' || Boolean(projectionContext?.projectionRequested);
 
-  const summary = extractStructuredSection(normalized, 'Resumo') || buildFallbackSummary(datasetMeta);
+  if (!normalized) {
+    if (!isProjectionQuestion) {
+      return '';
+    }
+
+    const summary = buildProjectionFallbackSummary(datasetMeta, projectionContext);
+    const changes = buildProjectionFallbackChanges(projectionContext);
+    const references = buildProjectionFallbackReferences(projectionContext, fallbackEvidence);
+    const tipContent = buildProjectionFallbackTip(projectionContext);
+
+    return normalizeLongText(
+      [
+        `Resumo: ${summary}`,
+        `Mudanças principais: ${changes}`,
+        `Referências: ${references}`,
+        `Dica prática: ${tipContent}`
+      ].join('\n\n'),
+      ANSWER_MAX_LENGTH
+    );
+  }
+
+  const summary =
+    extractStructuredSection(normalized, 'Resumo') ||
+    (isProjectionQuestion ? buildProjectionFallbackSummary(datasetMeta, projectionContext) : buildFallbackSummary(datasetMeta));
   const changes =
-    extractStructuredSection(normalized, 'Mudan(?:ç|c)as principais') || buildFallbackChanges(comparisonContext);
+    extractStructuredSection(normalized, 'Mudan(?:ç|c)as principais') ||
+    (isProjectionQuestion ? buildProjectionFallbackChanges(projectionContext) : buildFallbackChanges(comparisonContext));
   const references =
-    extractStructuredSection(normalized, 'Refer(?:ê|e)ncias') || buildFallbackReferences(fallbackEvidence);
-  const tipContent = extractTipContent(normalized, datasetMeta, session3Grouped);
+    extractStructuredSection(normalized, 'Refer(?:ê|e)ncias') ||
+    (isProjectionQuestion
+      ? buildProjectionFallbackReferences(projectionContext, fallbackEvidence)
+      : buildFallbackReferences(fallbackEvidence));
+  const tipContent = extractTipContent(normalized, datasetMeta, session3Grouped, {
+    projectionContext
+  });
 
   const structured = [
     `Resumo: ${summary}`,
@@ -1497,6 +1864,15 @@ const answerFinanceQuestion = onRequest(
         : [];
       const previousDatasetMeta = buildDatasetMeta(previousFilteredTransactions);
       const datasetMeta = mergeDatasetMeta(currentDatasetMeta, previousDatasetMeta, previousFilters);
+      const questionIntent = questionValidation.intent || 'general';
+      const projectionContext = buildProjectionContext({
+        question: questionValidation.question,
+        questionIntent,
+        transactions: filteredTransactions,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        datasetMeta: currentDatasetMeta
+      });
 
       if (filteredTransactions.length === 0) {
         response.status(200).json(buildBlockedResponse('NO_DATA', datasetMeta));
@@ -1531,7 +1907,9 @@ const answerFinanceQuestion = onRequest(
 
       const payload = {
         question: questionValidation.question,
+        questionIntent,
         comparisonRequested: isComparisonQuestion(questionValidation.question),
+        projectionContext,
         filters: {
           accountType: filters.accountType,
           category: filters.category,
@@ -1558,6 +1936,10 @@ const answerFinanceQuestion = onRequest(
         payload.currentPeriod.session3Grouped,
         payload.previousPeriod.session3Grouped
       );
+      const projectionPromptInstruction =
+        questionIntent === 'projection'
+          ? 'A pergunta é de projeção/futuro. Use projectionContext como base principal da estimativa, reduza o peso das transações fora do padrão e, se houver uma data futura explícita na pergunta, respeite esse horizonte; caso contrário, use o horizonte calculado em projectionContext. Quando projectionContext.valid=true, cite projectedEndOfMonth, projectedAdditionalEndOfMonth, weightedDailyAverage, outlierCount e outlierTransactions. Prefira responder com uma projeção conservadora em vez de bloquear a pergunta. '
+          : '';
 
       const result = await askGeminiForJson({
         geminiApiKey,
@@ -1569,6 +1951,7 @@ const answerFinanceQuestion = onRequest(
           '{"blocked":boolean,"reasonCode":"OUT_OF_SCOPE|CANNOT_ANSWER_FROM_DATA|","answer":"string","evidence":["string"],"context":{"current":{"categories":["string"],"merchants":["string"]},"previous":{"categories":["string"],"merchants":["string"]}}}. ' +
           'Regras: se a pergunta estiver fora do contexto financeiro pessoal do dataset, blocked=true e reasonCode="OUT_OF_SCOPE". ' +
           'Se faltarem dados para responder com confiança, blocked=true e reasonCode="CANNOT_ANSWER_FROM_DATA". ' +
+          projectionPromptInstruction +
           'Use prioritariamente os agrupamentos currentPeriod.session3Grouped e previousPeriod.session3Grouped (mesma lógica da sessão 3 da tela). ' +
           'uiSession3Context dos períodos pode ser usado apenas como referência visual (nunca como fonte factual principal). ' +
           'Se comparisonRequested=true ou a pergunta mencionar comparação/período anterior, compare explicitamente currentPeriod vs previousPeriod e destaque principais aumentos/reduções. ' +
@@ -1619,10 +2002,24 @@ const answerFinanceQuestion = onRequest(
         datasetMeta: contextualDatasetMeta,
         session3Grouped: payload.currentPeriod.session3Grouped,
         comparisonContext: payload.comparisonContext,
-        fallbackEvidence
+        fallbackEvidence,
+        questionIntent,
+        projectionContext
       });
 
       if (blocked) {
+        if (questionIntent === 'projection' && answer) {
+          response.status(200).json({
+            blocked: false,
+            reasonCode: '',
+            answer,
+            evidence,
+            datasetMeta: contextualDatasetMeta,
+            usage
+          });
+          return;
+        }
+
         response.status(200).json({
           blocked: true,
           reasonCode: reasonCode || 'CANNOT_ANSWER_FROM_DATA',

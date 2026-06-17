@@ -129,7 +129,7 @@ function sanitizeTopTransactions(rawTransactions) {
       accountType: String(transaction?.accountType || '').trim() || 'Conta',
       value: toCurrency(transaction?.value)
     }))
-    .filter((transaction) => transaction.value > 0 && transaction.title)
+    .filter((transaction) => transaction.value !== 0 && transaction.title)
     .sort((left, right) => right.value - left.value)
     .slice(0, 20);
 }
@@ -146,8 +146,8 @@ function sanitizeOutlierTransactions(rawOutliers) {
       category: String(transaction?.category || '').trim() || 'Outros',
       value: toCurrency(transaction?.value)
     }))
-    .filter((transaction) => transaction.value > 0 && transaction.title)
-    .sort((left, right) => right.value - left.value)
+    .filter((transaction) => transaction.value !== 0 && transaction.title)
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))
     .slice(0, 10);
 }
 

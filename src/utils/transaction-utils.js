@@ -76,12 +76,38 @@ export function shiftTransactionDateKey(value, deltaDays = 0) {
   return `${year}-${month}-${day}`;
 }
 
-export function generateTransactionDedupKey({ date, title, value }) {
+export function normalizeTransactionEntryType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'discount' || normalized === 'desconto' ? 'discount' : 'transaction';
+}
+
+export function getTransactionNetValue(transaction = {}) {
+  const numericValue = Number(transaction?.value || 0);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  const entryType = normalizeTransactionEntryType(transaction?.entryType);
+  if (entryType === 'discount') {
+    return -Math.abs(numericValue);
+  }
+
+  return numericValue;
+}
+
+function buildTransactionValueKey(transaction = {}) {
+  const numericValue = Math.abs(Number(transaction?.value || 0));
+  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
+  return valueKey;
+}
+
+export function generateTransactionDedupKey({ date, title, value, entryType }) {
   const dateKey = normalizeTransactionDateKey(date);
   const titleKey = getTransactionTitleMatchKey(title);
-  const numericValue = Math.abs(Number(value || 0));
-  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
-  return `${dateKey}|${titleKey}|${valueKey}`;
+  const valueKey = buildTransactionValueKey({ value });
+  const normalizedEntryType = normalizeTransactionEntryType(entryType);
+  const baseKey = `${dateKey}|${titleKey}|${valueKey}`;
+  return normalizedEntryType === 'discount' ? `${baseKey}|discount` : baseKey;
 }
 
 export function generateTransactionDedupKeyVariants(
@@ -91,8 +117,8 @@ export function generateTransactionDedupKeyVariants(
   const dedupKeys = [];
   const seen = new Set();
   const titleKeys = getTransactionTitleDedupKeys(transaction?.title);
-  const numericValue = Math.abs(Number(transaction?.value || 0));
-  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
+  const valueKey = buildTransactionValueKey(transaction);
+  const entryType = normalizeTransactionEntryType(transaction?.entryType);
 
   const pushDateKey = (dateKey) => {
     if (!dateKey) {
@@ -100,7 +126,8 @@ export function generateTransactionDedupKeyVariants(
     }
 
     titleKeys.forEach((titleKey) => {
-      const dedupKey = `${dateKey}|${titleKey}|${valueKey}`;
+      const baseKey = `${dateKey}|${titleKey}|${valueKey}`;
+      const dedupKey = entryType === 'discount' ? `${baseKey}|discount` : baseKey;
       if (!seen.has(dedupKey)) {
         seen.add(dedupKey);
         dedupKeys.push(dedupKey);
@@ -198,7 +225,7 @@ export function matchesTransactionSearch(transaction, mode, term) {
       return false;
     }
 
-    return Math.abs(Number(transaction.value || 0) - expectedValue) <= 0.01;
+    return Math.abs(Math.abs(Number(transaction.value || 0)) - expectedValue) <= 0.01;
   }
 
   if (mode === 'category') {
@@ -273,6 +300,13 @@ function buildFlexibleSortedTitleDedupKey(title) {
   return uniqueSorted.join(' ').trim();
 }
 
+function isLikelyCheckingExpenseTitle(title) {
+  const normalizedTitle = normalizeTitleForMatching(title).replace(/\s+/g, ' ');
+  return /\b(PIX\s+ENVIAD|TRANSFERENCIA\s+ENVIAD|TED\s+ENVIAD|DOC\s+ENVIAD|COMPRA|PAGAMENTO(?:\s+DE)?\s+BOLETO|PAGTO(?:\s+DE)?\s+BOLETO|PAGAMENTO(?:\s+DE)?\s+FATURA|BOLETO|FATURA|DEBITO(?:\s+EM\s+CONTA|\s+AUTOMATICO)?|SAQUE|TARIFA|IOF|JUROS|ENCARGO)\b/.test(
+    normalizedTitle
+  );
+}
+
 function getTransactionTitleDedupKeys(title) {
   const strict = getTransactionTitleMatchKey(title);
   const flexible = buildFlexibleTitleDedupKey(title);
@@ -292,8 +326,12 @@ function getTransactionTitleDedupKeys(title) {
   return [...new Set(keys)];
 }
 
-export function generateTransactionHash({ date, title, value, accountType }) {
-  const payload = `${date}_${title}_${Number(value).toFixed(2)}_${accountType}`;
+export function generateTransactionHash({ date, title, value, accountType, entryType } = {}) {
+  const normalizedEntryType = normalizeTransactionEntryType(entryType);
+  const numericValue = Math.abs(Number(value || 0));
+  const valueKey = Number.isFinite(numericValue) ? numericValue.toFixed(2) : '0.00';
+  const basePayload = `${date}_${title}_${valueKey}_${accountType}`;
+  const payload = normalizedEntryType === 'discount' ? `${basePayload}_discount` : basePayload;
   if (typeof globalThis.btoa === 'function') {
     return globalThis.btoa(unescape(encodeURIComponent(payload)));
   }
@@ -307,7 +345,11 @@ export function generateTransactionHash({ date, title, value, accountType }) {
 
 export function isIncomeOrIgnoredStatement(value, title) {
   const normalizedTitle = normalizeTitleForMatching(title);
-  return value >= 0 || /\b(PAGAMENTO|RECEBIDO|DEPOSITO|ESTORNO|CREDITO)\b/.test(normalizedTitle);
+  if (isLikelyCheckingExpenseTitle(normalizedTitle)) {
+    return false;
+  }
+
+  return value >= 0 || /\b(RECEBIDO|DEPOSITO|ESTORNO|CREDITO)\b/.test(normalizedTitle);
 }
 
 export function isIgnoredCreditEntry(value, title) {
@@ -406,13 +448,13 @@ export class TransactionQueryService {
     const considered = visibleTransactions.filter((transaction) => transaction.active !== false);
     const ignored = visibleTransactions.filter((transaction) => transaction.active === false);
 
-    const total = considered.reduce((sum, transaction) => sum + transaction.value, 0);
-    const ignoredTotal = ignored.reduce((sum, transaction) => sum + transaction.value, 0);
+    const total = considered.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
+    const ignoredTotal = ignored.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
 
     const categoryTotals = {};
     considered.forEach((transaction) => {
       const displayCategory = getDisplayCategory(transaction);
-      categoryTotals[displayCategory] = (categoryTotals[displayCategory] || 0) + transaction.value;
+      categoryTotals[displayCategory] = (categoryTotals[displayCategory] || 0) + getTransactionNetValue(transaction);
     });
 
     const sortedCategories = Object.keys(categoryTotals).sort(
@@ -430,6 +472,12 @@ export class TransactionQueryService {
   }
 
   getAiCandidates(visibleTransactions) {
-    return visibleTransactions.filter((transaction) => transaction.active !== false && transaction.category === 'Outros');
+    return visibleTransactions.filter(
+      (transaction) =>
+        transaction.active !== false &&
+        transaction.category === 'Outros' &&
+        getTransactionNetValue(transaction) > 0 &&
+        normalizeTransactionEntryType(transaction.entryType) !== 'discount'
+    );
   }
 }

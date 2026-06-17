@@ -406,6 +406,7 @@ function mapTransactionToDocument(rawTransaction = {}, account = {}, context = {
     date,
     title,
     value,
+    entryType: 'transaction',
     category: detectBaseCategory(title),
     accountType,
     bankAccount: sanitizeString(context.bankName || DEFAULT_BANK_ACCOUNT, 60) || DEFAULT_BANK_ACCOUNT,

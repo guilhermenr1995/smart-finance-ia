@@ -1,6 +1,11 @@
 import { buildCycleBoundaries, getDefaultCycleRange } from '../utils/date-utils.js';
 import { normalizeMonthlyGoalRecord } from '../utils/goal-utils.js';
-import { generateTransactionDedupKey, generateTransactionHash } from '../utils/transaction-utils.js';
+import {
+  generateTransactionDedupKey,
+  generateTransactionHash,
+  getTransactionNetValue,
+  normalizeTransactionEntryType
+} from '../utils/transaction-utils.js';
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
 
@@ -66,10 +71,20 @@ export class AppState {
       }
 
       const docId = String(transaction.docId || '').trim();
-      const normalized = {
+      const entryType = normalizeTransactionEntryType(transaction.entryType);
+      const value = getTransactionNetValue({
         ...transaction,
-        hash: String(transaction.hash || '').trim() || generateTransactionHash(transaction),
-        dedupKey: String(transaction.dedupKey || '').trim() || generateTransactionDedupKey(transaction)
+        entryType
+      });
+      const normalizedBase = {
+        ...transaction,
+        entryType,
+        value
+      };
+      const normalized = {
+        ...normalizedBase,
+        hash: String(transaction.hash || '').trim() || generateTransactionHash(normalizedBase),
+        dedupKey: String(transaction.dedupKey || '').trim() || generateTransactionDedupKey(normalizedBase)
       };
 
       if (!docId) {

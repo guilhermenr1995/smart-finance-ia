@@ -107,15 +107,19 @@ function buildTopMerchants(transactions, totalPeriod) {
 }
 
 function buildOutlierStats(consumptionTransactions) {
-  if (!Array.isArray(consumptionTransactions) || consumptionTransactions.length < 4) {
+  const positiveTransactions = Array.isArray(consumptionTransactions)
+    ? consumptionTransactions.filter((transaction) => Number(transaction.value || 0) > 0)
+    : [];
+
+  if (positiveTransactions.length < 4) {
     return {
       outlierThreshold: 0,
       outliers: [],
-      nonOutliers: consumptionTransactions || []
+      nonOutliers: positiveTransactions
     };
   }
 
-  const sortedValues = consumptionTransactions
+  const sortedValues = positiveTransactions
     .map((transaction) => Number(transaction.value || 0))
     .sort((left, right) => left - right);
 
@@ -124,20 +128,20 @@ function buildOutlierStats(consumptionTransactions) {
   const iqr = q3 - q1;
   const threshold = q3 + iqr * 1.5;
 
-  const outliers = consumptionTransactions.filter((transaction) => Number(transaction.value || 0) > threshold);
-  const nonOutliers = consumptionTransactions.filter((transaction) => Number(transaction.value || 0) <= threshold);
+  const outliers = positiveTransactions.filter((transaction) => Number(transaction.value || 0) > threshold);
+  const nonOutliers = positiveTransactions.filter((transaction) => Number(transaction.value || 0) <= threshold);
 
   return {
     outlierThreshold: roundCurrency(threshold),
     outliers,
-    nonOutliers: nonOutliers.length > 0 ? nonOutliers : consumptionTransactions
+    nonOutliers: nonOutliers.length > 0 ? nonOutliers : positiveTransactions
   };
 }
 
 function buildDeterministicInsights(periodDates, summary) {
   const considered = Array.isArray(summary?.considered)
     ? summary.considered
-        .filter((transaction) => Number(transaction?.value || 0) > 0)
+        .filter((transaction) => Number.isFinite(Number(transaction?.value || 0)))
         .map((transaction) => ({
           ...transaction,
           category: String(getDisplayCategory(transaction) || transaction.category || 'Sem categoria').trim() || 'Sem categoria'

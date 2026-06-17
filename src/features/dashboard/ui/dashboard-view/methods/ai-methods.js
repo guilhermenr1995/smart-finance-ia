@@ -58,11 +58,11 @@ class DashboardViewAiMethods {
   resolveAiFinanceBlockReason(reasonCode = '') {
     const map = {
       QUESTION_TOO_SHORT: 'Pergunta muito curta. Escreva pelo menos 4 caracteres e inclua o contexto financeiro.',
-      QUESTION_TOO_LONG: 'Pergunta muito longa. Resuma para até 320 caracteres.',
+      QUESTION_TOO_LONG: 'Pergunta muito longa. Resuma para até 500 caracteres.',
       QUESTION_MALICIOUS: 'Pergunta bloqueada por padrão suspeito. Reformule no contexto financeiro.',
-      QUESTION_OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças neste período filtrado.',
+      QUESTION_OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças, projeções ou comportamento neste período filtrado.',
       MALICIOUS_CONTENT: 'Pergunta bloqueada por padrão suspeito. Reformule no contexto financeiro.',
-      OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças neste período filtrado.',
+      OUT_OF_SCOPE: 'A pergunta precisa ser sobre suas finanças, projeções ou comportamento neste período filtrado.',
       NO_DATA: 'Não há transações ativas no filtro atual para responder.',
       TOO_MANY_TRANSACTIONS: 'Muitos dados no filtro atual. Refine período/categoria para continuar.',
       DAILY_LIMIT_REACHED: 'Você atingiu o limite diário de 10 perguntas para a IA. Tente novamente amanhã.',

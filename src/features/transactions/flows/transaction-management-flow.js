@@ -214,8 +214,10 @@ export async function createManualTransaction(app, payload = {}) {
   const category = String(payload.category || '').trim() || 'Outros';
   const bankAccount = normalizeBankAccountName(payload.bankAccount);
   const accountType = payload.accountType === 'Crédito' ? 'Crédito' : 'Conta';
+  const entryType = payload.entryType === 'discount' ? 'discount' : 'transaction';
   const parsedAmount = parseManualAmount(payload.value);
   const value = Math.abs(parsedAmount);
+  const signedValue = entryType === 'discount' ? -value : value;
 
   if (!title) {
     app.authView.showMessage('Informe a descrição da transação.', 'error');
@@ -231,10 +233,11 @@ export async function createManualTransaction(app, payload = {}) {
   const transaction = {
     date,
     title,
-    value,
+    value: signedValue,
     category,
     accountType,
     bankAccount,
+    entryType,
     active: true,
     createdBy: 'manual',
     createdAt: new Date().toISOString(),
@@ -265,7 +268,7 @@ export async function createManualTransaction(app, payload = {}) {
     } catch (usageError) {
       console.warn('Falha ao registrar transação manual em métricas:', usageError);
     }
-    app.authView.showMessage('Transação criada com sucesso.', 'success');
+    app.authView.showMessage(entryType === 'discount' ? 'Desconto criado com sucesso.' : 'Transação criada com sucesso.', 'success');
     return true;
   } catch (error) {
     app.authView.showMessage(app.normalizeError(error), 'error');

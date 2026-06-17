@@ -191,6 +191,9 @@ class DashboardViewInteractionMethods {
     if (this.sourceFilterSelect) this.sourceFilterSelect.disabled = isBusy;
     if (this.creditFileInput) this.creditFileInput.disabled = isBusy;
     if (this.accountFileInput) this.accountFileInput.disabled = isBusy;
+    this.transactionCreateTypeInputs?.forEach((input) => {
+      input.disabled = isBusy;
+    });
     if (this.aiButton) this.aiButton.disabled = isBusy;
     if (this.aiConsultantButton) this.aiConsultantButton.disabled = isBusy;
     if (this.aiFinanceQuestionButton) this.aiFinanceQuestionButton.disabled = isBusy;

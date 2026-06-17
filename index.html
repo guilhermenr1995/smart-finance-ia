@@ -729,6 +729,35 @@
             <label for="transaction-create-title" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Descrição</label>
             <input id="transaction-create-title" type="text" class="w-full font-black border-b-2 border-black outline-none bg-transparent py-2 text-sm" required />
           </div>
+          <fieldset class="space-y-3 bg-zinc-50 border-2 border-black p-3">
+            <legend class="block text-[10px] font-black uppercase text-zinc-500 italic px-1">Tipo de lançamento</legend>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 border-2 border-black bg-white px-3 py-2 font-black text-xs uppercase cursor-pointer">
+                <input
+                  id="transaction-create-type-transaction"
+                  name="transaction-create-type"
+                  type="radio"
+                  value="transaction"
+                  checked
+                  class="h-4 w-4 accent-black"
+                />
+                <span>Transação</span>
+              </label>
+              <label class="flex items-center gap-2 border-2 border-black bg-white px-3 py-2 font-black text-xs uppercase cursor-pointer">
+                <input
+                  id="transaction-create-type-discount"
+                  name="transaction-create-type"
+                  type="radio"
+                  value="discount"
+                  class="h-4 w-4 accent-black"
+                />
+                <span>Desconto</span>
+              </label>
+            </div>
+            <p class="text-[10px] font-bold text-zinc-600 leading-relaxed">
+              O desconto entra com sinal negativo, reduz o total filtrado e continua vinculado à categoria escolhida.
+            </p>
+          </fieldset>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label for="transaction-create-category" class="block text-[10px] font-black uppercase text-zinc-500 italic mb-2">Categoria</label>
@@ -751,7 +780,7 @@
             </div>
           </div>
           <button type="submit" class="w-full px-4 py-3 border-2 border-black font-black text-[11px] uppercase neo-brutalism bg-yellow-300">
-            Salvar transação
+            Salvar lançamento
           </button>
         </form>
       </div>

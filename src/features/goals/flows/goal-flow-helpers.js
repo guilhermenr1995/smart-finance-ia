@@ -6,7 +6,11 @@ import {
   normalizeMonthlyGoalRecord
 } from '../../../utils/goal-utils.js';
 import { shiftInputDateByMonths } from '../../../utils/date-utils.js';
-import { getDisplayCategory, getTransactionTitleMatchKey } from '../../../utils/transaction-utils.js';
+import {
+  getDisplayCategory,
+  getTransactionNetValue,
+  getTransactionTitleMatchKey
+} from '../../../utils/transaction-utils.js';
 const DISCRETIONARY_CATEGORIES = new Set(['alimentacao', 'lazer', 'compras', 'assinaturas', 'outros', 'pet']);
 const PROTECTED_CATEGORIES = new Set(['parcelas', 'transferencia']);
 const FIXED_CATEGORY_KEYWORDS = [
@@ -81,8 +85,8 @@ function summarizeHistoryForAutoGoals(transactions, monthKeys) {
     if (!transaction || transaction.active === false) {
       return;
     }
-    const value = Math.abs(Number(transaction.value || 0));
-    if (!Number.isFinite(value) || value <= 0) {
+    const value = getTransactionNetValue(transaction);
+    if (!Number.isFinite(value) || Math.abs(value) <= 0.00001) {
       return;
     }
     const monthKey = getMonthKeyFromDate(transaction.date);

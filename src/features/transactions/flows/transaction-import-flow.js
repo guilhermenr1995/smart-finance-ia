@@ -126,6 +126,7 @@ export async function importCsv(app, file, accountType, bankAccountName = DEFAUL
       const autoSuggestion = autoAssignedByIndex.get(index);
       const normalizedTransaction = {
         ...transaction,
+        entryType: 'transaction',
         hash: String(transaction.hash || '').trim() || generateTransactionHash(transaction),
         dedupKey: String(transaction.dedupKey || '').trim() || generateTransactionDedupKey(transaction)
       };

@@ -16,6 +16,25 @@ function toPercent(value) {
   return Number(toFiniteNumber(value).toFixed(2));
 }
 
+function normalizeTransactionEntryType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'discount' || normalized === 'desconto' ? 'discount' : 'transaction';
+}
+
+function getTransactionNetValue(transaction = {}) {
+  const numericValue = Number(transaction?.value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  const entryType = normalizeTransactionEntryType(transaction?.entryType);
+  if (entryType === 'discount') {
+    return -Math.abs(numericValue);
+  }
+
+  return numericValue;
+}
+
 function sanitizeString(value, maxLength = 200) {
   return String(value || '').trim().slice(0, maxLength);
 }
@@ -102,13 +121,17 @@ function buildTransactionDedupKey(transaction = {}) {
   const titleKey = normalizeTransactionTitleKey(transaction.title);
   const numericValue = Math.abs(toFiniteNumber(transaction.value));
   const valueKey = numericValue.toFixed(2);
-  return `${dateKey}|${titleKey}|${valueKey}`;
+  const entryType = normalizeTransactionEntryType(transaction.entryType);
+  const baseKey = `${dateKey}|${titleKey}|${valueKey}`;
+  return entryType === 'discount' ? `${baseKey}|discount` : baseKey;
 }
 
 function buildTransactionHash(transaction = {}) {
-  const payload = `${String(transaction.date || '').trim()}_${String(transaction.title || '').trim()}_${Math.abs(
+  const entryType = normalizeTransactionEntryType(transaction.entryType);
+  const basePayload = `${String(transaction.date || '').trim()}_${String(transaction.title || '').trim()}_${Math.abs(
     toFiniteNumber(transaction.value)
   ).toFixed(2)}_${String(transaction.accountType || '').trim()}`;
+  const payload = entryType === 'discount' ? `${basePayload}_discount` : basePayload;
   return Buffer.from(payload, 'utf8').toString('base64');
 }
 
@@ -209,7 +232,10 @@ function mergeDuplicateTransactionGroup(keeperDoc, groupDocs = []) {
     categoryAutoAssigned: hasAnyAutoAssigned,
     categoryManuallyEdited: hasAnyManuallyEdited,
     active: hasAnyActive,
-    bankAccount: selectPreferredBankAccount(ordered)
+    bankAccount: selectPreferredBankAccount(ordered),
+    entryType: normalizeTransactionEntryType(
+      bestCategoryDoc?.data?.entryType || keeperDoc.data?.entryType || ordered[0]?.data?.entryType
+    )
   };
 
   if (latestCategoryUpdateAt) {
@@ -234,6 +260,7 @@ function shouldUpdateKeeper(currentData = {}, mergedData = {}) {
     'categoryManuallyEdited',
     'active',
     'bankAccount',
+    'entryType',
     'createdAt',
     'lastCategoryUpdateAt',
     'hash',
@@ -256,10 +283,12 @@ module.exports = {
   sanitizeProviderIds,
   buildResetUserProfilePayload,
   normalizeCategoryKey,
+  normalizeTransactionEntryType,
   normalizeTransactionTitleKey,
   normalizeTransactionDateKey,
   buildTransactionDedupKey,
   buildTransactionHash,
+  getTransactionNetValue,
   isCategoryDefined,
   getTransactionQualityScore,
   sortByPriorityWithTimestamp,

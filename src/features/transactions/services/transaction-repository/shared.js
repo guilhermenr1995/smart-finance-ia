@@ -1,4 +1,9 @@
-import { generateTransactionDedupKey, generateTransactionHash } from '../../../../utils/transaction-utils.js';
+import {
+  generateTransactionDedupKey,
+  generateTransactionHash,
+  getTransactionNetValue,
+  normalizeTransactionEntryType
+} from '../../../../utils/transaction-utils.js';
 import { buildGoalDocId, getMonthBounds, normalizeMonthlyGoalRecord } from '../../../../utils/goal-utils.js';
 
 const DEFAULT_BANK_ACCOUNT = 'Padrão';
@@ -22,10 +27,12 @@ function normalizeTransactionMetadata(data = {}) {
   const categorySource = String(data.categorySource || '').trim() || 'manual';
   const createdAt = String(data.createdAt || '').trim();
   const lastCategoryUpdateAt = String(data.lastCategoryUpdateAt || '').trim() || createdAt;
+  const entryType = normalizeTransactionEntryType(data.entryType);
   return {
     categorySource,
     categoryAutoAssigned: Boolean(data.categoryAutoAssigned),
     categoryManuallyEdited: Boolean(data.categoryManuallyEdited),
+    entryType,
     createdBy: data.createdBy === 'manual' ? 'manual' : 'import',
     createdAt,
     lastCategoryUpdateAt
@@ -33,11 +40,16 @@ function normalizeTransactionMetadata(data = {}) {
 }
 
 function normalizeStoredTransaction(transaction = {}) {
+  const entryType = normalizeTransactionEntryType(transaction.entryType);
   const normalized = {
     ...transaction,
     ...normalizeTransactionMetadata(transaction),
     bankAccount: normalizeBankAccountName(transaction.bankAccount)
   };
+  normalized.value = getTransactionNetValue({
+    ...normalized,
+    entryType
+  });
 
   const hash = String(normalized.hash || '').trim();
   const dedupKey = String(normalized.dedupKey || '').trim();

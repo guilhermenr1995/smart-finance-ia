@@ -9,7 +9,7 @@ import {
   getMonthKeyFromDate,
   normalizeGoalScope
 } from '../../utils/goal-utils.js';
-import { getDisplayCategory, matchesTransactionSearch } from '../../utils/transaction-utils.js';
+import { getDisplayCategory, getTransactionNetValue, matchesTransactionSearch } from '../../utils/transaction-utils.js';
 
 function buildRhythmDailyByCategory(consideredTransactions = []) {
   const grouped = new Map();
@@ -31,7 +31,7 @@ function buildRhythmDailyByCategory(consideredTransactions = []) {
     const current = grouped.get(dateKey);
     const category = String(getDisplayCategory(transaction) || 'Outros').trim() || 'Outros';
     const title = String(transaction.title || '').trim() || 'Transação sem descrição';
-    const value = Number(transaction.value || 0);
+    const value = getTransactionNetValue(transaction);
     current.total += value;
     current.categories[category] = Number(current.categories[category] || 0) + value;
     current.transactions.push({
@@ -110,15 +110,15 @@ export function refreshDashboard(app) {
   const pendingAiCount = app.queryService.getAiCandidates(visibleTransactions).length;
   const activeInsight = app.state.getAiConsultantHistory(app.buildConsultantInsightKey(app.state.filters));
   const activeTableTransactions = tableTransactions.filter((transaction) => transaction.active !== false);
-  const matchedTotal = activeTableTransactions.reduce((sum, transaction) => sum + Number(transaction.value || 0), 0);
+  const matchedTotal = activeTableTransactions.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
   const baseTotal = searchSourceTransactions.reduce((sum, transaction) => {
     if (transaction.active === false) {
       return sum;
     }
 
-    return sum + Number(transaction.value || 0);
+    return sum + getTransactionNetValue(transaction);
   }, 0);
-  const percentageOfBase = baseTotal > 0 ? (matchedTotal / baseTotal) * 100 : 0;
+  const percentageOfBase = baseTotal > 0 ? (Math.abs(matchedTotal) / baseTotal) * 100 : 0;
 
   const previousPeriod = buildPreviousEquivalentPeriod(app.state.filters.startDate, app.state.filters.endDate);
   const previousStartDate = previousPeriod.startDate;

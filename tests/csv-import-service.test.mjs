@@ -33,6 +33,19 @@ test('imports checking account CSV with trailing minus values', () => {
   assert.equal(result.transactions[0].value, 123.45);
 });
 
+test('imports checking account boleto payments from CSV', () => {
+  const csv = [
+    'Data;Descrição;Valor',
+    '08/06/2026;Pagamento de boleto efetuado - UNIMED GUAXUPE COOP.TR.MED;654,36'
+  ].join('\n');
+
+  const result = service.parseCsvContent(csv, 'Conta', new Set());
+  assert.equal(result.transactions.length, 1);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.transactions[0].title, 'Pagamento de boleto efetuado - UNIMED GUAXUPE COOP.TR.MED');
+  assert.equal(result.transactions[0].value, 654.36);
+});
+
 test('imports checking account CSV using debit and credit columns', () => {
   const csv = [
     'Data;Histórico;Débito;Crédito;Saldo',
@@ -72,6 +85,26 @@ test('deduplicates same description and value when date differs by one day, keep
   assert.equal(result.skipped, 1);
   assert.equal(result.diagnostics.skippedDuplicateRows, 1);
   assert.equal(result.transactions[0].date, '2026-03-22');
+});
+
+test('imports checking account boleto payments from OFX', () => {
+  const ofx = [
+    '<OFX>',
+    '<STMTTRN>',
+    '<TRNTYPE>DEBIT',
+    '<DTPOSTED>20260608000000[-3:BRT]',
+    '<TRNAMT>-654.36',
+    '<FITID>6a238a13-f913-44a6-b280-cff203ca1ce1',
+    '<MEMO>Pagamento de boleto efetuado - UNIMED GUAXUPE COOP.TR.MED',
+    '</STMTTRN>',
+    '</OFX>'
+  ].join('\n');
+
+  const result = service.parseOfxContent(ofx, 'Conta', new Set());
+  assert.equal(result.transactions.length, 1);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.transactions[0].title, 'Pagamento de boleto efetuado - UNIMED GUAXUPE COOP.TR.MED');
+  assert.equal(result.transactions[0].value, 654.36);
 });
 
 test('marks as duplicate when transaction already exists on previous day', () => {

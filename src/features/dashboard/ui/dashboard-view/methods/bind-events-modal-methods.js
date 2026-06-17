@@ -128,13 +128,18 @@ class DashboardViewBindEventsModalMethods {
 
     this.transactionCreateForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      const selectedEntryType =
+        this.transactionCreateTypeInputs?.find((input) => input.checked)?.value ||
+        this.transactionCreateTransactionInput?.value ||
+        'transaction';
 
       const created = await this.handlers.onCreateTransaction({
         title: this.transactionCreateTitleInput.value,
         category: this.transactionCreateCategorySelect.value,
         bankAccount: this.transactionCreateBankAccountSelect.value,
         value: this.transactionCreateValueInput.value,
-        accountType: this.transactionCreateAccountTypeSelect.value
+        accountType: this.transactionCreateAccountTypeSelect.value,
+        entryType: selectedEntryType
       });
 
       if (created) {
