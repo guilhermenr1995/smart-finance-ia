@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Smart Finance IA">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a" />
-      <stop offset="55%" stop-color="#1d4ed8" />
-      <stop offset="100%" stop-color="#06b6d4" />
+      <stop offset="0%" stop-color="#111111" />
+      <stop offset="55%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#fde68a" />
     </linearGradient>
     <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#fde68a" />
@@ -14,14 +14,14 @@
     </filter>
   </defs>
   <rect width="192" height="192" rx="44" fill="url(#bg)" />
-  <circle cx="152" cy="40" r="24" fill="#facc15" fill-opacity="0.24" />
-  <circle cx="40" cy="152" r="20" fill="#67e8f9" fill-opacity="0.24" />
+  <circle cx="152" cy="40" r="24" fill="#fde68a" fill-opacity="0.3" />
+  <circle cx="40" cy="152" r="20" fill="#f59e0b" fill-opacity="0.28" />
 
   <g filter="url(#shadow)">
     <rect x="28" y="24" width="136" height="144" rx="30" fill="#f8fafc" stroke="#0f172a" stroke-width="6" />
     <path d="M58 118h18V86H58zm29 0h18V70H87zm29 0h18V96h-18z" fill="#0f172a" />
     <path d="M56 126h80" stroke="#0f172a" stroke-width="6" stroke-linecap="round" />
-    <path d="M60 78l16-10 14 8 22-14 20 10" fill="none" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M60 78l16-10 14 8 22-14 20 10" fill="none" stroke="#111111" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
     <circle cx="132" cy="62" r="14" fill="url(#coin)" stroke="#854d0e" stroke-width="3" />
     <path d="M128 62h8m-4-4v8" stroke="#7c2d12" stroke-width="2.8" stroke-linecap="round" />
   </g>

@@ -25,7 +25,7 @@
 
 - Backend counterpart:
   - `mem:backend/ai` covers the backend Q&A and spending-insights handlers, deterministic report builders, and normalization rules.
-  - The backend must keep a deterministic fallback so projection questions still produce structured output when Gemini is blocked or unavailable.
+  - The backend must keep a deterministic fallback so projection questions still produce a grounded answer when Gemini is blocked or unavailable.
 
 - UI rendering:
   - `src/features/dashboard/ui/dashboard-view/methods/ai-methods.js` renders the AI consultant blocks, including projection, tips, alerts, and category highlights.

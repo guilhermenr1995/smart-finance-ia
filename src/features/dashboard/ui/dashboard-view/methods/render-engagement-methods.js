@@ -82,16 +82,16 @@ class DashboardViewRenderEngagementMethods {
 
     const fixedCategoryColors = {
       alimentacao: '#fb7185',
-      transporte: '#60a5fa',
+      transporte: '#f59e0b',
       mercado: '#34d399',
-      saude: '#22d3ee',
-      educacao: '#818cf8',
-      moradia: '#f59e0b',
+      saude: '#f97316',
+      educacao: '#facc15',
+      moradia: '#d97706',
       lazer: '#f472b6',
-      assinaturas: '#a78bfa',
+      assinaturas: '#fde047',
       transferencia: '#64748b',
-      parcelas: '#f97316',
-      outros: '#94a3b8'
+      parcelas: '#fb923c',
+      outros: '#eab308'
     };
 
     if (fixedCategoryColors[key]) {
@@ -103,9 +103,9 @@ class DashboardViewRenderEngagementMethods {
       hash = (hash * 37 + key.charCodeAt(i)) % 1999;
     }
 
-    const hue = hash % 360;
-    const saturation = 68 + (hash % 8);
-    const lightness = 42 + (hash % 10);
+    const hue = 35 + (hash % 21);
+    const saturation = 72 + (hash % 8);
+    const lightness = 44 + (hash % 10);
     return `hsl(${hue}deg ${saturation}% ${lightness}%)`;
   }
 

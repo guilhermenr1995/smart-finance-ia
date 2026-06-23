@@ -19,7 +19,7 @@
   - The current max length is 500 characters.
 
 - UI rendering:
-  - `src/features/dashboard/ui/dashboard-view/methods/ai-methods.js` renders consultant blocks, projection output, lists, tips, alerts, and category highlights.
+  - `src/features/dashboard/ui/dashboard-view/methods/ai-methods.js` renders consultant blocks, projection output, flexible free-question answers, evidence lists, alerts, and category highlights.
 
 - What belongs here:
   - consultant UX

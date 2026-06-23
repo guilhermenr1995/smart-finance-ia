@@ -85,98 +85,119 @@ class DashboardViewAiMethods {
     );
   }
 
-  extractAiFinanceSection(answer = '', sectionPattern = '') {
-    const safeAnswer = String(answer || '');
-    if (!safeAnswer || !sectionPattern) {
-      return '';
-    }
-
-    const allSectionsPattern = '(?:Resumo|Mudan(?:ç|c)as principais|Refer(?:ê|e)ncias|Dica pr(?:á|a)tica)';
-    const regex = new RegExp(
-      `(?:^|\\n)\\s*${sectionPattern}\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*${allSectionsPattern}\\s*:|$)`,
-      'i'
-    );
-    const match = safeAnswer.match(regex);
-    return String(match?.[1] || '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+  formatAiFinanceInline(text = '') {
+    const escaped = escapeHtml(String(text || ''));
+    return escaped
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>');
   }
 
-  parseAiFinanceSections(answer = '') {
-    const safeAnswer = String(answer || '').trim();
+  splitAiFinanceAnswerSegments(answer = '') {
+    const safeAnswer = String(answer || '').replace(/\r\n/g, '\n').trim();
     if (!safeAnswer) {
-      return {
-        summary: '',
-        changes: '',
-        references: '',
-        tip: ''
-      };
-    }
-
-    const summary = this.extractAiFinanceSection(safeAnswer, 'Resumo');
-    const changes = this.extractAiFinanceSection(safeAnswer, 'Mudan(?:ç|c)as principais');
-    const references = this.extractAiFinanceSection(safeAnswer, 'Refer(?:ê|e)ncias');
-    const tip = this.extractAiFinanceSection(safeAnswer, 'Dica pr(?:á|a)tica');
-
-    if (!summary && !changes && !references && !tip) {
-      return {
-        summary: safeAnswer,
-        changes: '',
-        references: '',
-        tip: ''
-      };
-    }
-
-    return {
-      summary,
-      changes,
-      references,
-      tip
-    };
-  }
-
-  splitAiFinanceParagraphs(text = '') {
-    return String(text || '')
-      .split(/\n{2,}/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .slice(0, 8);
-  }
-
-  splitAiFinanceListItems(text = '') {
-    const safe = String(text || '').trim();
-    if (!safe) {
       return [];
     }
 
-    const normalized = safe
-      .replace(/\n/g, '\n')
-      .replace(/\s+\|\s+/g, '\n')
-      .replace(/\s*[•]\s*/g, '\n')
-      .replace(/\s*-\s+/g, '\n');
+    const segments = [];
+    let paragraphLines = [];
+    let listItems = [];
 
-    let items = normalized
-      .split(/\n+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const flushParagraph = () => {
+      if (paragraphLines.length === 0) {
+        return;
+      }
 
-    if (items.length <= 1) {
-      items = safe
-        .split(/\s*;\s+/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
+      segments.push({
+        type: 'paragraph',
+        text: paragraphLines.join(' ').replace(/\s+/g, ' ').trim()
+      });
+      paragraphLines = [];
+    };
 
-    return items.slice(0, 8);
+    const flushList = () => {
+      if (listItems.length === 0) {
+        return;
+      }
+
+      segments.push({
+        type: 'list',
+        items: [...listItems]
+      });
+      listItems = [];
+    };
+
+    safeAnswer.split('\n').forEach((line) => {
+      const trimmed = String(line || '').trim();
+      if (!trimmed) {
+        flushParagraph();
+        flushList();
+        return;
+      }
+
+      const markdownHeadingMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
+      const labelHeadingMatch = trimmed.match(/^([A-ZÀ-Ú][^:]{1,70}):$/);
+      if (markdownHeadingMatch || labelHeadingMatch) {
+        flushParagraph();
+        flushList();
+        segments.push({
+          type: 'heading',
+          text: String((markdownHeadingMatch || labelHeadingMatch)?.[1] || '').trim()
+        });
+        return;
+      }
+
+      const bulletMatch = trimmed.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+      if (bulletMatch) {
+        flushParagraph();
+        listItems.push(bulletMatch[1].trim());
+        return;
+      }
+
+      if (listItems.length > 0) {
+        flushList();
+      }
+
+      paragraphLines.push(trimmed);
+    });
+
+    flushParagraph();
+    flushList();
+
+    return segments;
   }
 
-  renderAiFinanceParagraphs(text = '', className = 'text-[13px] font-semibold text-zinc-800 leading-relaxed') {
-    const paragraphs = this.splitAiFinanceParagraphs(text);
-    if (paragraphs.length === 0) {
+  renderAiFinanceHeading(text = '') {
+    const safeText = String(text || '').trim();
+    if (!safeText) {
       return '';
     }
 
-    return paragraphs.map((item) => `<p class="${className}">${escapeHtml(item)}</p>`).join('');
+    return `
+      <div class="pt-1">
+        <p class="text-[11px] font-black uppercase tracking-[0.18em] text-zinc-500">${this.formatAiFinanceInline(safeText)}</p>
+      </div>
+    `;
+  }
+
+  renderAiFinanceAnswer(answer = '', className = 'text-[13px] font-semibold text-zinc-800 leading-relaxed') {
+    const segments = this.splitAiFinanceAnswerSegments(answer);
+    if (segments.length === 0) {
+      return '';
+    }
+
+    return segments
+      .map((segment) => {
+        if (segment.type === 'heading') {
+          return this.renderAiFinanceHeading(segment.text);
+        }
+
+        if (segment.type === 'list') {
+          return this.renderAiFinanceList(segment.items);
+        }
+
+        return `<p class="${className} whitespace-pre-line">${this.formatAiFinanceInline(segment.text)}</p>`;
+      })
+      .join('');
   }
 
   renderAiFinanceList(items = []) {
@@ -196,7 +217,7 @@ class DashboardViewAiMethods {
         (item) => `
           <li class="flex items-start gap-2 border border-black/15 bg-white px-2 py-2">
             <span class="mt-[5px] inline-block h-1.5 w-1.5 rounded-full bg-zinc-900"></span>
-            <span class="text-[12px] font-bold text-zinc-800 leading-relaxed">${escapeHtml(item)}</span>
+            <span class="text-[12px] font-bold text-zinc-800 leading-relaxed">${this.formatAiFinanceInline(item)}</span>
           </li>
         `
       )
@@ -251,21 +272,8 @@ class DashboardViewAiMethods {
     }
 
     this.aiFinanceQuestionStatusLabel.innerText = 'Resposta disponível';
-    const sections = this.parseAiFinanceSections(answer || 'Sem resposta disponível.');
-    const summaryParagraphs = this.renderAiFinanceParagraphs(sections.summary || answer || 'Sem resposta disponível.');
-    const changeItems = this.splitAiFinanceListItems(sections.changes);
-    const changesList = this.renderAiFinanceList(changeItems);
-    const referencesParagraphs = this.renderAiFinanceParagraphs(
-      sections.references,
-      'text-[12px] font-semibold text-zinc-700 leading-relaxed'
-    );
-    const referencesList = this.renderAiFinanceList(
-      evidence.length > 0 ? evidence.slice(0, 6) : this.splitAiFinanceListItems(sections.references)
-    );
-    const tipParagraphs = this.renderAiFinanceParagraphs(
-      sections.tip,
-      'text-[13px] font-black text-zinc-800 leading-relaxed'
-    );
+    const answerContent = this.renderAiFinanceAnswer(answer || 'Sem resposta disponível.');
+    const evidenceList = this.renderAiFinanceList(evidence.length > 0 ? evidence.slice(0, 6) : []);
     const isContextualMeta = datasetMeta && String(datasetMeta.scopeMode || '').toLowerCase() === 'contextual';
     const baseLabel = datasetMeta
       ? `${Number(datasetMeta.count || 0)} transação(ões) ativas • total ${formatCurrencyBRL(Number(datasetMeta.total || 0))}`
@@ -282,27 +290,20 @@ class DashboardViewAiMethods {
     this.aiFinanceQuestionContent.innerHTML = `
       <div class="bg-zinc-50 border-2 border-black p-4 space-y-4">
         <p class="text-[10px] font-black uppercase text-zinc-500">Resposta da IA</p>
-        <div class="space-y-3">
+        <div class="bg-white border border-black/20 p-3 space-y-2">
+          <div class="space-y-2">${answerContent || '<p class="text-[13px] font-semibold text-zinc-800 leading-relaxed">Sem resposta disponível.</p>'}</div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div class="bg-white border border-black/20 p-3 space-y-2">
-            <p class="text-[10px] font-black uppercase text-zinc-500">Resumo</p>
-            <div class="space-y-2">${summaryParagraphs || '<p class="text-[13px] font-semibold text-zinc-800">Sem resumo disponível.</p>'}</div>
-          </div>
-          <div class="bg-white border border-black/20 p-3 space-y-2">
-            <p class="text-[10px] font-black uppercase text-zinc-500">Mudanças principais</p>
-            ${changesList || '<p class="text-[12px] font-semibold text-zinc-700 leading-relaxed">Sem mudanças relevantes identificadas.</p>'}
-          </div>
-          <div class="bg-white border border-black/20 p-3 space-y-2">
-            <p class="text-[10px] font-black uppercase text-zinc-500">Referências</p>
-            ${referencesParagraphs ? `<div class="space-y-2">${referencesParagraphs}</div>` : ''}
-            ${referencesList || '<p class="text-[12px] font-semibold text-zinc-700 leading-relaxed">Sem referências disponíveis.</p>'}
+            <p class="text-[10px] font-black uppercase text-zinc-500">Evidências</p>
+            ${evidenceList || '<p class="text-[12px] font-semibold text-zinc-700 leading-relaxed">Sem referências adicionais disponíveis.</p>'}
           </div>
           <div class="bg-emerald-50 border border-black/20 p-3 space-y-2">
-            <p class="text-[10px] font-black uppercase text-emerald-700">Dica prática</p>
-            <div class="space-y-2">${tipParagraphs || '<p class="text-[13px] font-black text-zinc-800 leading-relaxed">Sem dica prática disponível.</p>'}</div>
+            <p class="text-[10px] font-black uppercase text-emerald-700">Base filtrada</p>
+            <p class="text-[12px] font-bold text-zinc-800">${escapeHtml(`${isContextualMeta ? 'Base considerada na resposta' : 'Base filtrada ativa'}: ${baseLabel}`)}</p>
+            ${previousBaseLabel ? `<p class="text-[10px] font-bold text-zinc-600">${escapeHtml(previousBaseLabel)}</p>` : ''}
           </div>
         </div>
-        <p class="text-[10px] font-bold text-zinc-600">${escapeHtml(`${isContextualMeta ? 'Base considerada na resposta' : 'Base filtrada ativa'}: ${baseLabel}`)}</p>
-        ${previousBaseLabel ? `<p class="text-[10px] font-bold text-zinc-600">${escapeHtml(previousBaseLabel)}</p>` : ''}
       </div>
     `;
   }

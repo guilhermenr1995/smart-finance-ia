@@ -161,7 +161,7 @@ class AdminDashboardRenderDashboardMethods {
       leftLabel: 'Sync IA',
       rightLabel: 'Consultor IA',
       leftClass: 'admin-bar-yellow',
-      rightClass: 'admin-bar-indigo',
+      rightClass: 'admin-bar-yellow-soft',
       emptyMessage: 'Sem uso de IA nos últimos dias.'
     });
 
