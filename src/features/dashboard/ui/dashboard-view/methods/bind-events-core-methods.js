@@ -55,6 +55,12 @@ class DashboardViewBindEventsCoreMethods {
       });
     });
 
+    this.searchShowInactiveCheckbox?.addEventListener('change', () => {
+      handlers.onSearchChange({
+        showInactiveTransactions: this.searchShowInactiveCheckbox?.checked
+      });
+    });
+
     this.clearSearchButton.addEventListener('click', () => {
       this.searchTermInput.value = '';
       handlers.onSearchChange({ term: '' });

@@ -81,17 +81,20 @@ class DashboardViewRenderEngagementMethods {
     const key = normalizeForSearch(category);
 
     const fixedCategoryColors = {
-      alimentacao: '#fb7185',
-      transporte: '#f59e0b',
-      mercado: '#34d399',
-      saude: '#f97316',
-      educacao: '#facc15',
-      moradia: '#d97706',
-      lazer: '#f472b6',
-      assinaturas: '#fde047',
+      alimentacao: '#ef4444',
+      mercado: '#22c55e',
+      transporte: '#3b82f6',
+      lazer: '#d946ef',
+      saude: '#06b6d4',
+      assinaturas: '#f97316',
+      compras: '#8b5cf6',
+      pet: '#14b8a6',
+      casa: '#f59e0b',
+      educacao: '#4f46e5',
+      parcelas: '#0ea5e9',
       transferencia: '#64748b',
-      parcelas: '#fb923c',
-      outros: '#eab308'
+      moradia: '#db2777',
+      outros: '#ec4899'
     };
 
     if (fixedCategoryColors[key]) {
@@ -100,12 +103,12 @@ class DashboardViewRenderEngagementMethods {
 
     let hash = 0;
     for (let i = 0; i < key.length; i += 1) {
-      hash = (hash * 37 + key.charCodeAt(i)) % 1999;
+      hash = (hash * 37 + key.charCodeAt(i)) >>> 0;
     }
 
-    const hue = 35 + (hash % 21);
-    const saturation = 72 + (hash % 8);
-    const lightness = 44 + (hash % 10);
+    const hue = hash % 360;
+    const saturation = 82;
+    const lightness = 52;
     return `hsl(${hue}deg ${saturation}% ${lightness}%)`;
   }
 

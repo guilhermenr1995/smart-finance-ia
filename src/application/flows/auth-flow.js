@@ -19,7 +19,7 @@ export async function handleAuthState(app, user) {
     app.state.setUserCategories([]);
     app.state.setUserBankAccounts(['Padrão']);
     app.state.setMonthlyGoals([]);
-    app.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false });
+    app.state.updateSearch({ mode: 'description', term: '', useGlobalBase: false, showInactiveTransactions: false });
     app.state.setAiConsultantReport(null);
     app.state.setAiConsultantUsage({ limit: 3, used: 0, remaining: 3, dateKey: '' });
     app.state.setAiConsultantHistory([]);
