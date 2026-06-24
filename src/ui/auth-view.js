@@ -14,6 +14,7 @@ export class AuthView {
     this.resetPasswordButton = document.getElementById('btn-reset-password');
     this.logoutButton = document.getElementById('btn-logout');
     this.adminPanelButton = document.getElementById('btn-admin-panel');
+    this.familyBudgetButton = document.getElementById('btn-family-budget');
 
     this.authStatus = document.getElementById('auth-status');
     this.userEmail = document.getElementById('user-email');
@@ -76,6 +77,9 @@ export class AuthView {
     this.authScreen.setAttribute('aria-hidden', String(!showAuthScreen));
     this.appScreen.setAttribute('aria-hidden', String(!showAppScreen));
     this.logoutButton.classList.toggle('hidden', !isAuthenticated);
+    if (this.familyBudgetButton) {
+      this.familyBudgetButton.classList.toggle('hidden', !isAuthenticated);
+    }
     if (this.adminPanelButton) {
       this.adminPanelButton.classList.toggle('hidden', !isAuthenticated || !isAdmin);
     }

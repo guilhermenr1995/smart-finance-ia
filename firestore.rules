@@ -219,6 +219,84 @@ service cloud.firestore {
         && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
     }
 
+    function isValidBudgetMonthKey(monthKey) {
+      return monthKey is string
+        && monthKey.size() == 7
+        && monthKey.matches('^[0-9]{4}-[0-9]{2}$');
+    }
+
+    function hasValidBudgetWorkspaceShape(data, monthKey) {
+      return data.keys().hasOnly([
+          'monthKey',
+          'label',
+          'sourceMonthKey',
+          'status',
+          'notes',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.monthKey is string
+        && data.monthKey == monthKey
+        && isValidBudgetMonthKey(data.monthKey)
+        && data.label is string
+        && data.label.size() > 0
+        && data.label.size() <= 80
+        && (!('sourceMonthKey' in data) || (data.sourceMonthKey is string && (data.sourceMonthKey == '' || isValidBudgetMonthKey(data.sourceMonthKey))))
+        && data.status in ['active', 'replicated']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
+    function hasValidBudgetOwnerShape(data) {
+      return data.keys().hasOnly(['ownerId', 'name', 'order', 'active', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.ownerId.size() > 0
+        && data.ownerId.size() <= 150
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && isNonNegativeNumber(data.order)
+        && data.active is bool
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
+    function hasValidBudgetRecordShape(data, monthKey) {
+      return data.keys().hasOnly([
+          'recordId',
+          'monthKey',
+          'ownerId',
+          'type',
+          'name',
+          'amount',
+          'notes',
+          'order',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.recordId is string
+        && data.recordId.size() > 0
+        && data.recordId.size() <= 150
+        && data.monthKey is string
+        && data.monthKey == monthKey
+        && isValidBudgetMonthKey(data.monthKey)
+        && data.ownerId is string
+        && data.ownerId.size() > 0
+        && data.ownerId.size() <= 150
+        && data.type in ['income', 'expense', 'reserve']
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.amount is number
+        && data.amount > 0
+        && data.amount <= 100000000
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && isNonNegativeNumber(data.order)
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
     match /artifacts/{appId}/users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && hasValidUserProfileShape(request.resource.data);
@@ -241,6 +319,39 @@ service cloud.firestore {
         && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
 
       allow delete: if isOwner(userId);
+    }
+
+    match /artifacts/{appId}/users/{userId}/orcamentos_mensais/{monthKey} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && hasValidBudgetWorkspaceShape(request.resource.data, monthKey);
+      allow update: if isOwner(userId)
+        && hasValidBudgetWorkspaceShape(request.resource.data, monthKey)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+
+      match /donos/{ownerId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && hasValidBudgetOwnerShape(request.resource.data)
+          && request.resource.data.ownerId == ownerId;
+        allow update: if isOwner(userId)
+          && hasValidBudgetOwnerShape(request.resource.data)
+          && request.resource.data.ownerId == ownerId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
+
+      match /registros/{recordId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && hasValidBudgetRecordShape(request.resource.data, monthKey)
+          && request.resource.data.recordId == recordId;
+        allow update: if isOwner(userId)
+          && hasValidBudgetRecordShape(request.resource.data, monthKey)
+          && request.resource.data.recordId == recordId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
     }
 
     match /artifacts/{appId}/users/{userId}/metrics_daily/{dateKey} {
