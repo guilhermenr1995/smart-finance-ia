@@ -100,7 +100,10 @@ class DashboardViewTransactionRenderMethods {
     targetContainer.innerHTML = chartRows.join('');
   }
 
-  renderTransactions(transactions) {
+  renderTransactions(transactions, options = {}) {
+    const hasInactiveTransactions = Boolean(options.hasInactiveTransactions);
+    const showInactiveTransactions = Boolean(options.showInactiveTransactions);
+    const hasSearchTerm = Boolean(options.hasSearchTerm);
     this.tableBody.innerHTML = transactions
       .map((transaction) => {
         const displayCategory = getDisplayCategory(transaction);
@@ -184,8 +187,12 @@ class DashboardViewTransactionRenderMethods {
       .join('');
 
     if (!this.tableBody.innerHTML) {
+      const emptyMessage =
+        !showInactiveTransactions && hasInactiveTransactions && !hasSearchTerm
+          ? 'Nenhuma transação ativa neste recorte. Marque "Mostrar desativados" para listar os itens ignorados.'
+          : 'Nenhuma transação encontrada para este recorte.';
       this.tableBody.innerHTML =
-        '<p class="text-[11px] font-black uppercase text-zinc-500 text-center py-6">Nenhuma transação encontrada para este recorte.</p>';
+        `<p class="text-[11px] font-black uppercase text-zinc-500 text-center py-6">${escapeHtml(emptyMessage)}</p>`;
     }
   }
 }

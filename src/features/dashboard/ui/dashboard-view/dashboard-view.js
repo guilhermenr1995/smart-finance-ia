@@ -19,6 +19,7 @@ export class DashboardView {
     this.searchTermInput = document.getElementById('search-term');
     this.clearSearchButton = document.getElementById('btn-clear-search');
     this.searchUseGlobalBaseCheckbox = document.getElementById('search-use-global-base');
+    this.searchShowInactiveCheckbox = document.getElementById('search-show-inactive-transactions');
     this.sourceFilterSelect = document.getElementById('filter-source');
     this.sectionsContainer = document.getElementById('dashboard-sections');
     this.floatingFiltersBar = document.getElementById('dashboard-floating-filters');

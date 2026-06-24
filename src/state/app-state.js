@@ -21,7 +21,8 @@ export class AppState {
     this.search = {
       mode: 'description',
       term: '',
-      useGlobalBase: false
+      useGlobalBase: false,
+      showInactiveTransactions: false
     };
     this.aiConsultant = {
       report: null,

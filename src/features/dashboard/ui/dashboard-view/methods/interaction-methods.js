@@ -188,6 +188,7 @@ class DashboardViewInteractionMethods {
     if (this.searchTermInput) this.searchTermInput.disabled = isBusy;
     if (this.clearSearchButton) this.clearSearchButton.disabled = isBusy;
     if (this.searchUseGlobalBaseCheckbox) this.searchUseGlobalBaseCheckbox.disabled = isBusy;
+    if (this.searchShowInactiveCheckbox) this.searchShowInactiveCheckbox.disabled = isBusy;
     if (this.sourceFilterSelect) this.sourceFilterSelect.disabled = isBusy;
     if (this.creditFileInput) this.creditFileInput.disabled = isBusy;
     if (this.accountFileInput) this.accountFileInput.disabled = isBusy;

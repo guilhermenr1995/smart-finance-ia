@@ -117,6 +117,9 @@ class DashboardViewCoreMethods {
     if (this.searchUseGlobalBaseCheckbox) {
       this.searchUseGlobalBaseCheckbox.checked = Boolean(search.useGlobalBase);
     }
+    if (this.searchShowInactiveCheckbox) {
+      this.searchShowInactiveCheckbox.checked = Boolean(search.showInactiveTransactions);
+    }
     this.clearSearchButton.disabled = !this.searchTermInput.value.trim();
     this.setImportBankAccount(this.selectedImportBankAccount);
   }

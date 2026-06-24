@@ -90,12 +90,16 @@ export function getVisibleTransactions(app) {
 }
 
 export function getTableTransactions(app, sourceTransactions) {
+  const showInactiveTransactions = Boolean(app.state.search.showInactiveTransactions);
+  const activeSourceTransactions = showInactiveTransactions
+    ? sourceTransactions
+    : sourceTransactions.filter((transaction) => transaction.active !== false);
   const term = app.state.search.term.trim();
   if (!term) {
-    return sourceTransactions;
+    return activeSourceTransactions;
   }
 
-  return sourceTransactions.filter((transaction) =>
+  return activeSourceTransactions.filter((transaction) =>
     matchesTransactionSearch(transaction, app.state.search.mode, term)
   );
 }
@@ -109,8 +113,7 @@ export function refreshDashboard(app) {
   const summary = app.queryService.buildSummary(visibleTransactions);
   const pendingAiCount = app.queryService.getAiCandidates(visibleTransactions).length;
   const activeInsight = app.state.getAiConsultantHistory(app.buildConsultantInsightKey(app.state.filters));
-  const activeTableTransactions = tableTransactions.filter((transaction) => transaction.active !== false);
-  const matchedTotal = activeTableTransactions.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
+  const matchedTotal = tableTransactions.reduce((sum, transaction) => sum + getTransactionNetValue(transaction), 0);
   const baseTotal = searchSourceTransactions.reduce((sum, transaction) => {
     if (transaction.active === false) {
       return sum;

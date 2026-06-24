@@ -578,7 +578,7 @@
                 <button
                   type="button"
                   class="help-tooltip"
-                  data-tooltip="Você pode editar categoria por item, ignorar lançamento e usar a busca por descrição, valor, categoria ou origem."
+                  data-tooltip="Você pode editar categoria por item, ignorar lançamento, mostrar desativados e usar a busca por descrição, valor, categoria ou origem."
                   aria-label="Ajuda sobre lançamentos"
                 >
                   ?
@@ -608,7 +608,7 @@
             <div class="search-panel mb-1 border-2 border-black bg-zinc-50 p-4 space-y-4">
               <div class="search-panel-heading space-y-1">
                 <p class="search-panel-title">Busca inteligente por descrição, valor, categoria e origem</p>
-                <p class="search-panel-subtitle">Veja o total encontrado e a representatividade sobre sua base ativa.</p>
+                <p class="search-panel-subtitle">Veja o total encontrado e a representatividade sobre sua base ativa. Use o filtro de desativados quando quiser auditar itens ignorados.</p>
               </div>
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div class="lg:col-span-3">
@@ -651,10 +651,16 @@
                   </button>
                 </div>
               </div>
-              <label class="search-global-toggle mt-1 inline-flex items-center gap-2 text-xs font-black text-zinc-600 cursor-pointer">
-                <input id="search-use-global-base" type="checkbox" class="w-4 h-4 accent-black" />
-                Buscar em toda a base do cliente (ignora período superior)
-              </label>
+              <div class="mt-1 flex flex-col gap-2">
+                <label class="search-global-toggle inline-flex items-center gap-2 text-xs font-black text-zinc-600 cursor-pointer">
+                  <input id="search-use-global-base" type="checkbox" class="w-4 h-4 accent-black" />
+                  Buscar em toda a base do cliente (ignora período superior)
+                </label>
+                <label class="search-global-toggle inline-flex items-center gap-2 text-xs font-black text-zinc-600 cursor-pointer">
+                  <input id="search-show-inactive-transactions" type="checkbox" class="w-4 h-4 accent-black" />
+                  Mostrar desativados na listagem
+                </label>
+              </div>
             </div>
 
             <div id="search-summary-panel" class="search-summary-panel hidden mb-4 bg-zinc-900 text-white border-2 border-black p-4">

@@ -50,6 +50,9 @@ class DashboardViewRenderSummaryMethods {
     if (this.searchUseGlobalBaseCheckbox) {
       this.searchUseGlobalBaseCheckbox.checked = Boolean(search.useGlobalBase);
     }
+    if (this.searchShowInactiveCheckbox) {
+      this.searchShowInactiveCheckbox.checked = Boolean(search.showInactiveTransactions);
+    }
     this.clearSearchButton.disabled = !search.term.trim();
 
     if (this.totalValue) {
@@ -91,7 +94,11 @@ class DashboardViewRenderSummaryMethods {
 
     this.renderCategoryStats(summary, previousSummary, goals?.targetsByCategory || {});
     this.renderGoals(goals, summary);
-    this.renderTransactions(paginationMeta.pageItems);
+    this.renderTransactions(paginationMeta.pageItems, {
+      hasInactiveTransactions: Array.isArray(summary?.ignored) && summary.ignored.length > 0,
+      hasSearchTerm: Boolean(search.term.trim()),
+      showInactiveTransactions: Boolean(search.showInactiveTransactions)
+    });
     this.renderTransactionsPagination(paginationMeta);
     this.renderSearchTotals(searchTotals);
     this.renderAiConsultant(aiConsultant);
@@ -243,8 +250,8 @@ class DashboardViewRenderSummaryMethods {
     const buildColorVariant = (category, attempt = 0) => {
       const seed = hashCategory(`${category}-${attempt}`);
       const hue = seed % 360;
-      const saturation = 68 + (seed % 10);
-      const lightness = 42 + (seed % 14);
+      const saturation = 82 + (seed % 6);
+      const lightness = 48 + (seed % 5);
       return `hsl(${hue}deg ${saturation}% ${lightness}%)`;
     };
 

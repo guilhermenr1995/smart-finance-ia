@@ -899,7 +899,6 @@ export class FamilyBudgetApp {
       this.statusBanner.classList.add('bg-rose-100', 'text-rose-900');
       return;
     }
-
     if (type === 'success') {
       this.statusBanner.classList.add('bg-emerald-100', 'text-emerald-900');
       return;
