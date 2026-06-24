@@ -1,14 +1,16 @@
-const CACHE_NAME = 'smart-finance-shell-v19';
+const CACHE_NAME = 'smart-finance-shell-v20';
 const NETWORK_FIRST_DESTINATIONS = new Set(['document', 'script', 'style', 'manifest']);
 
 const APP_SHELL_FILES = [
   './',
   './index.html',
   './admin.html',
+  './family-budget.html',
   './manifest.webmanifest',
   './src/styles.css',
   './src/app.js',
   './src/admin.js',
+  './src/family-budget.js',
   './src/config/app-config.js',
   './src/application/flows/auth-flow.js',
   './src/application/flows/dashboard-flow.js',
@@ -17,6 +19,7 @@ const APP_SHELL_FILES = [
   './src/application/flows/ai-flow.js',
   './src/constants/categories.js',
   './src/state/app-state.js',
+  './src/state/family-budget-state.js',
   './src/services/auth-service.js',
   './src/services/ai-categorization-service.js',
   './src/services/ai-consultant-service.js',
@@ -28,6 +31,9 @@ const APP_SHELL_FILES = [
   './src/ui/auth-view.js',
   './src/ui/dashboard-view.js',
   './src/ui/overlay-view.js',
+  './src/features/family-budget/shared.js',
+  './src/features/family-budget/family-budget-app.js',
+  './src/features/family-budget/services/family-budget-repository/family-budget-repository.js',
   './src/utils/csv-utils.js',
   './src/utils/date-utils.js',
   './src/utils/format-utils.js',

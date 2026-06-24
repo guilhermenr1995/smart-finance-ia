@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Smart Finance IA - Controle Mensal Familiar</title>
+
+    <meta name="theme-color" content="#facc15" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icons/icon-192.svg" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body class="font-sans text-zinc-900 bg-zinc-100 min-h-screen">
+    <section id="app-screen" class="dashboard-shell p-4 pb-24">
+      <div class="w-full max-w-[1440px] mx-auto space-y-5">
+        <header class="dashboard-header bg-yellow-300 p-5 neo-brutalism">
+          <div class="dashboard-header-main">
+            <h1 class="dashboard-brand-title">Controle Mensal Familiar</h1>
+            <p class="dashboard-status-line">
+              Mês ativo: <span id="family-budget-month-label" class="text-black italic">-</span>
+            </p>
+            <p id="family-budget-month-hint" class="dashboard-user-line">Carregando cenário mensal...</p>
+          </div>
+          <div class="dashboard-header-actions">
+            <button
+              id="btn-install-app"
+              class="hidden px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Instalar App
+            </button>
+            <button
+              id="family-budget-replicate-button"
+              class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Replicar mês
+            </button>
+            <a
+              href="./index.html"
+              class="px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Voltar ao app
+            </a>
+            <a
+              id="btn-admin-panel"
+              href="./admin.html"
+              class="hidden px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-white"
+            >
+              Painel Gerencial
+            </a>
+            <button
+              id="btn-logout"
+              class="hidden px-4 py-2 border-2 border-black font-black text-xs uppercase neo-brutalism bg-black text-white"
+            >
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section class="bg-white neo-brutalism p-5 space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Visão mensal</p>
+              <h2 class="mt-1 text-2xl font-black italic uppercase tracking-tighter">
+                Controle da família, um mês por vez
+              </h2>
+              <p class="mt-1 text-sm font-bold text-zinc-600">
+                Registre receitas, despesas e caixinhas, acompanhe o saldo de cada dono e replique o cenário rapidamente.
+              </p>
+            </div>
+            <div class="flex flex-col gap-3">
+              <label class="block">
+                <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Mês</span>
+                <input
+                  id="family-budget-month-input"
+                  type="month"
+                  class="w-full sm:w-56 border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+                />
+              </label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  id="family-budget-prev-month-button"
+                  type="button"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                >
+                  Mês anterior
+                </button>
+                <button
+                  id="family-budget-current-month-button"
+                  type="button"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                >
+                  Mês atual
+                </button>
+                <button
+                  id="family-budget-next-month-button"
+                  type="button"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                >
+                  Próximo mês
+                </button>
+              </div>
+            </div>
+          </div>
+          <p id="family-budget-status" class="hidden" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="bg-yellow-100 neo-brutalism p-4 space-y-3">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Leitura rápida</p>
+              <h3 class="mt-1 text-xl font-black italic uppercase tracking-tighter">Resumo do mês em um relance</h3>
+              <p class="mt-1 text-sm font-bold text-zinc-600">
+                Os totais mudam em tempo real enquanto você lança receitas, despesas e caixinhas.
+              </p>
+            </div>
+            <p class="text-[11px] font-black uppercase tracking-widest text-zinc-600">
+              Atualização automática
+            </p>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Receita total</p>
+              <p id="family-budget-family-income" class="mt-1 text-lg sm:text-xl font-black italic leading-none">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Despesas totais</p>
+              <p id="family-budget-family-expense" class="mt-1 text-lg sm:text-xl font-black italic leading-none">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Caixinha total</p>
+              <p id="family-budget-family-reserve" class="mt-1 text-lg sm:text-xl font-black italic leading-none">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-black p-3 text-white">
+              <p class="text-[9px] font-black uppercase tracking-widest text-yellow-300">Saldo disponível</p>
+              <p id="family-budget-family-net" class="mt-1 text-lg sm:text-xl font-black italic leading-none text-yellow-300">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Poupança prevista</p>
+              <p id="family-budget-family-savings" class="mt-1 text-lg sm:text-xl font-black italic leading-none">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Déficit previsto</p>
+              <p id="family-budget-family-deficit" class="mt-1 text-lg sm:text-xl font-black italic leading-none">R$ 0,00</p>
+            </article>
+            <article class="neo-brutalism bg-white p-3">
+              <p class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Registros do mês</p>
+              <p id="family-budget-family-record-count" class="mt-1 text-lg sm:text-xl font-black italic leading-none">0 registros</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="family-budget-owner-section" class="dashboard-accordion-section bg-white neo-brutalism overflow-hidden">
+          <div class="dashboard-accordion-trigger-row p-4 pb-0">
+            <button
+              id="family-budget-owner-accordion-toggle"
+              type="button"
+              class="dashboard-accordion-trigger bg-yellow-300"
+              aria-expanded="false"
+              aria-controls="family-budget-owner-accordion-content"
+            >
+              <span class="dashboard-accordion-trigger-main">
+                <span class="dashboard-step-badge">1</span>
+                <span class="dashboard-accordion-trigger-title">Donos</span>
+              </span>
+              <span class="dashboard-accordion-trigger-icon" aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div id="family-budget-owner-accordion-content" class="dashboard-accordion-content p-4 pt-3" hidden>
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Cadastro rápido</p>
+                <h3 class="mt-1 text-xl font-black italic uppercase tracking-tighter">Quem participa do mês</h3>
+                <p class="mt-1 text-sm font-bold text-zinc-600">
+                  Cadastre e ajuste os responsáveis. Os lançamentos são feitos pelos atalhos do resumo do dono logo acima.
+                </p>
+              </div>
+              <form id="family-budget-owner-form" class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <input
+                  id="family-budget-owner-name"
+                  type="text"
+                  placeholder="Nome do dono"
+                  class="w-full sm:w-72 border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+                />
+                <button
+                  id="family-budget-add-owner"
+                  type="submit"
+                  class="px-4 py-2 border-2 border-black bg-black text-white font-black text-xs uppercase neo-brutalism"
+                >
+                  Adicionar dono
+                </button>
+              </form>
+            </div>
+            <div id="family-budget-owner-list" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+          </div>
+        </section>
+
+        <section class="bg-white neo-brutalism p-5 space-y-4">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Resumo por dono</p>
+            <h3 class="mt-1 text-xl font-black italic uppercase tracking-tighter">Saldo e atalhos por responsável</h3>
+            <p class="mt-1 text-sm font-bold text-zinc-600">
+              Use os botões de Receita, Despesa e Caixinha para lançar direto no dono certo.
+            </p>
+          </div>
+          <div id="family-budget-owner-summary-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+        </section>
+
+        <section class="bg-white neo-brutalism p-5 space-y-4">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Registros</p>
+              <h3 class="mt-1 text-xl font-black italic uppercase tracking-tighter">Tudo que entra, sai e reserva</h3>
+              <p class="mt-1 text-sm font-bold text-zinc-600">
+                Use o botão <span class="font-black uppercase">Novo registro</span>, os atalhos do dono e os filtros para encontrar ou lançar dados sem perder tempo.
+              </p>
+            </div>
+            <div class="flex flex-col items-start md:items-end gap-3">
+              <div id="family-budget-record-filters" class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-record-filter="all"
+                  data-record-filter-label="Todos"
+                  class="px-3 py-2 border-2 border-black bg-black text-white font-black text-[11px] uppercase neo-brutalism"
+                  aria-pressed="true"
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  data-record-filter="income"
+                  data-record-filter-label="Receitas"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                  aria-pressed="false"
+                >
+                  Receitas
+                </button>
+                <button
+                  type="button"
+                  data-record-filter="expense"
+                  data-record-filter-label="Despesas"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                  aria-pressed="false"
+                >
+                  Despesas
+                </button>
+                <button
+                  type="button"
+                  data-record-filter="reserve"
+                  data-record-filter-label="Caixinhas"
+                  class="px-3 py-2 border-2 border-black bg-white font-black text-[11px] uppercase neo-brutalism"
+                  aria-pressed="false"
+                >
+                  Caixinhas
+                </button>
+              </div>
+              <p id="family-budget-record-filter-summary" class="text-[11px] font-bold text-zinc-600 text-left md:text-right">
+                Mostrando todos os registros.
+              </p>
+              <button
+                id="family-budget-new-record"
+                type="button"
+                class="px-4 py-2 border-2 border-black bg-yellow-300 font-black text-xs uppercase neo-brutalism"
+              >
+                Novo registro
+              </button>
+            </div>
+          </div>
+          <p id="family-budget-record-empty" class="hidden text-[11px] font-bold text-zinc-600">
+            Nenhum registro cadastrado neste mês.
+          </p>
+          <div id="family-budget-record-list" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+        </section>
+      </div>
+    </section>
+
+    <div id="family-budget-record-modal" class="hidden fixed inset-0 bg-black/60 z-[9998] p-4 flex items-center justify-center">
+      <div class="w-full max-w-2xl bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Registro</p>
+            <h3 id="family-budget-record-modal-title" class="text-xl font-black italic uppercase tracking-tighter">Novo registro</h3>
+          </div>
+          <button id="family-budget-record-close" type="button" class="px-3 py-2 border-2 border-black bg-white font-black text-xs uppercase neo-brutalism">
+            Fechar
+          </button>
+        </div>
+
+        <form id="family-budget-record-form" class="space-y-4">
+          <input id="family-budget-record-id" type="hidden" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="block">
+              <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Nome</span>
+              <input
+                id="family-budget-record-name"
+                type="text"
+                class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+                placeholder="Ex.: aluguel, salário, feira"
+              />
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Valor</span>
+              <input
+                id="family-budget-record-amount"
+                type="text"
+                inputmode="decimal"
+                class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+                placeholder="1.234,56"
+              />
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Tipo</span>
+              <select
+                id="family-budget-record-type"
+                class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+              >
+                <option value="expense">Despesa</option>
+                <option value="income">Receita</option>
+                <option value="reserve">Caixinha</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Dono</span>
+              <select
+                id="family-budget-record-owner"
+                class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+              ></select>
+            </label>
+          </div>
+          <label class="block">
+            <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Observações</span>
+            <textarea
+              id="family-budget-record-notes"
+              rows="3"
+              class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+              placeholder="Opcional"
+            ></textarea>
+          </label>
+          <div class="flex flex-wrap gap-2 justify-between">
+            <button
+              id="family-budget-record-delete"
+              type="button"
+              class="hidden px-4 py-2 border-2 border-black bg-white font-black text-xs uppercase neo-brutalism"
+            >
+              Excluir
+            </button>
+            <div class="flex flex-wrap gap-2 ml-auto">
+              <button
+                type="button"
+                id="family-budget-record-cancel"
+                class="px-4 py-2 border-2 border-black bg-white font-black text-xs uppercase neo-brutalism"
+              >
+                Cancelar
+              </button>
+              <button
+                id="family-budget-record-save-and-new"
+                type="button"
+                class="px-4 py-2 border-2 border-black bg-yellow-300 font-black text-xs uppercase neo-brutalism"
+              >
+                Salvar e novo
+              </button>
+              <button
+                type="submit"
+                class="px-4 py-2 border-2 border-black bg-black text-white font-black text-xs uppercase neo-brutalism"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="family-budget-replicate-modal" class="hidden fixed inset-0 bg-black/60 z-[9998] p-4 flex items-center justify-center">
+      <div class="w-full max-w-lg bg-white neo-brutalism p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Replicação</p>
+            <h3 id="family-budget-replicate-modal-title" class="text-xl font-black italic uppercase tracking-tighter">Replicar mês</h3>
+          </div>
+          <button id="family-budget-replicate-close" type="button" class="px-3 py-2 border-2 border-black bg-white font-black text-xs uppercase neo-brutalism">
+            Fechar
+          </button>
+        </div>
+        <form id="family-budget-replicate-form" class="space-y-4">
+          <label class="block">
+            <span class="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Mês de destino</span>
+            <input
+              id="family-budget-replicate-target-month"
+              type="month"
+              class="w-full border-2 border-black bg-white px-3 py-2 text-sm font-black outline-none neo-brutalism"
+            />
+          </label>
+          <p id="family-budget-replicate-hint" class="text-[11px] font-bold text-zinc-600">
+            Escolha o mês de destino e confirme a replicação.
+          </p>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              id="family-budget-replicate-cancel"
+              class="px-4 py-2 border-2 border-black bg-white font-black text-xs uppercase neo-brutalism"
+            >
+              Cancelar
+            </button>
+            <button
+              id="family-budget-replicate-confirm"
+              type="submit"
+              class="px-4 py-2 border-2 border-black bg-black text-white font-black text-xs uppercase neo-brutalism"
+            >
+              Replicar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="overlay" class="hidden fixed inset-0 z-[9999] bg-black/80 text-yellow-300 p-6">
+      <div class="max-w-3xl mx-auto neo-brutalism bg-black p-5">
+        <div class="flex items-center justify-between gap-4">
+          <p id="overlay-msg" class="text-sm font-black uppercase tracking-widest">Carregando...</p>
+          <button id="btn-fechar-overlay" class="hidden px-3 py-2 border-2 border-yellow-300 font-black text-[11px] uppercase">
+            Fechar
+          </button>
+        </div>
+        <div id="debug-console" class="mt-4 text-[11px] font-mono whitespace-pre-wrap max-h-80 overflow-auto"></div>
+      </div>
+    </div>
+
+    <script src="./runtime-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script type="module" src="./src/family-budget.js"></script>
+  </body>
+</html>

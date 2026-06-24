@@ -1,6 +1,17 @@
 export function getDefaultCycleRange(referenceDate = new Date()) {
-  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 23, 59, 59, 999);
+  const safeReference =
+    referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  const startMonthOffset = safeReference.getDate() < 3 ? -1 : 0;
+  const start = new Date(safeReference.getFullYear(), safeReference.getMonth() + startMonthOffset, 3, 0, 0, 0, 0);
+  const end = new Date(
+    safeReference.getFullYear(),
+    safeReference.getMonth(),
+    safeReference.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
 
   return {
     startDate: toInputDateValue(start),
