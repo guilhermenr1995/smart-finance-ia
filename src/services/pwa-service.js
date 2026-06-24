@@ -32,12 +32,8 @@ export class PwaService {
       });
 
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (this.hasReloadedForNewWorker) {
-          return;
-        }
-
         this.hasReloadedForNewWorker = true;
-        window.location.reload();
+        console.info('Novo service worker ativo em segundo plano.');
       });
       return registration;
     } catch (error) {
