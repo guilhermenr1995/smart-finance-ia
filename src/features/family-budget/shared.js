@@ -173,6 +173,45 @@ export function sortBudgetRecords(records = []) {
   });
 }
 
+function normalizeBudgetSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+export function filterBudgetRecords(records = [], { filterType = 'all', searchTerm = '', ownerNamesById = {} } = {}) {
+  const safeRecords = Array.isArray(records) ? records : [];
+  const normalizedFilterType = String(filterType || 'all').trim().toLowerCase();
+  const normalizedSearchTerm = normalizeBudgetSearchText(searchTerm);
+  const ownerLookup = ownerNamesById && typeof ownerNamesById === 'object' ? ownerNamesById : {};
+
+  return safeRecords.filter((record) => {
+    if (normalizedFilterType === 'income' || normalizedFilterType === 'expense' || normalizedFilterType === 'reserve') {
+      if (String(record?.type || '').trim() !== normalizedFilterType) {
+        return false;
+      }
+    }
+
+    if (!normalizedSearchTerm) {
+      return true;
+    }
+
+    const ownerName = ownerLookup[record?.ownerId] || '';
+    const searchableFields = [
+      record?.name,
+      record?.notes,
+      record?.type,
+      getBudgetTypeLabel(record?.type),
+      ownerName,
+      record?.amount
+    ];
+
+    return searchableFields.some((field) => normalizeBudgetSearchText(field).includes(normalizedSearchTerm));
+  });
+}
+
 export function computeBudgetSummary(owners = [], records = []) {
   const ownerSummariesById = new Map();
   const ownerSummaries = sortOwners(owners)

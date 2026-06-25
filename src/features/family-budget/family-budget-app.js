@@ -1,5 +1,6 @@
 import {
   escapeBudgetHtml,
+  filterBudgetRecords,
   formatBudgetCurrency,
   getBudgetTypeLabel,
   getBudgetTypeTone,
@@ -118,6 +119,7 @@ export class FamilyBudgetApp {
     this.newRecordButton = document.getElementById('family-budget-new-record');
     this.recordList = document.getElementById('family-budget-record-list');
     this.recordEmptyState = document.getElementById('family-budget-record-empty');
+    this.recordSearchInput = document.getElementById('family-budget-record-search');
 
     this.recordModal = document.getElementById('family-budget-record-modal');
     this.recordModalTitle = document.getElementById('family-budget-record-modal-title');
@@ -132,6 +134,7 @@ export class FamilyBudgetApp {
     this.recordDeleteButton = document.getElementById('family-budget-record-delete');
     this.recordSaveAndNewButton = document.getElementById('family-budget-record-save-and-new');
     this.recordFilterType = 'all';
+    this.recordSearchTerm = '';
     this.recordFilterContainer = document.getElementById('family-budget-record-filters');
     this.recordFilterButtons = Array.from(document.querySelectorAll('[data-record-filter]'));
     this.recordFilterSummary = document.getElementById('family-budget-record-filter-summary');
@@ -269,19 +272,18 @@ export class FamilyBudgetApp {
     this.ownerSummaryList?.addEventListener('click', handleOwnerAction);
 
     this.recordFilterContainer?.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-record-filter]');
+      const button = event.target.closest('button[data-record-filter]');
       if (!button) {
         return;
       }
 
+      event.preventDefault();
+      event.stopPropagation();
       this.setRecordFilter(button.dataset.recordFilter || 'all');
     });
 
-    this.recordFilterButtons.forEach((button) => {
-      button?.addEventListener('click', (event) => {
-        event.stopPropagation();
-        this.setRecordFilter(button.dataset.recordFilter || 'all');
-      });
+    this.recordSearchInput?.addEventListener('input', () => {
+      this.setRecordSearchTerm(this.recordSearchInput.value);
     });
 
     this.newRecordButton?.addEventListener('click', () => {
@@ -407,6 +409,7 @@ export class FamilyBudgetApp {
     this.lastRecordOwnerId = '';
     this.lastRecordType = 'expense';
     this.recordFilterType = 'all';
+    this.recordSearchTerm = '';
     return this.state;
   }
 
@@ -809,6 +812,9 @@ export class FamilyBudgetApp {
     if (this.replicateTargetInput) {
       this.replicateTargetInput.value = this.state.replicateTargetMonthKey || shiftMonthKey(monthKey, 1);
     }
+    if (this.recordSearchInput && this.recordSearchInput.value !== this.recordSearchTerm) {
+      this.recordSearchInput.value = this.recordSearchTerm;
+    }
 
     this.renderStatus();
     this.renderFamilySummary(summary);
@@ -855,15 +861,23 @@ export class FamilyBudgetApp {
   getVisibleRecords(records = []) {
     const safeRecords = Array.isArray(records) ? records : [];
     const filterType = String(this.recordFilterType || 'all').trim();
-    if (filterType === 'income' || filterType === 'expense' || filterType === 'reserve') {
-      return safeRecords.filter((record) => record.type === filterType);
-    }
-    return safeRecords;
+    const ownerNamesById = Object.fromEntries((this.state.owners || []).map((owner) => [owner.ownerId, owner.name]));
+
+    return filterBudgetRecords(safeRecords, {
+      filterType,
+      searchTerm: this.recordSearchTerm,
+      ownerNamesById
+    });
   }
 
   setRecordFilter(filterType = 'all') {
     const normalized = String(filterType || 'all').trim();
     this.recordFilterType = normalized === 'income' || normalized === 'expense' || normalized === 'reserve' ? normalized : 'all';
+    this.render();
+  }
+
+  setRecordSearchTerm(searchTerm = '') {
+    this.recordSearchTerm = String(searchTerm || '').trim();
     this.render();
   }
 
@@ -1129,17 +1143,28 @@ export class FamilyBudgetApp {
 
     const visibleCount = Array.isArray(visibleRecords) ? visibleRecords.length : 0;
     const totalCount = counts.all;
+    const searchTerm = String(this.recordSearchTerm || '').trim();
     if (!totalCount) {
       this.recordFilterSummary.innerText = 'Ainda não há registros neste mês.';
       return;
     }
 
-    if (this.recordFilterType === 'all') {
+    const parts = [`Mostrando ${visibleCount} de ${totalCount} registro(s)`];
+    if (this.recordFilterType !== 'all') {
+      parts.push(`de ${this.getRecordFilterLabel(this.recordFilterType).toLowerCase()}`);
+    } else {
+      parts.push('neste mês');
+    }
+    if (searchTerm) {
+      parts.push(`para "${searchTerm}"`);
+    }
+
+    if (this.recordFilterType === 'all' && !searchTerm) {
       this.recordFilterSummary.innerText = `Mostrando ${visibleCount} registro(s) deste mês.`;
       return;
     }
 
-    this.recordFilterSummary.innerText = `Mostrando ${visibleCount} de ${totalCount} registros de ${this.getRecordFilterLabel(this.recordFilterType).toLowerCase()}.`;
+    this.recordFilterSummary.innerText = `${parts.join(' ')}.`;
   }
 
   renderRecordsList(records, ownerSummaries, allRecords = records) {
@@ -1153,8 +1178,10 @@ export class FamilyBudgetApp {
       if (this.recordEmptyState) {
         this.recordEmptyState.classList.remove('hidden');
         const filterLabel = this.getRecordFilterLabel(this.recordFilterType).toLowerCase();
+        const searchTerm = String(this.recordSearchTerm || '').trim();
+        const searchLabel = searchTerm ? ` para "${searchTerm}"` : '';
         this.recordEmptyState.innerText = Array.isArray(allRecords) && allRecords.length > 0
-          ? `Nenhum registro de ${filterLabel} neste mês. Tente outro filtro ou use os atalhos rápidos para lançar algo novo.`
+          ? `Nenhum registro${searchLabel} de ${filterLabel} neste mês. Tente outro filtro, ajuste a busca ou use os atalhos rápidos para lançar algo novo.`
           : 'Nenhum registro cadastrado ainda. Use "Novo registro" ou um atalho de dono para começar rapidinho.';
       }
       this.recordList.innerHTML = '';
@@ -1279,6 +1306,7 @@ export class FamilyBudgetApp {
       this.recordTypeSelect,
       this.recordOwnerSelect,
       this.recordNotesInput,
+      this.recordSearchInput,
       this.recordDeleteButton,
       this.recordSaveAndNewButton,
       this.recordCloseButton,
