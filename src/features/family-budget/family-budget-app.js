@@ -1290,6 +1290,7 @@ export class FamilyBudgetApp {
   }
 
   setBusy(isBusy) {
+    const previousBusy = Boolean(this.state.isBusy);
     this.state.isBusy = Boolean(isBusy);
     const controls = [
       this.installButton,
@@ -1337,6 +1338,10 @@ export class FamilyBudgetApp {
 
     if (this.recordSaveAndNewButton) {
       this.recordSaveAndNewButton.classList.toggle('hidden', Boolean(this.recordIdInput?.value || this.state.activeRecordId));
+    }
+
+    if (previousBusy !== this.state.isBusy) {
+      this.render();
     }
   }
 
